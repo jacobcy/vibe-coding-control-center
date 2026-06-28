@@ -59,6 +59,13 @@ if TYPE_CHECKING:
         determine_risk_level,
         generate_score_report,
     )
+    from vibe3.analysis.review_kernel import (
+        ReviewKernelConfigError,
+        ReviewKernelEntry,
+        ReviewKernelManifest,
+        classify_review_kernel,
+        load_review_kernel,
+    )
     from vibe3.analysis.serena_service import SerenaService
 
 # Lazy imports
@@ -84,6 +91,11 @@ _LAZY_IMPORTS = {
     "calculate_risk_score": "vibe3.analysis.pr_scoring",
     "determine_risk_level": "vibe3.analysis.pr_scoring",
     "generate_score_report": "vibe3.analysis.pr_scoring",
+    "ReviewKernelConfigError": "vibe3.analysis.review_kernel",
+    "ReviewKernelEntry": "vibe3.analysis.review_kernel",
+    "ReviewKernelManifest": "vibe3.analysis.review_kernel",
+    "classify_review_kernel": "vibe3.analysis.review_kernel",
+    "load_review_kernel": "vibe3.analysis.review_kernel",
     "as_list": "vibe3.analysis.inspect_output_adapter",
     "as_mapping": "vibe3.analysis.inspect_output_adapter",
     "changed_symbols": "vibe3.analysis.inspect_output_adapter",
@@ -136,6 +148,11 @@ __all__ = [
     "calculate_risk_score",
     "determine_risk_level",
     "generate_score_report",
+    "ReviewKernelConfigError",
+    "ReviewKernelEntry",
+    "ReviewKernelManifest",
+    "classify_review_kernel",
+    "load_review_kernel",
     # Output adapters
     "as_list",
     "as_mapping",

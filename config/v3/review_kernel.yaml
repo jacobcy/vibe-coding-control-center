@@ -1,0 +1,134 @@
+version: 1
+entries:
+  - path: src/vibe3/runtime/orchestra_instance.py
+    responsibilities: [process_lifecycle]
+    reason: Owns orchestra process lifecycle and instance identity
+    review_floor: repeated
+  - path: src/vibe3/runtime/heartbeat.py
+    responsibilities: [heartbeat_timer, event_ingestion]
+    reason: Drives reconciliation timing and event ingestion
+    review_floor: repeated
+  - path: src/vibe3/runtime/periodic_check_executor.py
+    responsibilities: [heartbeat_timer]
+    reason: Executes periodic reconciliation checks
+    review_floor: repeated
+  - path: src/vibe3/runtime/pool_exhaustion.py
+    responsibilities: [heartbeat_timer]
+    reason: Controls pool exhaustion behavior during heartbeat processing
+    review_floor: repeated
+  - path: src/vibe3/runtime/circuit_breaker.py
+    responsibilities: [concurrency_circuit_breaker]
+    reason: Owns runtime circuit breaker behavior
+    review_floor: repeated
+  - path: src/vibe3/runtime/protocols.py
+    responsibilities: [protocols]
+    reason: Defines runtime kernel protocols
+    review_floor: repeated
+  - path: src/vibe3/runtime/cleanup_executor.py
+    responsibilities: [cleanup]
+    reason: Owns runtime cleanup execution
+    review_floor: repeated
+  - path: src/vibe3/runtime/taxonomy.py
+    responsibilities: [taxonomy]
+    reason: Defines the strict Architecture Kernel taxonomy
+    review_floor: repeated
+  - path: src/vibe3/orchestra/queue_operations.py
+    responsibilities: [job_queue_lifecycle]
+    reason: Owns queue mutation operations
+    review_floor: repeated
+  - path: src/vibe3/orchestra/queue_entry.py
+    responsibilities: [job_queue_lifecycle]
+    reason: Defines queue entry lifecycle state
+    review_floor: repeated
+  - path: src/vibe3/orchestra/queue_persistence_service.py
+    responsibilities: [job_queue_lifecycle]
+    reason: Persists orchestra queue state
+    review_floor: repeated
+  - path: src/vibe3/orchestra/logging.py
+    responsibilities: [status_metadata]
+    reason: Emits orchestra status metadata
+    review_floor: repeated
+  - path: src/vibe3/orchestra/global_dispatch_coordinator.py
+    responsibilities: [dispatch_coordination]
+    reason: Coordinates global dispatch decisions
+    review_floor: repeated
+  - path: src/vibe3/orchestra/dispatch_coordinator_factory.py
+    responsibilities: [dispatch_coordination]
+    reason: Constructs the active dispatch coordinator
+    review_floor: repeated
+  - path: src/vibe3/orchestra/flow_dispatch.py
+    responsibilities: [dispatch_coordination]
+    reason: Dispatches work for eligible flows
+    review_floor: repeated
+  - path: src/vibe3/orchestra/failed_gate.py
+    responsibilities: [dispatch_coordination]
+    reason: Applies failed-gate dispatch behavior
+    review_floor: repeated
+  - path: src/vibe3/orchestra/issue_loader.py
+    responsibilities: [dispatch_coordination]
+    reason: Loads issue inputs for dispatch
+    review_floor: repeated
+  - path: src/vibe3/orchestra/remote_check.py
+    responsibilities: [dispatch_coordination]
+    reason: Collects remote evidence used by dispatch
+    review_floor: repeated
+  - path: src/vibe3/orchestra/protocols.py
+    responsibilities: [protocols]
+    reason: Defines orchestra kernel protocols
+    review_floor: repeated
+  - path: src/vibe3/orchestra/domain_types.py
+    responsibilities: [domain_types]
+    reason: Defines types crossing orchestra kernel boundaries
+    review_floor: repeated
+  - path: src/vibe3/cli.py
+    responsibilities: [cli_composition]
+    reason: Changes alter the public command surface and startup imports
+    review_floor: focused
+  - path: src/vibe3/config/loader.py
+    responsibilities: [runtime_configuration]
+    reason: Changes alter which repository, global, and environment values win
+    review_floor: focused
+  - path: src/vibe3/config/settings.py
+    responsibilities: [configuration_schema]
+    reason: Changes alter validation and defaults consumed across commands
+    review_floor: focused
+  - path: src/vibe3/models/flow.py
+    responsibilities: [flow_status_model]
+    reason: Changes alter persisted and rendered flow-state semantics
+    review_floor: repeated
+  - path: src/vibe3/clients/sqlite_base.py
+    responsibilities: [shared_store_connection]
+    reason: Changes affect every shared-state reader and writer
+    review_floor: repeated
+  - path: src/vibe3/clients/sqlite_schema.py
+    responsibilities: [shared_store_schema]
+    reason: Changes alter durable state layout and migrations
+    review_floor: repeated
+  - path: src/vibe3/clients/sqlite_flow_state_repo.py
+    responsibilities: [flow_state_persistence]
+    reason: Changes alter canonical flow and issue-link reads or writes
+    review_floor: repeated
+  - path: src/vibe3/services/flow/service.py
+    responsibilities: [flow_lifecycle_facade]
+    reason: Changes affect the service entry used across commands and roles
+    review_floor: focused
+  - path: src/vibe3/services/flow/status.py
+    responsibilities: [terminal_flow_transitions]
+    reason: Changes can break terminal-state closure across consumers
+    review_floor: repeated
+  - path: src/vibe3/services/flow/transition.py
+    responsibilities: [flow_transition_rules]
+    reason: Changes alter allowed lifecycle transitions and reactivation
+    review_floor: repeated
+  - path: src/vibe3/services/flow/write_mixin.py
+    responsibilities: [flow_state_mutation]
+    reason: Changes alter the shared write contract for flow metadata
+    review_floor: repeated
+  - path: src/vibe3/services/shared/status_query.py
+    responsibilities: [status_projection]
+    reason: Changes alter status shown by multiple public observation commands
+    review_floor: repeated
+  - path: src/vibe3/services/handoff/service.py
+    responsibilities: [handoff_write_contract]
+    reason: Changes alter canonical plan, run, and review handoff records
+    review_floor: focused

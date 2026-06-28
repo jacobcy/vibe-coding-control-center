@@ -33,6 +33,7 @@ import pytest
 # Import helper from test_taxonomy.py for extracting module-level imports
 # Re-using the canonical implementation to avoid duplication
 from tests.vibe3.test_modularity.test_taxonomy import _get_module_level_imports
+from vibe3.analysis.review_kernel import load_review_kernel
 from vibe3.runtime.taxonomy import (
     MODULE_CATEGORY_MAP,
     ModuleCategory,
@@ -43,54 +44,6 @@ _MIN_VIBE3_IMPORT_PARTS = 2
 
 # Core module set — explicit definition of runtime kernel packages
 CORE_MODULES: frozenset[str] = frozenset({"runtime", "orchestra"})
-
-# Core responsibilities — documented allowlist mapping responsibility
-# categories to the kernel submodules that own them
-CORE_RESPONSIBILITIES: dict[str, list[str]] = {
-    "process_lifecycle": [
-        "runtime.orchestra_instance",
-    ],
-    "heartbeat_timer": [
-        "runtime.heartbeat",
-        "runtime.periodic_check_executor",
-        "runtime.pool_exhaustion",
-    ],
-    "event_ingestion": [
-        "runtime.heartbeat",  # on_tick drives event ingestion
-    ],
-    "job_queue_lifecycle": [
-        "orchestra.queue_operations",
-        "orchestra.queue_entry",
-        "orchestra.queue_persistence_service",
-    ],
-    "concurrency_circuit_breaker": [
-        "runtime.circuit_breaker",
-    ],
-    "status_metadata": [
-        "orchestra.logging",
-    ],
-    "dispatch_coordination": [
-        "orchestra.global_dispatch_coordinator",
-        "orchestra.dispatch_coordinator_factory",
-        "orchestra.flow_dispatch",
-        "orchestra.failed_gate",
-        "orchestra.issue_loader",
-        "orchestra.remote_check",
-    ],
-    "protocols": [
-        "orchestra.protocols",
-        "runtime.protocols",
-    ],
-    "domain_types": [
-        "orchestra.domain_types",
-    ],
-    "cleanup": [
-        "runtime.cleanup_executor",
-    ],
-    "taxonomy": [
-        "runtime.taxonomy",
-    ],
-}
 
 # Top-level modules the core must not import from at module level.
 # Aligns with #2293 kernel startup boundary (FORBIDDEN list).
@@ -261,10 +214,8 @@ class TestCoreBudget:
         - Criterion 3: Test includes a concise responsibility allowlist
         - Criterion 4: Future pluginization work can rely on this boundary
         """
-        # Build a set of all modules covered by CORE_RESPONSIBILITIES
-        covered_modules: set[str] = set()
-        for modules in CORE_RESPONSIBILITIES.values():
-            covered_modules.update(modules)
+        manifest = load_review_kernel(Path("config/v3/review_kernel.yaml"))
+        covered_paths = {entry.path for entry in manifest.entries}
 
         # Check all .py files in runtime/ and orchestra/
         missing_modules: list[str] = []
@@ -277,20 +228,15 @@ class TestCoreBudget:
                 if py_file.name == "__init__.py":
                     continue
 
-                # Build module path (e.g., "runtime.heartbeat")
-                relative_path = py_file.relative_to("src/vibe3")
-                module_path = str(relative_path.with_suffix("")).replace("/", ".")
-
-                # Check if module is covered
-                if module_path not in covered_modules:
-                    missing_modules.append(module_path)
+                relative_path = py_file.as_posix()
+                if relative_path not in covered_paths:
+                    missing_modules.append(relative_path)
 
         # Fail if any module is missing responsibility assignment
         if missing_modules:
             missing_list = "\n".join(f"  - {m}" for m in missing_modules)
             pytest.fail(
                 f"Kernel modules must have documented responsibilities in "
-                f"CORE_RESPONSIBILITIES:\n{missing_list}\n\n"
-                f"Add each module to an appropriate responsibility category "
-                f"or create a new category if needed.",
+                f"config/v3/review_kernel.yaml:\n{missing_list}\n\n"
+                f"Add each exact file with responsibilities, reason, and review floor.",
             )
