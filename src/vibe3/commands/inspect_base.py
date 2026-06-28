@@ -1,25 +1,22 @@
-"""Inspect base command - 分支对比核心文件改动分析."""
+"""Git-backed branch observation for the inspect command group."""
+
+from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 import typer
 import yaml
-from loguru import logger
 
+from vibe3.analysis.review_observation import build_review_observation
 from vibe3.commands.common import enable_method_trace
-from vibe3.commands.inspect_base_helpers import (
-    build_json_output,
-    count_changed_lines_in_code_paths,
-    print_human_output,
-    validate_base_branch,
-)
+from vibe3.commands.inspect_base_helpers import render_review_observation
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 
 
 def register(app: typer.Typer) -> None:
-    """Register the base command on the given app."""
+    """Register the evidence-only base command."""
 
     @app.command()
     def base(
@@ -46,159 +43,42 @@ def register(app: typer.Typer) -> None:
             typer.Option("--trace", help="Enable call tracing (set VIBE3_TRACE=1)"),
         ] = False,
     ) -> None:
-        """Analyze core file changes between current branch and base branch.
-
-        Focus on critical paths and public API files only.
-        Shows impact scope, not detailed diffs.
-
-        Automatically detects uncommitted changes if no committed branch diff is found.
-
-        Examples:
-            vibe inspect base                # Compare current branch vs parent branch
-            vibe inspect base origin/develop # Compare current branch vs origin/develop
-            vibe inspect base main           # Compare current branch vs origin/main
-        """
-        from vibe3.clients import GitClient, GitHubClient
-        from vibe3.config import get_config
-        from vibe3.models import BranchSource, UncommittedSource
+        """Show exact Git changes and deterministic Kernel review evidence."""
+        from vibe3.clients import GitClient
+        from vibe3.services.flow import FlowService
         from vibe3.utils import get_current_branch
 
+        del quiet
         if trace:
             enable_method_trace()
 
         current_branch = get_current_branch()
-
-        # Get creation_source from flow state if available
-        from vibe3.services.flow import FlowService
-
-        flow_service = FlowService()
-        flow_state = flow_service.get_flow_status(current_branch)
+        flow_state = FlowService().get_flow_status(current_branch)
         creation_source = flow_state.creation_source if flow_state else None
-
         resolved = build_base_resolution_usecase().resolve_inspect_base(
             base_branch,
             current_branch=current_branch,
             creation_source=creation_source,
         )
-        resolved_base = resolved.base_branch
 
-        # Validate base branch exists
-        git_client = GitClient()
-        validate_base_branch(git_client, resolved_base)
-
-        log = logger.bind(
-            domain="inspect",
-            action="base_analysis",
-            current_branch=current_branch,
-            base_branch=resolved_base,
+        git = GitClient()
+        manifest_path = (
+            Path(git.get_worktree_root()) / "config" / "v3" / "review_kernel.yaml"
         )
-        log.info("Analyzing core file changes")
-
-        git = GitClient(github_client=GitHubClient())
-
-        # Collect both committed and uncommitted changes
-        source = BranchSource(branch=current_branch, base=resolved_base)
-        branch_files = list(git.get_changed_files(source))
-        uncommitted_source = UncommittedSource()
-        uncommitted_files = git.get_changed_files(uncommitted_source)
-        all_changed_files = list(branch_files)
-        for f in uncommitted_files:
-            if f not in all_changed_files:
-                all_changed_files.append(f)
-
-        # Count changed lines from both committed and working tree diffs.
-        changed_lines = count_changed_lines_in_code_paths(git, source)
-        if uncommitted_files:
-            changed_lines += count_changed_lines_in_code_paths(git, uncommitted_source)
-
-        # Track all files for scoring, but note which ones are deleted
-        # Deleted files should still participate in risk assessment
-        existing_files = [f for f in all_changed_files if Path(f).exists()]
-        deleted_files = [f for f in all_changed_files if not Path(f).exists()]
-
-        if deleted_files:
-            log.bind(
-                total_files=len(all_changed_files),
-                existing_files=len(existing_files),
-                deleted_files=len(deleted_files),
-            ).warning(
-                f"Found {len(deleted_files)} deleted files "
-                "- including in risk assessment"
-            )
-
-        config = get_config()
-        critical_paths = config.review_scope.critical_paths
-        public_api_paths = config.review_scope.public_api_paths
-
-        core_files: list[dict[str, Any]] = []
-        # Check all files (including deleted) for critical/public_api status
-        for file in all_changed_files:
-            is_critical = any(p in str(file) for p in critical_paths)
-            is_public_api = any(p in str(file) for p in public_api_paths)
-            if is_critical or is_public_api:
-                core_files.append(
-                    {
-                        "path": file,
-                        "critical_path": is_critical,
-                        "public_api": is_public_api,
-                        "deleted": not Path(file).exists(),
-                    }
-                )
-
-        branch_existing_files = [f for f in branch_files if Path(f).exists()]
-        uncommitted_existing_files = [f for f in uncommitted_files if Path(f).exists()]
+        observation = build_review_observation(
+            requested_base=base_branch,
+            resolved_base=resolved.base_branch,
+            git=git,
+            manifest_path=manifest_path,
+        )
 
         if json_out:
-            result = build_json_output(
-                git=git,
-                source=source,
-                current_branch=current_branch,
-                base_branch=resolved_base,
-                all_changed_files=all_changed_files,
-                existing_files=existing_files,
-                deleted_files=deleted_files,
-                core_files=core_files,
-                changed_lines=changed_lines,
-                source_file_sets=[
-                    (source, branch_existing_files),
-                    (uncommitted_source, uncommitted_existing_files),
-                ],
-            )
-            typer.echo(json.dumps(result, indent=2, default=str))
-            return
+            typer.echo(observation.model_dump_json(indent=2))
         elif yaml_out:
-            result = build_json_output(
-                git=git,
-                source=source,
-                current_branch=current_branch,
-                base_branch=resolved_base,
-                all_changed_files=all_changed_files,
-                existing_files=existing_files,
-                deleted_files=deleted_files,
-                core_files=core_files,
-                changed_lines=changed_lines,
-                source_file_sets=[
-                    (source, branch_existing_files),
-                    (uncommitted_source, uncommitted_existing_files),
-                ],
-            )
-            # Convert to JSON-serializable dict first (handles enums, etc.)
-            clean_result = json.loads(json.dumps(result, default=str))
-            typer.echo(
-                yaml.dump(clean_result, default_flow_style=False, allow_unicode=True)
-            )
-            return
+            payload = json.loads(observation.model_dump_json())
+            typer.echo(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True))
+        else:
+            typer.echo(render_review_observation(observation))
 
-        # Human-readable output
-        print_human_output(
-            current_branch=current_branch,
-            base_branch=resolved_base,
-            all_changed_files=all_changed_files,
-            existing_files=existing_files,
-            deleted_files=deleted_files,
-            core_files=core_files,
-        )
-
-        from vibe3.commands.inspect_helpers import suggest_next_step
-
-        suggest_next_step("inspect_base", quiet)
+        if observation.status == "error":
+            raise typer.Exit(1)

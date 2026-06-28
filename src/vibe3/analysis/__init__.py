@@ -66,6 +66,7 @@ if TYPE_CHECKING:
         classify_review_kernel,
         load_review_kernel,
     )
+    from vibe3.analysis.review_observation import build_review_observation
     from vibe3.analysis.serena_service import SerenaService
 
 # Lazy imports
@@ -96,6 +97,7 @@ _LAZY_IMPORTS = {
     "ReviewKernelManifest": "vibe3.analysis.review_kernel",
     "classify_review_kernel": "vibe3.analysis.review_kernel",
     "load_review_kernel": "vibe3.analysis.review_kernel",
+    "build_review_observation": "vibe3.analysis.review_observation",
     "as_list": "vibe3.analysis.inspect_output_adapter",
     "as_mapping": "vibe3.analysis.inspect_output_adapter",
     "changed_symbols": "vibe3.analysis.inspect_output_adapter",
@@ -153,6 +155,7 @@ __all__ = [
     "ReviewKernelManifest",
     "classify_review_kernel",
     "load_review_kernel",
+    "build_review_observation",
     # Output adapters
     "as_list",
     "as_mapping",

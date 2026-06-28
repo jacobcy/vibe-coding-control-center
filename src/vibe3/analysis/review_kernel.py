@@ -74,7 +74,9 @@ def _validate_entry_path(entry: ReviewKernelEntry, repo_root: Path) -> None:
         raise ReviewKernelConfigError(f"Review Kernel path does not exist: {raw_path}")
 
 
-def load_review_kernel(path: Path) -> ReviewKernelManifest:
+def load_review_kernel(
+    path: Path, *, repo_root: Path | None = None
+) -> ReviewKernelManifest:
     """Load and validate an exact-file Review Kernel manifest."""
 
     try:
@@ -83,7 +85,9 @@ def load_review_kernel(path: Path) -> ReviewKernelManifest:
     except (OSError, yaml.YAMLError, ValidationError) as exc:
         raise ReviewKernelConfigError(f"Invalid Review Kernel manifest: {exc}") from exc
 
-    repo_root = _repo_root_for_manifest(path)
+    resolved_repo_root = (
+        repo_root.resolve() if repo_root is not None else _repo_root_for_manifest(path)
+    )
     seen: set[str] = set()
     for entry in manifest.entries:
         if entry.path in seen:
@@ -91,7 +95,7 @@ def load_review_kernel(path: Path) -> ReviewKernelManifest:
                 f"Review Kernel contains duplicate path: {entry.path}"
             )
         seen.add(entry.path)
-        _validate_entry_path(entry, repo_root)
+        _validate_entry_path(entry, resolved_repo_root)
     return manifest
 
 
