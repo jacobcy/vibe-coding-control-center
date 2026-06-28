@@ -365,6 +365,8 @@ class GlobalDispatchCoordinator:
         """
         # Sleep mode: once the FSM is sleeping (sustained inactivity),
         # throttle collection to scheduled refresh ticks to save API calls.
+        # Like the paused gate below, this intentionally precedes the
+        # capacity check (capacity does not gate sleep/paused decisions).
         if self._dispatch_lifecycle.is_sleeping:
             return self._dispatch_lifecycle.should_collect(self._current_tick_id)
 
