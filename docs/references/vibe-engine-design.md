@@ -159,7 +159,6 @@ graph TD
 ### 3.3 无痛护航 (Pain-Free Tooling)
 
 在这套机制下：
-- 用户从来不需要主动命令 Agent 运行 `find_referencing_symbols`（这是 Execution Gate 的潜规则）。
 - 用户不需要关心如何把一个逻辑变成 OpenSpec，他们只需要正常问答，Agent 代为沉淀文件。
 - Shell 命令和 Agent 对话合流：你在 Shell 敲击 `vibe3 review` 实际上就是调用 `vibe3 review --local` 并把输出和 metrics 丢回 Shell。
 
