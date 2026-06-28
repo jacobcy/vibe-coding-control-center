@@ -292,9 +292,10 @@ class DispatchQueueMaintenanceService:
            issue_numbers, so genuinely *new* work stays actionable
            (waiting_state=None) while duplicates of already-waiting entries do
            not.
-        3. After the merge, check whether any entry in the merged queue is
-           still actionable (waiting_state is None *and* collected_state !=
-           'blocked').  If none are, the pool is truly exhausted — return
+        3. After the merge, check whether any entry in the merged queue
+           survives dispatch preflight (`_has_preflight_passing`: loads the
+           issue, runs should_skip + preflight, and finds an active role).
+           If none do, the pool is truly exhausted — return
            dispatch_paused=True.
 
            Exception: when this tick just re-qualified a blocked entry, the
@@ -322,8 +323,8 @@ class DispatchQueueMaintenanceService:
             # Merge preserves old entries with waiting_state for same issue_numbers,
             # so if all fresh entries are duplicates of existing waiting entries
             # or fail preflight, the merged queue should remain paused.
-            has_dispatchable = self._has_preflight_passing(new_frozen_queue)
-            if not has_dispatchable and not unpaused_for_qualifiable_blocked:
+            has_preflight_passing = self._has_preflight_passing(new_frozen_queue)
+            if not has_preflight_passing and not unpaused_for_qualifiable_blocked:
                 self._emit_event(
                     "dispatcher",
                     "GlobalDispatchCoordinator: dispatch paused "
@@ -348,8 +349,8 @@ class DispatchQueueMaintenanceService:
             and queue_refreshed
             and not unpaused_for_qualifiable_blocked
         ):
-            has_dispatchable = self._has_preflight_passing(frozen_queue)
-            if not has_dispatchable and dispatch_paused is False:
+            has_preflight_passing = self._has_preflight_passing(frozen_queue)
+            if not has_preflight_passing and dispatch_paused is False:
                 self._emit_event(
                     "dispatcher",
                     "GlobalDispatchCoordinator: dispatch paused "
