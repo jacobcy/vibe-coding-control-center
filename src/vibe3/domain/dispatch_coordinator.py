@@ -25,7 +25,10 @@ from vibe3.clients import GitHubClient
 from vibe3.config import get_manager_usernames
 from vibe3.domain import publish
 from vibe3.domain.dispatch_health import DispatchHealthService
-from vibe3.domain.dispatch_lifecycle import DispatchLifecycle
+from vibe3.domain.dispatch_lifecycle import (
+    DispatchLifecycle,
+    DispatchLifecycleConfig,
+)
 from vibe3.domain.dispatch_preflight import (
     DispatchPreflightDecision,
     DispatchPreflightService,
@@ -152,7 +155,15 @@ class GlobalDispatchCoordinator:
             self._label_dispatcher = label_dispatcher
 
         self._dispatch_paused = False
-        self._dispatch_lifecycle = DispatchLifecycle()
+        # FSM refresh_interval shares the single source of truth with
+        # scheduled_refresh (QueueRefreshConfig.interval_ticks) so the two
+        # periodic-collect triggers cannot drift. idle_threshold stays at the
+        # FSM default (it measures activity, unrelated to queue_refresh).
+        self._dispatch_lifecycle = DispatchLifecycle(
+            DispatchLifecycleConfig(
+                refresh_interval_ticks=config.queue_refresh.interval_ticks
+            )
+        )
         self._supervisor_label = config.supervisor_handoff.issue_label
         self._queue_filter = queue_filter
         self._remote_check_runner = remote_check_runner
@@ -182,10 +193,10 @@ class GlobalDispatchCoordinator:
             load_issue=issue_loader,
             check_service=lambda: self._check_service,
             supervisor_label=config.supervisor_handoff.issue_label,
-            has_actionable=lambda: self._has_actionable_entries(),
-            has_pending_blocked=lambda: self._has_pending_blocked_entries(),
-            has_qualifiable_blocked=lambda: self._has_qualifiable_blocked_entries(),
-            has_dispatchable_entries=lambda entries: self._has_dispatchable_entries(
+            has_unblocked_candidate=lambda: self._has_unblocked_candidate_entries(),
+            has_blocked_candidate=lambda: self._has_blocked_candidate_entries(),
+            has_blocked_qualifiable=lambda: self._has_blocked_qualifiable_entries(),
+            has_preflight_passing=lambda entries: self._has_preflight_passing_entries(
                 entries
             ),
             merge_queue_fn=lambda existing, fresh: self._merge_queue(existing, fresh),
@@ -282,8 +293,14 @@ class GlobalDispatchCoordinator:
                 merged.append(entry)
         return merged
 
-    def _has_actionable_entries(self) -> bool:
-        """Whether queue still has dispatchable active entries."""
+    def _has_unblocked_candidate_entries(self) -> bool:
+        """Field-level check (no API call): queue has unblocked, non-waiting entries.
+
+        Cheaper than _has_preflight_passing_entries: inspects only QueueEntry
+        fields (waiting_state is None and collected_state != "blocked"). Used
+        for high-frequency collect decisions where a full preflight pass would
+        be too expensive.
+        """
         return bool(
             self._frozen_queue
             and any(
@@ -292,8 +309,8 @@ class GlobalDispatchCoordinator:
             )
         )
 
-    def _has_pending_blocked_entries(self) -> bool:
-        """Whether queue still has blocked entries that have not been re-qualified."""
+    def _has_blocked_candidate_entries(self) -> bool:
+        """Field-level check (no API call): queue has pending blocked entries."""
         return bool(
             self._frozen_queue
             and any(
@@ -302,8 +319,8 @@ class GlobalDispatchCoordinator:
             )
         )
 
-    def _has_qualifiable_blocked_entries(self) -> bool:
-        """Whether any blocked queue entry would pass the qualify gate right now.
+    def _has_blocked_qualifiable_entries(self) -> bool:
+        """Verified check (runs qualify_gate): a blocked entry would unblock right now.
 
         Short-circuits on first qualifiable entry. Only called when already in
         paused state, so the per-entry qualify calls are cheaper than a full
@@ -320,12 +337,17 @@ class GlobalDispatchCoordinator:
                     return True
         return False
 
-    def _has_dispatchable_entries(self, entries: list[QueueEntry]) -> bool:
-        """Whether entries contain work that can pass dispatch preflight.
+    def _has_preflight_passing_entries(self, entries: list[QueueEntry]) -> bool:
+        """Verified check (loads issue + runs preflight): entries survive dispatch.
 
-        Excludes aborted flows to prevent pool exhaustion detection interference.
-        Aborted flows are allowed through health checks for recovery opportunities,
-        but should not count as "dispatchable" for pool exhaustion purposes.
+        The deep counterpart to _has_unblocked_candidate_entries: loads each
+        issue, runs should_skip + dispatch preflight, and confirms a role
+        exists for the target state. Used for low-frequency paused-state
+        decisions where accuracy matters more than cost.
+
+        Excludes aborted flows to prevent pool exhaustion detection interference:
+        aborted flows are allowed through health checks for recovery opportunities,
+        but should not count as dispatchable for pool exhaustion purposes.
         """
         for entry in entries:
             if entry.waiting_state is not None or entry.collected_state == "blocked":
@@ -363,16 +385,20 @@ class GlobalDispatchCoordinator:
         exhausted_refresh from triggering collection, which causes the
         exhausted counter to reset — the server never auto-stops.
         """
-        # Sleep mode: once the FSM is sleeping (sustained inactivity),
-        # throttle collection to scheduled refresh ticks to save API calls.
-        # Like the paused gate below, this intentionally precedes the
-        # capacity check (capacity does not gate sleep/paused decisions).
-        if self._dispatch_lifecycle.is_sleeping:
-            return self._dispatch_lifecycle.should_collect(self._current_tick_id)
-
-        # If already paused, always collect to maintain paused state verification
+        # Paused is the stronger signal (content-based exhaustion detected
+        # by exhausted_refresh/paused_blocked_check) and must always trigger
+        # collection to keep that verification current. It precedes the sleep
+        # gate so the FSM's activity-based throttle can never mask a paused
+        # state that needs per-tick re-verification.
         if self._dispatch_paused:
             return True
+
+        # Sleep mode: once the FSM is sleeping (sustained inactivity),
+        # throttle collection to scheduled refresh ticks to save API calls.
+        # This intentionally precedes the capacity check (capacity does not
+        # gate sleep/paused decisions).
+        if self._dispatch_lifecycle.is_sleeping:
+            return self._dispatch_lifecycle.should_collect(self._current_tick_id)
 
         status = self._capacity.get_capacity_status("manager")
         available_slots = status["remaining"]
@@ -383,7 +409,7 @@ class GlobalDispatchCoordinator:
         if dispatched_count >= max_intents:
             return False
 
-        return not self._has_actionable_entries()
+        return not self._has_unblocked_candidate_entries()
 
     def _dispatch_loop(self, tick_id: int = 0) -> int:
         """Run dispatch loop against frozen queue.
@@ -625,8 +651,10 @@ class GlobalDispatchCoordinator:
         """
         return self._dispatch_paused
 
-    # Shim methods: delegate to DispatchQueueMaintenanceService for
-    # backward compatibility with existing tests that call these directly.
+    # Queue-maintenance helpers: thin wrappers over DispatchQueueMaintenanceService
+    # that re-bind the service's issue loader to the coordinator's current loader
+    # before delegating. Called from coordinate() (Steps 1/2/2.5); also invoked
+    # directly by tests.
 
     def _queue_startup_restore(self) -> None:
         self._queue_maintenance._load_issue = self._load_issue  # type: ignore[union-attr]

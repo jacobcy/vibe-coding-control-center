@@ -153,8 +153,8 @@ class TestQueueScheduledRefresh:
             return [QueueEntry(issue_number=2, collected_state="handoff")]
 
         coordinator._collect_frozen_queue = mock_collect
-        coordinator._has_dispatchable_entries = lambda _entries: False
-        coordinator._has_actionable_entries = MagicMock(return_value=False)
+        coordinator._has_preflight_passing_entries = lambda _entries: False
+        coordinator._has_unblocked_candidate_entries = MagicMock(return_value=False)
         await coordinator.coordinate(tick_id=10)
         assert coordinator.is_dispatch_paused() is True
 
@@ -191,10 +191,10 @@ class TestQueueScheduledRefresh:
         # fails during exhausted_refresh re-verification (entry popped by
         # _dispatch_loop since _load_issue returns None by default).
         weak_check_results = [True, False]
-        coordinator._has_dispatchable_entries = lambda _entries: (
+        coordinator._has_preflight_passing_entries = lambda _entries: (
             weak_check_results.pop(0)
         )
-        coordinator._has_actionable_entries = MagicMock(return_value=False)
+        coordinator._has_unblocked_candidate_entries = MagicMock(return_value=False)
 
         await coordinator.coordinate(tick_id=10)
 
@@ -301,7 +301,7 @@ class TestQueueExhaustedRefresh:
             return [QueueEntry(issue_number=2, collected_state="handoff")]
 
         coordinator._collect_frozen_queue = mock_collect
-        coordinator._has_dispatchable_entries = lambda _entries: False
+        coordinator._has_preflight_passing_entries = lambda _entries: False
 
         await coordinator.coordinate(tick_id=6)
 
@@ -335,10 +335,10 @@ class TestQueueExhaustedRefresh:
         coordinator._collect_frozen_queue = mock_collect
         # Weak check returns False so scheduled_refresh keeps paused=True,
         # letting paused_blocked_check produce unpaused_for_qualifiable_blocked.
-        coordinator._has_dispatchable_entries = lambda _entries: False
-        coordinator._has_actionable_entries = MagicMock(return_value=False)
-        coordinator._has_pending_blocked_entries = MagicMock(return_value=True)
-        coordinator._has_qualifiable_blocked_entries = MagicMock(return_value=True)
+        coordinator._has_preflight_passing_entries = lambda _entries: False
+        coordinator._has_unblocked_candidate_entries = MagicMock(return_value=False)
+        coordinator._has_blocked_candidate_entries = MagicMock(return_value=True)
+        coordinator._has_blocked_qualifiable_entries = MagicMock(return_value=True)
 
         await coordinator.coordinate(tick_id=10)
 
@@ -368,9 +368,9 @@ class TestQueuePausedBlockedCheck:
 
         coordinator._dispatch_paused = True
 
-        coordinator._has_actionable_entries = MagicMock(return_value=False)
-        coordinator._has_pending_blocked_entries = MagicMock(return_value=True)
-        coordinator._has_qualifiable_blocked_entries = MagicMock(return_value=False)
+        coordinator._has_unblocked_candidate_entries = MagicMock(return_value=False)
+        coordinator._has_blocked_candidate_entries = MagicMock(return_value=True)
+        coordinator._has_blocked_qualifiable_entries = MagicMock(return_value=False)
 
         await coordinator.coordinate()
 
@@ -395,9 +395,9 @@ class TestQueuePausedBlockedCheck:
 
         coordinator._dispatch_paused = True
 
-        coordinator._has_actionable_entries = MagicMock(return_value=False)
-        coordinator._has_pending_blocked_entries = MagicMock(return_value=True)
-        coordinator._has_qualifiable_blocked_entries = MagicMock(return_value=True)
+        coordinator._has_unblocked_candidate_entries = MagicMock(return_value=False)
+        coordinator._has_blocked_candidate_entries = MagicMock(return_value=True)
+        coordinator._has_blocked_qualifiable_entries = MagicMock(return_value=True)
 
         await coordinator.coordinate()
 
@@ -472,9 +472,9 @@ class TestTriggerLogging:
             QueueEntry(issue_number=1, collected_state="blocked")
         ]
 
-        coordinator._has_actionable_entries = lambda: False
-        coordinator._has_pending_blocked_entries = lambda: True
-        coordinator._has_qualifiable_blocked_entries = lambda: False
+        coordinator._has_unblocked_candidate_entries = lambda: False
+        coordinator._has_blocked_candidate_entries = lambda: True
+        coordinator._has_blocked_qualifiable_entries = lambda: False
 
         await coordinator.coordinate(tick_id=0)
 

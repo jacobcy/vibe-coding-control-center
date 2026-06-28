@@ -1,11 +1,22 @@
 """Dispatch lifecycle FSM for queue sleep/wake cycling.
 
 Two-state finite state machine (ACTIVE / SLEEPING) driven by a single
-idle_ticks counter. Replaces the dual-counter pool_exhaustion logic whose
-two counters could diverge (issue #3220, PR #3209 root cause C1).
+idle_ticks counter (activity-based: consecutive ticks with
+dispatched_count == 0).
 
-Phase 1: standalone module, not yet wired into HeartbeatServer or
-GlobalDispatchCoordinator. Wiring lands in later phases.
+Role in the dispatch architecture (issues #3220, #3233):
+- This FSM throttles *collection frequency* when the queue is idle
+  (SLEEPING -> collect on scheduled refresh ticks only), saving GitHub
+  API calls. It is wired into GlobalDispatchCoordinator.
+- It is intentionally distinct from the structural pause
+  (``_dispatch_paused``, content-based: "no dispatchable entry after
+  collect+merge") and from ``pool_exhaustion`` (which stops the server
+  after sustained structural pause). The three mechanisms measure
+  different things and coexist by design.
+
+The single-counter design replaces the dual-counter pool_exhaustion
+divergence bug (issue #3220 C1 root cause) for the collection-throttling
+concern.
 """
 
 from __future__ import annotations

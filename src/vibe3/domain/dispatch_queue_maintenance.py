@@ -48,10 +48,10 @@ class DispatchQueueMaintenanceService:
         load_issue: Callable[[int], IssueInfo | None],
         check_service: Callable[[], CheckServiceProtocol],
         supervisor_label: str,
-        has_actionable: Callable[[], bool],
-        has_pending_blocked: Callable[[], bool],
-        has_qualifiable_blocked: Callable[[], bool],
-        has_dispatchable_entries: Callable[[list[QueueEntry]], bool],
+        has_unblocked_candidate: Callable[[], bool],
+        has_blocked_candidate: Callable[[], bool],
+        has_blocked_qualifiable: Callable[[], bool],
+        has_preflight_passing: Callable[[list[QueueEntry]], bool],
         merge_queue_fn: Callable[
             [list[QueueEntry], list[QueueEntry]], list[QueueEntry]
         ],
@@ -64,10 +64,10 @@ class DispatchQueueMaintenanceService:
         self._load_issue = load_issue
         self._check_service_callable = check_service
         self._supervisor_label = supervisor_label
-        self._has_actionable = has_actionable
-        self._has_pending_blocked = has_pending_blocked
-        self._has_qualifiable_blocked = has_qualifiable_blocked
-        self._has_dispatchable_entries = has_dispatchable_entries
+        self._has_unblocked_candidate = has_unblocked_candidate
+        self._has_blocked_candidate = has_blocked_candidate
+        self._has_blocked_qualifiable = has_blocked_qualifiable
+        self._has_preflight_passing = has_preflight_passing
         self._merge_queue_fn = merge_queue_fn
         self._should_collect_fn = should_collect_fn
         self._collect_frozen_queue_fn = collect_frozen_queue_fn
@@ -245,7 +245,7 @@ class DispatchQueueMaintenanceService:
             # then check dispatchable entries using the same logic
             # as exhausted_refresh (commit aff68e917).
             merged = self._merge_queue_fn(frozen_queue or [], fresh)
-            new_paused = not self._has_dispatchable_entries(merged)
+            new_paused = not self._has_preflight_passing(merged)
             return True, merged, new_paused
         return False, frozen_queue, dispatch_paused
 
@@ -266,10 +266,10 @@ class DispatchQueueMaintenanceService:
             "Checking paused state and blocked entries"
         )
         if dispatch_paused:
-            if self._has_actionable():
+            if self._has_unblocked_candidate():
                 return False, False, False
-            if self._has_pending_blocked():
-                if self._has_qualifiable_blocked():
+            if self._has_blocked_candidate():
+                if self._has_blocked_qualifiable():
                     return False, False, True
                 return True, True, False
         return dispatch_paused, False, False
@@ -322,7 +322,7 @@ class DispatchQueueMaintenanceService:
             # Merge preserves old entries with waiting_state for same issue_numbers,
             # so if all fresh entries are duplicates of existing waiting entries
             # or fail preflight, the merged queue should remain paused.
-            has_dispatchable = self._has_dispatchable_entries(new_frozen_queue)
+            has_dispatchable = self._has_preflight_passing(new_frozen_queue)
             if not has_dispatchable and not unpaused_for_qualifiable_blocked:
                 self._emit_event(
                     "dispatcher",
@@ -334,9 +334,9 @@ class DispatchQueueMaintenanceService:
 
         # When collection was skipped (queue already refreshed this tick),
         # still re-verify the paused state.  scheduled_refresh uses
-        # _has_dispatchable_entries, a weaker check than the full dispatch
+        # _has_preflight_passing, a weaker check than the full dispatch
         # preflight run by _dispatch_loop, which is why we re-verify here:
-        # an entry that passes _has_dispatchable_entries may still fail
+        # an entry that passes _has_preflight_passing may still fail
         # dispatch preflight and be removed from the queue.  If nothing was
         # dispatched and the queue now has no truly dispatchable entries, the
         # pool is exhausted.  The unpaused_for_qualifiable_blocked guard
@@ -348,7 +348,7 @@ class DispatchQueueMaintenanceService:
             and queue_refreshed
             and not unpaused_for_qualifiable_blocked
         ):
-            has_dispatchable = self._has_dispatchable_entries(frozen_queue)
+            has_dispatchable = self._has_preflight_passing(frozen_queue)
             if not has_dispatchable and dispatch_paused is False:
                 self._emit_event(
                     "dispatcher",
@@ -401,13 +401,13 @@ class DispatchQueueMaintenanceService:
             return True, frozen_queue, dispatch_paused
 
         # Check if resort found any actionable entries
-        has_actionable = any(
+        has_unblocked_candidate = any(
             entry.waiting_state is None and entry.collected_state != "blocked"
             for entry in result
         )
 
         # If no actionable entries found, fall back to full collection
-        if not has_actionable:
+        if not has_unblocked_candidate:
             logger.bind(
                 domain="global_dispatch",
                 trigger="queue_dirty_signal",
@@ -433,12 +433,12 @@ class DispatchQueueMaintenanceService:
                 return True, result, dispatch_paused
 
             # Check again if full collection found actionable entries
-            has_actionable_after = any(
+            has_unblocked_candidate_after = any(
                 entry.waiting_state is None and entry.collected_state != "blocked"
                 for entry in result
             )
 
-            if not has_actionable_after:
+            if not has_unblocked_candidate_after:
                 self._emit_event(
                     "dispatcher",
                     "GlobalDispatchCoordinator: dispatch paused "

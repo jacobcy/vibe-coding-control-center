@@ -88,6 +88,7 @@ async def test_collect_frozen_queue_executor_shutdown_returns_empty():
 
     # Create mock services
     mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.queue_refresh = MagicMock()
     mock_config.max_concurrent_flows = 1
     mock_config.supervisor_handoff = MagicMock()
     mock_config.supervisor_handoff.issue_label = "supervisor"
@@ -141,6 +142,7 @@ async def test_collect_frozen_queue_re_raises_other_runtime_error():
 
     # Create mock services
     mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.queue_refresh = MagicMock()
     mock_config.max_concurrent_flows = 1
     mock_config.supervisor_handoff = MagicMock()
     mock_config.supervisor_handoff.issue_label = "supervisor"
@@ -192,6 +194,7 @@ async def test_collect_frozen_queue_cancelled_error_returns_empty():
 
     # Create mock services
     mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.queue_refresh = MagicMock()
     mock_config.max_concurrent_flows = 1
     mock_config.supervisor_handoff = MagicMock()
     mock_config.supervisor_handoff.issue_label = "supervisor"
@@ -243,6 +246,7 @@ async def test_collect_frozen_queue_unexpected_exception_returns_empty():
 
     # Create mock services
     mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.queue_refresh = MagicMock()
     mock_config.max_concurrent_flows = 1
     mock_config.supervisor_handoff = MagicMock()
     mock_config.supervisor_handoff.issue_label = "supervisor"
@@ -339,7 +343,7 @@ async def test_coordinate_consumes_queue_dirty_signal():
     coordinator._queue_maintenance.consume_queue_dirty_signal.assert_called_once()
 
 
-def test_has_dispatchable_entries_excludes_aborted_flows():
+def test_has_preflight_passing_entries_excludes_aborted_flows():
     """Verify aborted flows are excluded from dispatchable count.
 
     This prevents pool exhaustion detection interference when aborted
@@ -353,6 +357,7 @@ def test_has_dispatchable_entries_excludes_aborted_flows():
 
     # Create mock services
     mock_config = MagicMock(spec=OrchestraConfig)
+    mock_config.queue_refresh = MagicMock()
     mock_config.max_concurrent_flows = 1
     mock_config.supervisor_handoff = MagicMock()
     mock_config.supervisor_handoff.issue_label = "supervisor"
@@ -410,7 +415,7 @@ def test_has_dispatchable_entries_excludes_aborted_flows():
     entry = QueueEntry(issue_number=123, collected_state="ready", waiting_state=None)
 
     # Test: Should return False for aborted flow (excluded from dispatchable count)
-    result = coordinator._has_dispatchable_entries([entry])
+    result = coordinator._has_preflight_passing_entries([entry])
     assert result is False, "Aborted flow should not count as dispatchable"
 
 
