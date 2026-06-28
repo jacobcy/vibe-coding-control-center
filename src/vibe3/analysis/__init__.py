@@ -59,6 +59,7 @@ if TYPE_CHECKING:
         determine_risk_level,
         generate_score_report,
     )
+    from vibe3.analysis.python_file_inspector import inspect_python_file
     from vibe3.analysis.review_kernel import (
         ReviewKernelConfigError,
         ReviewKernelEntry,
@@ -92,6 +93,7 @@ _LAZY_IMPORTS = {
     "calculate_risk_score": "vibe3.analysis.pr_scoring",
     "determine_risk_level": "vibe3.analysis.pr_scoring",
     "generate_score_report": "vibe3.analysis.pr_scoring",
+    "inspect_python_file": "vibe3.analysis.python_file_inspector",
     "ReviewKernelConfigError": "vibe3.analysis.review_kernel",
     "ReviewKernelEntry": "vibe3.analysis.review_kernel",
     "ReviewKernelManifest": "vibe3.analysis.review_kernel",
@@ -150,6 +152,7 @@ __all__ = [
     "calculate_risk_score",
     "determine_risk_level",
     "generate_score_report",
+    "inspect_python_file",
     "ReviewKernelConfigError",
     "ReviewKernelEntry",
     "ReviewKernelManifest",

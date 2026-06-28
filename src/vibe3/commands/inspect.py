@@ -10,8 +10,7 @@ import yaml
 from vibe3.analysis import (
     SerenaService,
     command_analyzer,
-    dag_service,
-    structure_service,
+    inspect_python_file,
 )
 from vibe3.commands.common import enable_method_trace
 from vibe3.commands.inspect_base import register as register_base
@@ -111,7 +110,7 @@ register_change(app)
 
 @app.command(name="files")
 def files_(
-    file: Annotated[str, typer.Argument(help="File to analyze")] = "",
+    file: Annotated[str, typer.Argument(help="Single Python file to inspect")],
     json_out: _JSON_OPT = False,
     yaml_out: Annotated[bool, typer.Option("--yaml", help="Output as YAML")] = False,
     quiet: Annotated[
@@ -119,77 +118,47 @@ def files_(
     ] = False,
     trace: _TRACE_OPT = False,
 ) -> None:
-    """Analyze file structure (functions, LOC, dependencies).
+    """Show syntax evidence for a single Python file.
 
     Examples:
-        vibe3 inspect files src/vibe3/services/flow_service.py
-        vibe3 inspect files                    # Analyze all Python files
+        vibe3 inspect files src/vibe3/commands/inspect_base.py
     """
+    from vibe3.clients import GitClient
+
     if trace:
         enable_method_trace()
+    del quiet
+    git = GitClient()
+    repo_root = Path(git.get_worktree_root())
+    input_path = Path(file)
+    if not input_path.is_absolute():
+        input_path = repo_root / input_path
+    result = inspect_python_file(input_path, repo_root=repo_root)
 
-    if file:
-        result = structure_service.analyze_file(file)
-
-        if file.endswith(".py"):
-            result.imports = dag_service._extract_imports(file)
-
-            module_graph = dag_service.build_module_graph()
-            current_module = dag_service._file_to_module(file)
-
-            imported_by: list[str] = []
-            for module, node in module_graph.items():
-                if current_module in node.imports:
-                    imported_by.append(module)
-            result.imported_by = sorted(imported_by)
-
-        if json_out:
-            typer.echo(json.dumps(result.model_dump(), indent=2))
-        elif yaml_out:
-            typer.echo(
-                yaml.dump(
-                    result.model_dump(), default_flow_style=False, allow_unicode=True
-                )
-            )
-        else:
-            typer.echo(f"=== File: {file} ===")
-            typer.echo(f"  Language  : {result.language}")
-            typer.echo(f"  Total LOC : {result.total_loc}")
-            typer.echo(f"  Functions : {result.function_count}")
-            for fn in result.functions:
-                typer.echo(f"    L{fn.line:4d}  {fn.name}  ({fn.loc} lines)")
-
-            if result.imports:
-                typer.echo(f"\n  Imports ({len(result.imports)}):")
-                for imp in result.imports:
-                    typer.echo(f"    - {imp}")
-
-            if result.imported_by:
-                typer.echo(f"\n  Imported by ({len(result.imported_by)}):")
-                for imp_by in result.imported_by:
-                    typer.echo(f"    - {imp_by}")
+    if json_out:
+        typer.echo(result.model_dump_json(indent=2))
+    elif yaml_out:
+        payload = json.loads(result.model_dump_json())
+        typer.echo(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True))
     else:
-        results = [
-            file_struct.model_dump()
-            for file_struct in structure_service.collect_python_file_structures()
-        ]
-
-        if json_out:
-            typer.echo(json.dumps(results, indent=2))
-        elif yaml_out:
-            typer.echo(yaml.dump(results, default_flow_style=False, allow_unicode=True))
-        else:
-            typer.echo("=== Python Files Summary ===")
-            for r in results:
+        typer.echo(f"Observation status: {result.status}")
+        if result.file is not None and result.metrics is not None:
+            typer.echo(f"=== File: {result.file.path} ===")
+            typer.echo(f"  Content SHA256: {result.file.content_sha256}")
+            typer.echo(f"  Total lines: {result.metrics.total_lines}")
+            typer.echo(f"  Declarations: {len(result.declarations)}")
+            for declaration in result.declarations:
                 typer.echo(
-                    f"  {r['path']}: {r['total_loc']} LOC, "
-                    f"{r['function_count']} functions"
+                    f"    L{declaration.range.start_line}-"
+                    f"{declaration.range.end_line} "
+                    f"{declaration.kind} {declaration.qualified_name}"
                 )
+            typer.echo(f"  Direct imports: {len(result.imports)}")
+        for diagnostic in result.diagnostics:
+            typer.echo(f"  {diagnostic.code}: {diagnostic.message}")
 
-        if file and not json_out:
-            from vibe3.commands.inspect_helpers import suggest_next_step
-
-            suggest_next_step("inspect_files", quiet)
+    if result.status != "ready":
+        raise typer.Exit(1)
 
 
 @app.command()
