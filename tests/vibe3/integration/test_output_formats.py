@@ -41,10 +41,6 @@ def stub_pr_show_service(monkeypatch):
             "draft": True,
         },
     )
-    analysis_summary = {
-        "raw": {},
-        "score": {"level": "LOW", "score": 1},
-    }
     payload = {
         "number": 123,
         "title": "Test PR",
@@ -60,8 +56,8 @@ def stub_pr_show_service(monkeypatch):
         lambda *_args, **_kwargs: pr,
     )
     monkeypatch.setattr(
-        "vibe3.commands.pr_query._load_pr_analysis_summary",
-        lambda *_: analysis_summary,
+        "vibe3.commands.pr_query._load_local_review_observation",
+        lambda *_: None,
     )
     monkeypatch.setattr(
         "vibe3.commands.pr_query._build_pr_output_payload",
@@ -96,49 +92,3 @@ class TestTraceOutputIntegration:
         result = runner.invoke(app, ["pr", "show", "--json", "--yaml"])
         assert result.exit_code != 0
         assert "Cannot use both" in result.output
-
-
-class TestInspectOutputIntegration:
-    """Integration tests for inspect command output formats."""
-
-    def test_inspect_commands_default_yaml(self) -> None:
-        """Test inspect commands with default YAML output."""
-        result = runner.invoke(app, ["inspect", "commands", "pr", "show"])
-        assert result.exit_code == 0
-        # Should contain YAML structure
-        assert "command:" in result.output
-        assert "file:" in result.output
-        assert "call_tree:" in result.output
-
-    def test_inspect_commands_json_format(self) -> None:
-        """Test inspect commands --json outputs JSON structure."""
-        result = runner.invoke(app, ["inspect", "commands", "pr", "show", "--json"])
-        assert result.exit_code == 0
-        # Should contain JSON structure
-        assert '"command"' in result.output
-        assert '"file"' in result.output
-        assert '"call_tree"' in result.output
-
-    def test_inspect_commands_tree_format(self) -> None:
-        """Test inspect commands --tree outputs ASCII tree."""
-        result = runner.invoke(app, ["inspect", "commands", "pr", "show", "--tree"])
-        assert result.exit_code == 0
-        # Should contain tree characters
-        assert "pr show" in result.output
-        # Should contain line references
-        assert "L" in result.output
-
-    def test_inspect_commands_mermaid_format(self) -> None:
-        """Test inspect commands --mermaid outputs Mermaid diagram."""
-        result = runner.invoke(app, ["inspect", "commands", "pr", "show", "--mermaid"])
-        assert result.exit_code == 0
-        # Should contain Mermaid markers
-        assert "```mermaid" in result.output
-        assert "graph TD" in result.output
-
-    def test_inspect_commands_no_command_lists_available(self) -> None:
-        """Test inspect commands without arguments lists available commands."""
-        result = runner.invoke(app, ["inspect", "commands"])
-        assert result.exit_code == 0
-        assert "=== vibe3 command structure ===" in result.output
-        assert "Top-level commands:" in result.output

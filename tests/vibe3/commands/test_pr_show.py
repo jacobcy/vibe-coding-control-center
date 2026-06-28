@@ -62,16 +62,12 @@ class TestPRShowBoundTask:
         )
 
         with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
-            with patch(
-                "vibe3.commands.pr_query._load_pr_analysis_summary",
-                return_value={},
-            ):
-                result = runner.invoke(app, ["pr", "show", "123"])
+            result = runner.invoke(app, ["pr", "show", "123"])
 
-                assert result.exit_code == 0
-                assert "### Bound Task(s)" in result.output
-                assert "#456" in result.output
-                assert "#789" in result.output
+            assert result.exit_code == 0
+            assert "### Bound Task(s)" in result.output
+            assert "#456" in result.output
+            assert "#789" in result.output
 
     def test_pr_show_no_bound_tasks_message(self, mock_pr_svc_factory) -> None:
         """Test pr show when no bound tasks exist in flow."""
@@ -82,14 +78,10 @@ class TestPRShowBoundTask:
         )
 
         with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
-            with patch(
-                "vibe3.commands.pr_query._load_pr_analysis_summary",
-                return_value={},
-            ):
-                result = runner.invoke(app, ["pr", "show", "124"])
+            result = runner.invoke(app, ["pr", "show", "124"])
 
-                assert result.exit_code == 0
-                assert "### Bound Task(s)" not in result.output
+            assert result.exit_code == 0
+            assert "### Bound Task(s)" not in result.output
 
     def test_pr_show_renders_comments(self, mock_pr_svc_factory) -> None:
         """Test pr show displays PR comments with author and time."""
@@ -111,14 +103,10 @@ class TestPRShowBoundTask:
         )
 
         with patch("vibe3.commands.pr_query.PRService", return_value=mock_pr_svc):
-            with patch(
-                "vibe3.commands.pr_query._load_pr_analysis_summary",
-                return_value={},
-            ):
-                result = runner.invoke(app, ["pr", "show", "125"])
+            result = runner.invoke(app, ["pr", "show", "125"])
 
-                assert result.exit_code == 0
-                assert "### General Comments" in result.output
-                assert "alice" in result.output
-                assert "bob" in result.output
-                assert "2026-05-06 10:30" in result.output
+            assert result.exit_code == 0
+            assert "### General Comments" in result.output
+            assert "alice" in result.output
+            assert "bob" in result.output
+            assert "2026-05-06 10:30" in result.output

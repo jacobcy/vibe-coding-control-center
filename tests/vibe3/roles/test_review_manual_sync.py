@@ -42,7 +42,7 @@ def test_execute_manual_review_sync_imports_session_service_from_execution(
     )
 
     result = review_module.execute_manual_review_sync(
-        request=ReviewRequest(scope=ReviewScope.for_base("main"), changed_symbols={}),
+        request=ReviewRequest(scope=ReviewScope.for_base("main")),
         dry_run=True,
         instructions="smoke",
         branch="task/issue-2023",

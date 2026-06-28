@@ -58,23 +58,6 @@ class TestPathsConfig:
         root = get_commands_root()
         assert root == "src/vibe3/commands"
 
-    def test_dag_service_uses_custom_source_root(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """build_module_graph() uses configured source root."""
-        from vibe3.analysis.dag_service import DAGError, build_module_graph
-
-        # Set custom source root by patching get_config
-        custom_root = "custom/src/vibe3"
-        custom_config = VibeConfig(paths=PathsConfig(vibe3_root=custom_root))
-        monkeypatch.setattr("vibe3.config.loader.get_config", lambda: custom_config)
-
-        # Should fail because custom path doesn't exist, proving it tried to use it
-        with pytest.raises(DAGError) as exc_info:
-            build_module_graph()
-
-        assert custom_root in str(exc_info.value)
-
     def test_coverage_service_categorize_uses_custom_source_root(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -117,26 +100,6 @@ class TestPathsConfig:
         assert is_v3_source_file(f"{custom_root}/services/flow_service.py")
         # Should return False for default path
         assert not is_v3_source_file("src/vibe3/services/flow_service.py")
-
-    def test_command_analyzer_uses_custom_commands_root(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """analyze_command() uses configured commands root."""
-        from vibe3.analysis.command_analyzer import (
-            CommandAnalyzerError,
-            analyze_command,
-        )
-
-        # Set custom commands root by patching get_config
-        custom_root = "custom/commands"
-        custom_config = VibeConfig(paths=PathsConfig(commands_root=custom_root))
-        monkeypatch.setattr("vibe3.config.loader.get_config", lambda: custom_config)
-
-        # Should fail because custom path doesn't exist, proving it tried to use it
-        with pytest.raises(CommandAnalyzerError) as exc_info:
-            analyze_command("flow")
-
-        assert "Command file not found" in str(exc_info.value)
 
 
 class TestExpandConfigVariables:

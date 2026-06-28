@@ -211,16 +211,6 @@ def render_local_review_summary(
         return
 
     console.print("- [cyan]Status[/]: Found")
-    if local_review.risk_level:
-        console.print(f"- [cyan]Risk Level[/]: {local_review.risk_level}")
-    else:
-        console.print("- [cyan]Risk Level[/]: [dim]N/A[/]")
-
-    if local_review.risk_score:
-        console.print(f"- [cyan]Risk Score[/]: {local_review.risk_score}")
-    else:
-        console.print("- [cyan]Risk Score[/]: [dim]N/A[/]")
-
     if local_review.verdict:
         console.print(f"- [cyan]Verdict[/]: {local_review.verdict}")
     else:

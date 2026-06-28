@@ -10,6 +10,8 @@ These models enforce contract stability and prevent parameter drift.
 from dataclasses import dataclass
 from typing import Literal
 
+from vibe3.models.inspect_evidence import ReviewObservation
+
 
 @dataclass(frozen=True)
 class ReviewScope:
@@ -53,14 +55,13 @@ class ReviewRequest:
     """Encapsulates all information needed for a code review.
 
     This model unifies the review pipeline contract by:
-    - Consolidating scope, symbols, and task guidance into one object
+    - Consolidating scope, exact observation, and task guidance into one object
     - Making the contract explicit and type-safe
     - Enabling future extension (e.g., cloud review, review ready)
 
     Attributes:
         scope: What is being reviewed (base branch or PR)
-        changed_symbols: Map of file -> list of changed function names
-        symbol_dag: Map of function -> list of caller locations
+        observation: Exact Git and Review Kernel evidence
         task_guidance: Optional custom task instructions
 
     Examples:
@@ -73,6 +74,5 @@ class ReviewRequest:
     """
 
     scope: ReviewScope
-    changed_symbols: dict[str, list[str]] | None = None
-    symbol_dag: dict[str, list[str]] | None = None
+    observation: ReviewObservation | None = None
     task_guidance: str | None = None

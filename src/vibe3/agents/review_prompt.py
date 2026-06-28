@@ -31,37 +31,17 @@ from vibe3.prompts import (
 ReviewPromptMode = Literal["first", "retry"]
 
 
-def _build_ast_analysis_section(
-    changed_symbols: dict[str, list[str]] | None,
-    symbol_dag: dict[str, list[str]] | None,
-) -> str | None:
-    """Build AST analysis section from runtime data.
-
-    Source: Runtime (inspect command output)
-
-    Args:
-        changed_symbols: Map of file -> list of changed function names
-        symbol_dag: Map of function -> list of caller locations
-
-    Returns:
-        AST analysis section or None if no data provided
-    """
-    if not changed_symbols and not symbol_dag:
+def _build_review_observation_section(request: ReviewRequest) -> str | None:
+    """Build a review evidence section from the shared observation model."""
+    if request.observation is None:
         return None
-
-    ast_parts: list[str] = []
-
-    if changed_symbols:
-        symbols_json = json.dumps(changed_symbols, indent=2)
-        ast_parts.append(
-            f"### Changed Functions (AST Analysis)\n```json\n{symbols_json}\n```"
-        )
-
-    if symbol_dag:
-        dag_json = json.dumps(symbol_dag, indent=2)
-        ast_parts.append(f"### Function Call Chain (DAG)\n```json\n{dag_json}\n```")
-
-    return "## AST Analysis\n" + "\n\n".join(ast_parts)
+    payload = request.observation.model_dump(mode="json")
+    return (
+        "## Review Observation (validated evidence)\n"
+        "This data reports Git facts and repository-owned review policy. "
+        "Runtime impact analysis is disabled.\n"
+        f"```json\n{json.dumps(payload, indent=2)}\n```"
+    )
 
 
 def _build_review_task_section(task_text: str | None) -> str:
@@ -153,9 +133,7 @@ def _build_review_prompt_providers(
         "review.policy@project": project_review_policy,
         "common.rules": common_rules_section,
         "common.rules@project": project_common_rules_section,
-        "review.ast_analysis": lambda: _build_ast_analysis_section(
-            request.changed_symbols, request.symbol_dag
-        ),
+        "review.observation": lambda: _build_review_observation_section(request),
         "review.output_format": lambda: _build_output_contract_section(
             config.review.output_format
         ),

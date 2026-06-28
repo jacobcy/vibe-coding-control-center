@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
 from rich.console import Console
 from rich.prompt import Prompt
 
-from vibe3.clients import AIClient, AISuggestionClient, BaseResolver
+from vibe3.analysis import build_review_observation
+from vibe3.clients import AIClient, AISuggestionClient, BaseResolver, GitClient
 from vibe3.config import VibeConfig
 from vibe3.prompts import resolve_prompts_path
 from vibe3.services.pr.base_resolution import BaseResolutionUsecase
@@ -49,34 +51,38 @@ class BranchMaterial:
 
 
 def _build_inspect_summary(branch: str, base_branch: str) -> str:
-    """Build a human-readable inspect summary for AI prompt context."""
+    """Build exact Git/Kernel evidence for AI prompt context."""
     try:
-        from vibe3.analysis import build_change_analysis
-
-        result = build_change_analysis("branch", branch, base_branch)
-        score = result.get("score", {})
-        if not isinstance(score, dict):
+        git = GitClient()
+        if git.get_current_branch() != branch:
             return ""
-        level = score.get("level", "UNKNOWN")
-        points = score.get("score", 0)
-        recs = score.get("recommendations", [])
-        dims = score.get("dimensions", {})
-        if not isinstance(dims, dict):
-            dims = {}
+        repo_root = Path(git.get_worktree_root())
+        result = build_review_observation(
+            requested_base=base_branch,
+            resolved_base=base_branch,
+            git=git,
+            manifest_path=repo_root / "config" / "v3" / "review_kernel.yaml",
+        )
+        if result.status == "error":
+            return ""
 
         lines = [
-            "## Impact Analysis (inspect base)",
-            f"- Risk Level: {level} (score: {points})",
-            f"- Public API changes: {dims.get('public_api_touch', False)}",
-            f"- Critical path changes: {dims.get('critical_path_touch', False)}",
-            f"- Changed lines: {dims.get('changed_lines', 0)}",
-            f"- Changed files: {dims.get('changed_files', 0)}",
-            f"- Impacted modules: {dims.get('impacted_modules', 0)}",
+            "## Review Observation (inspect base)",
+            f"- Status: {result.status}",
+            f"- Committed files: {result.changes.summary.committed.files}",
+            f"- Staged files: {result.changes.summary.staged.files}",
+            f"- Unstaged files: {result.changes.summary.unstaged.files}",
+            f"- Untracked files: {result.changes.summary.untracked.files}",
+            "- Runtime impact analysis: disabled (benchmark gate failed)",
         ]
-        if recs:
-            lines.append("- Recommendations:")
-            for r in recs:
-                lines.append(f"  - {r}")
+        if result.kernel is not None:
+            lines.append(f"- Kernel impact: {result.kernel.impact.value}")
+            hits = result.kernel.architecture_hits + result.kernel.review_hits
+            if hits:
+                lines.append("- Kernel files:")
+                lines.extend(f"  - {hit.path}" for hit in hits)
+        if result.review is not None:
+            lines.append(f"- Minimum review depth: {result.review.minimum_depth.value}")
         return "\n".join(lines)
     except Exception:
         return ""  # Gracefully degrade - inspect data is optional

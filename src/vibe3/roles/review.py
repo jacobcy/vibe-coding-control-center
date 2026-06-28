@@ -14,7 +14,7 @@ from vibe3.agents import (
     describe_review_sections,
     make_review_context_builder,
 )
-from vibe3.analysis import build_change_analysis, changed_symbols
+from vibe3.analysis import build_review_observation
 
 # public-api: pending upstream export
 from vibe3.config import (
@@ -41,6 +41,7 @@ from vibe3.models import (
     IssueInfo,
     IssueState,
     OrchestraConfig,
+    ReviewObservation,
     ReviewRequest,
     ReviewScope,
     WorktreeRequirement,
@@ -341,12 +342,13 @@ def build_manual_review_request_payload(
     head_branch: str | None = None,
     source_type: str,
     identifier: str,
-    analysis_runner: Callable[[str, str], dict[str, object]] = build_change_analysis,
+    observation: ReviewObservation | None = None,
 ) -> tuple[ReviewRequest, int | None, str | None]:
     """Consolidated factory for manual review request payloads (PR and Base)."""
+    del source_type, identifier
     request = ReviewRequest(
         scope=scope,
-        changed_symbols=changed_symbols(analysis_runner(source_type, identifier)),
+        observation=observation,
     )
     return request, issue_number, head_branch
 
@@ -356,17 +358,26 @@ def build_base_review_request(
     base_branch: str,
     *,
     flow_service: FlowService | None = None,
-    analysis_runner: Callable[[str, str], dict[str, object]] = build_change_analysis,
 ) -> tuple[ReviewRequest, int | None, str | None]:
     """Build request payload for base-branch review."""
     service = flow_service or FlowService()
     flow = service.get_flow_status(current_branch)
+    from vibe3.clients import GitClient
+
+    git = GitClient()
+    repo_root = Path(git.get_worktree_root())
+    observation = build_review_observation(
+        requested_base=base_branch,
+        resolved_base=base_branch,
+        git=git,
+        manifest_path=repo_root / "config" / "v3" / "review_kernel.yaml",
+    )
     return build_manual_review_request_payload(
         scope=ReviewScope.for_base(base_branch),
         issue_number=flow.task_issue_number if flow else None,
         source_type="branch",
         identifier=base_branch,
-        analysis_runner=analysis_runner,
+        observation=observation,
     )
 
 

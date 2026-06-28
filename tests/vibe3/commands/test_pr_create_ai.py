@@ -223,21 +223,38 @@ class TestPRCreateCommandAI:
         assert "Commit your changes first" in result.output
 
 
-def test_build_inspect_summary_uses_explicit_base_branch() -> None:
-    """Inspect summary should analyze against the caller's base branch."""
-    with patch("vibe3.analysis.build_change_analysis") as mock_analysis:
-        mock_analysis.return_value = {
-            "score": {
-                "level": "LOW",
-                "score": 1,
-                "recommendations": [],
-                "dimensions": {},
-            }
-        }
+def test_build_inspect_summary_uses_review_observation() -> None:
+    """AI context must use the exact shared observation without risk claims."""
+    from vibe3.models import (
+        KernelImpact,
+        KernelObservation,
+        ReviewDepth,
+        ReviewObservation,
+        ReviewPolicy,
+    )
 
-        _build_inspect_summary("feature/child", "feature/parent")
+    git = MagicMock()
+    git.get_current_branch.return_value = "feature/child"
+    git.get_worktree_root.return_value = "/repo"
+    observation = ReviewObservation(
+        status="ready",
+        kernel=KernelObservation(impact=KernelImpact.SMALL),
+        review=ReviewPolicy(minimum_depth=ReviewDepth.FOCUSED),
+    )
+    with (
+        patch("vibe3.services.pr.create.GitClient", return_value=git),
+        patch(
+            "vibe3.services.pr.create.build_review_observation",
+            return_value=observation,
+        ) as build,
+    ):
+        result = _build_inspect_summary("feature/child", "feature/parent")
 
-    mock_analysis.assert_called_once_with("branch", "feature/child", "feature/parent")
+    assert build.call_args.kwargs["requested_base"] == "feature/parent"
+    assert "Kernel impact: small" in result
+    assert "Minimum review depth: focused" in result
+    assert "Risk" not in result
+    assert "Impacted modules" not in result
 
 
 def test_enrich_changed_files_uses_numstat_loc_deltas() -> None:

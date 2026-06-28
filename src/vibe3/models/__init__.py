@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     from vibe3.models.coordination_truth import CoordinationTruth
     from vibe3.models.coverage import CoverageReport, LayerCoverage
     from vibe3.models.data_source import DataSource
-    from vibe3.models.dead_code import DeadCodeFinding, DeadCodeReport
     from vibe3.models.diff_summary import DiffSummary
     from vibe3.models.dispatch import DispatchExclusion
     from vibe3.models.domain_events import (
@@ -88,7 +87,6 @@ if TYPE_CHECKING:
         ReviewPolicy,
         SourceRange,
     )
-    from vibe3.models.inspection import CallNode, CommandInspection
     from vibe3.models.issue_body import FlowStateProjection
     from vibe3.models.job import (
         CommandType,
@@ -119,11 +117,6 @@ if TYPE_CHECKING:
         UpdatePRRequest,
         VersionBumpResponse,
         VersionBumpType,
-    )
-    from vibe3.models.pr_analysis import (
-        CommitInfo,
-        CriticalFileInfo,
-        PRCriticalAnalysis,
     )
     from vibe3.models.prompt_meta import PromptContextMode
     from vibe3.models.queue_entry import QueueEntry
@@ -173,10 +166,8 @@ _LAZY_IMPORTS = {
     "ALLOWED_TRANSITIONS": "vibe3.models.orchestration",
     "BranchConvention": "vibe3.models.branch_convention",
     "BranchSource": "vibe3.models.change_source",
-    "CommitInfo": "vibe3.models.pr_analysis",
     "CoordinationTruth": "vibe3.models.coordination_truth",
     "CreatePRRequest": "vibe3.models.pr",
-    "CriticalFileInfo": "vibe3.models.pr_analysis",
     "DataSource": "vibe3.models.data_source",
     "DispatchExclusion": "vibe3.models.dispatch",
     "ChangeSource": "vibe3.models.change_source",
@@ -189,13 +180,9 @@ _LAZY_IMPORTS = {
     "UncommittedSource": "vibe3.models.change_source",
     "CoverageReport": "vibe3.models.coverage",
     "LayerCoverage": "vibe3.models.coverage",
-    "DeadCodeFinding": "vibe3.models.dead_code",
-    "DeadCodeReport": "vibe3.models.dead_code",
     "AsyncExecutionHandle": "vibe3.models.execution_handle",
     "ExecutionLaunchResult": "vibe3.models.execution_request",
     "ExecutionRequest": "vibe3.models.execution_request",
-    "CallNode": "vibe3.models.inspection",
-    "CommandInspection": "vibe3.models.inspection",
     "ChangedFileFact": "vibe3.models.inspect_evidence",
     "ChangeObservation": "vibe3.models.inspect_evidence",
     "ChangePartitionSummary": "vibe3.models.inspect_evidence",
@@ -220,7 +207,6 @@ _LAZY_IMPORTS = {
     "IssueLink": "vibe3.models.flow",
     "IssueState": "vibe3.models.orchestration",
     "MainBranchProtectedError": "vibe3.models.flow",
-    "PRCriticalAnalysis": "vibe3.models.pr_analysis",
     "PRMetadata": "vibe3.models.pr",
     "PRResponse": "vibe3.models.pr",
     "PRState": "vibe3.models.pr",
@@ -290,12 +276,10 @@ __all__: list[str] = [
     "AuditSuggestion",
     "BranchConvention",
     "BranchSource",
-    "CallNode",
     "ChangeSource",
     "ChangeSourceType",
     "CheckResult",
     "CICheck",
-    "CommandInspection",
     "ChangedFileFact",
     "ChangeObservation",
     "ChangePartitionSummary",
@@ -310,17 +294,13 @@ __all__: list[str] = [
     "ReviewObservation",
     "ReviewPolicy",
     "SourceRange",
-    "CommitInfo",
     "CommitSource",
     "CommandType",
     "ControlPlaneEventPublished",
     "CoordinationTruth",
     "CoverageReport",
     "CreatePRRequest",
-    "CriticalFileInfo",
     "DataSource",
-    "DeadCodeFinding",
-    "DeadCodeReport",
     "DiffSummary",
     "DispatchExclusion",
     "DomainEvent",
@@ -352,7 +332,6 @@ __all__: list[str] = [
     "normalize_actor",
     "OrchestraConfig",
     "PeriodicCheckConfig",
-    "PRCriticalAnalysis",
     "PRMetadata",
     "PRMerged",
     "PRResponse",

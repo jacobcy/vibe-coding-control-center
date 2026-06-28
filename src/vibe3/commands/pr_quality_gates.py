@@ -6,25 +6,6 @@ from rich.console import Console
 from typer import Exit
 
 
-def _render_score_explanation(console: Console, score: dict[str, object]) -> None:
-    """Render explainable risk details."""
-    reason = score.get("reason")
-    if isinstance(reason, str) and reason:
-        console.print(f"[yellow]原因[/]: {reason}")
-
-    trigger_factors = score.get("trigger_factors")
-    if isinstance(trigger_factors, list) and trigger_factors:
-        console.print("[yellow]扣分项[/]:")
-        for factor in trigger_factors:
-            console.print(f"  - {factor}")
-
-    recommendations = score.get("recommendations")
-    if isinstance(recommendations, list) and recommendations:
-        console.print("[yellow]建议[/]:")
-        for item in recommendations:
-            console.print(f"  - {item}")
-
-
 def run_coverage_gate(console: Console, yes: bool = False) -> None:
     """Run coverage quality gate.
 
@@ -74,41 +55,3 @@ def run_coverage_gate(console: Console, yes: bool = False) -> None:
     console.print(f"  [green]✓ services[/]: {svc_pct:.1f}%")
     console.print(f"  [green]✓ clients[/]: {cli_pct:.1f}%")
     console.print(f"  [green]✓ commands[/]: {cmd_pct:.1f}%")
-
-
-def run_risk_gate(console: Console, pr_number: int) -> None:
-    """Run risk score quality gate.
-
-    Args:
-        console: Rich console for output
-        pr_number: PR number to check
-
-    Raises:
-        Exit: If risk gate fails
-        Exception: If risk check fails (fail-fast, no interactive bypass)
-    """
-    from vibe3.analysis import build_change_analysis, score
-
-    # Call inspect pr to get risk score
-    analysis = build_change_analysis("pr", str(pr_number))
-    risk_score = score(analysis)
-
-    # Check if blocked
-    if risk_score.get("block", False):
-        console.print("\n[red]✗ 质量门禁失败[/]")
-        console.print("[red]PR 被阻断：高风险变更[/]")
-        console.print(
-            "\n[yellow]风险评分[/]: "
-            f"{risk_score.get('score', 'N/A')} "
-            f"({risk_score.get('level', 'N/A')})"
-        )
-        _render_score_explanation(console, risk_score)
-
-        console.print("\n[dim]请修复问题或使用 --yes 跳过（不推荐）[/]")
-        raise Exit(1)
-
-    # Display passed info
-    console.print("\n[green]✓ 质量门禁通过[/]")
-    console.print(f"[cyan]风险等级[/]: {risk_score.get('level', 'N/A')}")
-    console.print(f"[cyan]风险评分[/]: {risk_score.get('score', 'N/A')}")
-    _render_score_explanation(console, risk_score)

@@ -20,21 +20,13 @@ def test_maps_source_file_to_related_tests() -> None:
 
 
 @pytest.mark.slow
-def test_dag_resolves_tests_for_unmapped_source() -> None:
-    # shared/signatures.py has no test_signatures.py (name miss).
-    # Multiple services import SignatureService (verdict_service, orchestrator,
-    # handoff.service). DAG layer should narrow to tests that import these
-    # services instead of falling back to the full services directory.
+def test_unmapped_source_uses_directory_fallback_without_dag() -> None:
+    # shared/signatures.py has no direct filename-matched test. Selection must
+    # use the deterministic directory fallback, not inferred import impact.
     selection = select_pre_push_tests(["src/vibe3/services/shared/signatures.py"])
 
     assert selection.mode == "incremental"
-    # DAG resolves tests from services importing SignatureService
-    # Current: verdict_service.py and orchestrator.py import SignatureService
-    # -> test_verdict_service.py and test_flow_orchestrator_service.py
-    # Note: handoff/service.py also imports SignatureService but may not
-    # be tracked by DAG due to subpackage structure
-    assert len(selection.tests) > 0
-    assert "tests/vibe3/services" not in selection.tests
+    assert selection.tests == ["tests/vibe3/services/shared"]
     assert selection.unmapped_sources == ["src/vibe3/services/shared/signatures.py"]
 
 

@@ -89,48 +89,31 @@ def discover_modules() -> list[str]:
 
 
 def build_import_graph() -> dict[str, list[str]]:
-    """Build import graph from vibe3.analysis.dag_service.
-
-    Aggregates file-level imports to top-level module level.
+    """Build a test-only top-level import graph from repository source.
 
     Returns:
         Dict mapping module name to list of imported module names
     """
-    from vibe3.analysis.dag_service import build_module_graph
-
-    file_graph = build_module_graph()
-
-    # Aggregate to top-level module
     module_imports: dict[str, set[str]] = defaultdict(set)
-
-    for file_module, node in file_graph.items():
-        # Extract top-level module from file path
-        # e.g., vibe3.services.flow_service -> services
+    source_root = Path("src/vibe3")
+    for source_file in sorted(source_root.rglob("*.py")):
+        relative = source_file.relative_to("src").with_suffix("")
+        file_module = ".".join(relative.parts)
         if not file_module.startswith("vibe3."):
             continue
-
         parts = file_module.split(".")
         if len(parts) < 2:
             continue
-
-        source_module = parts[1]  # e.g., 'services'
-
-        # Process imports
-        for imp in node.imports:
+        source_module = parts[1]
+        for imp in extract_file_imports(str(source_file)):
             if not imp.startswith("vibe3."):
                 continue
-
             imp_parts = imp.split(".")
             if len(imp_parts) < 2:
                 continue
-
-            target_module = imp_parts[1]  # e.g., 'domain'
-
-            # Skip self-imports
+            target_module = imp_parts[1]
             if target_module != source_module:
                 module_imports[source_module].add(target_module)
-
-    # Convert sets to sorted lists
     return {k: sorted(v) for k, v in module_imports.items()}
 
 

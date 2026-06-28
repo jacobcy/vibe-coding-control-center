@@ -138,9 +138,6 @@ code_limits:
       - path: "src/vibe3/services/handoff/resolution.py"
         limit: 600
         reason: "Handoff 目标解析工具，支持四种命名空间解析（@vibe/、@prefix/、relative/、absolute/），包含路径验证、边界检查、别名处理等紧密耦合逻辑；迁移前已存在（544 行），迁移是机械重构，无逻辑改变"
-      - path: "src/vibe3/analysis/serena_service.py"
-        limit: 457
-        reason: "Serena 符号级代码分析服务聚合，包含 analyze_file/analyze_files/analyze_changes/scan_dead_code 等核心分析流程、文件缓存管理、AST 缓存共享机制（#2886 优化冗余文件 I/O）等紧密耦合逻辑；职责单一（代码分析编排）但方法较多，拆分会破坏分析流程完整性；#2932 新增异常类检测集成，删除重复 AST 遍历逻辑（-20行），从 477 行优化至 457 行"
       - path: "src/vibe3/services/shared/status_query.py"
         limit: 480
         reason: "Status 查询服务，聚合 orchestra/flow/task 多维度查询逻辑"
@@ -450,12 +447,6 @@ code_limits:
       - path: "tests/vibe3/services/test_status_query_utils.py"
         limit: 425
         reason: "Status query service 测试集，覆盖 issue priority sorting、branch classification helpers、remote field calculation、fetch_orchestrated_issues with manager detection、blocked state handling、dispatch exclusion、handoff/merge-ready state、dev collab flow pass-through 等紧密耦合场景；Issue #3189 新增 test_fetch_orchestrated_issues_extra_flows_mapping 测试验证 extra_flows 参数映射逻辑（+28 行）"
-      - path: "tests/vibe3/analysis/test_serena_service.py"
-        limit: 668
-        reason: "Serena service 测试集，覆盖 analyze_file/analyze_files/analyze_changes/scan_dead_code/analyze_symbol 等核心功能，包含完整的 mock setup 和参数化测试；PR #2744 新增 4 个 scan_dead_code 测试验证 line/loc 计算逻辑（+128 行）；PR #2905 新增 6 个 analyze_symbol 测试覆盖正常提取、空结果、异常处理、CLI 检测、多引用场景（+71 行）；PR #2905 code review follow-up 完善断言覆盖与新增多引用测试（+48 行）；#2932 新增 test_exception_class_detection_works 测试验证异常类检测逻辑（+66 行），从 596 行增至 667 行"
-      - path: "tests/vibe3/analysis/test_dead_code_rules.py"
-        limit: 458
-        reason: "Dead code rules 测试集，覆盖 is_exception_class、is_dead_code、get_router_functions 等核心规则函数的单元测试；#2932 新增 test_is_exception_class_with_inheritance 等异常类检测测试（+58 行），从 400 行增至 458 行"
       - path: "tests/vibe3/commands/test_ask.py"
         limit: 450
         reason: "Ask command 测试集，覆盖 input validation（4 tests）、forbidden patterns（6 tests）、execution logic with mocked backend（7 tests）、branch parameter（4 tests）等紧密耦合场景；新增 --branch 参数测试后从 299 行增至 443 行（+144 行）；所有测试围绕 ask 命令功能，拆分会降低可读性；仅超限 43 行（443 vs 400），符合 test exception 策略"

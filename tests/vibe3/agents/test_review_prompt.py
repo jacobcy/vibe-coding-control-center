@@ -10,13 +10,13 @@ from unittest.mock import patch
 import pytest
 
 from vibe3.agents.review_prompt import (
-    _build_ast_analysis_section,
     _build_output_contract_section,
+    _build_review_observation_section,
     _build_review_task_section,
     build_review_prompt_body,
     describe_review_sections,
 )
-from vibe3.models import ReviewRequest, ReviewScope
+from vibe3.models import ReviewObservation, ReviewRequest, ReviewScope
 from vibe3.prompts import build_policy_section
 
 
@@ -40,41 +40,26 @@ class TestBuildPolicySection:
         assert result is None
 
 
-class TestBuildAstAnalysisSection:
-    """Tests for _build_ast_analysis_section (unit test)."""
+class TestBuildReviewObservationSection:
+    """Tests for the shared review observation prompt section."""
 
     def test_returns_none_if_no_data(self) -> None:
-        """Should return None if no symbols or DAG provided."""
-        result = _build_ast_analysis_section(None, None)
+        result = _build_review_observation_section(
+            ReviewRequest(scope=ReviewScope.for_base("main"))
+        )
         assert result is None
 
-    def test_formats_changed_symbols(self) -> None:
-        """Should format changed symbols as JSON."""
-        symbols = {"src/foo.py": ["func1", "func2"]}
-        result = _build_ast_analysis_section(symbols, None)
+    def test_formats_validated_observation(self) -> None:
+        request = ReviewRequest(
+            scope=ReviewScope.for_base("main"),
+            observation=ReviewObservation(status="ready"),
+        )
+        result = _build_review_observation_section(request)
 
         assert result is not None
-        assert "## AST Analysis" in result
-        assert "Changed Functions" in result
-        assert "func1" in result
-
-    def test_formats_symbol_dag(self) -> None:
-        """Should format symbol DAG as JSON."""
-        dag = {"func1": ["caller1", "caller2"]}
-        result = _build_ast_analysis_section(None, dag)
-
-        assert result is not None
-        assert "Function Call Chain" in result
-        assert "caller1" in result
-
-    def test_formats_both_symbols_and_dag(self) -> None:
-        """Should format both symbols and DAG."""
-        symbols = {"src/foo.py": ["func1"]}
-        dag = {"func1": ["caller1"]}
-        result = _build_ast_analysis_section(symbols, dag)
-
-        assert "Changed Functions" in result
-        assert "Function Call Chain" in result
+        assert "Review Observation" in result
+        assert '"schema_version": 1' in result
+        assert "Runtime impact analysis is disabled" in result
 
 
 class TestBuildReviewTaskSection:
@@ -116,21 +101,20 @@ class TestBuildOutputContractSection:
 class TestBuildReviewPromptBody:
     """Tests for build_review_prompt_body orchestration (integration test)."""
 
-    def test_build_review_prompt_body_with_ast_analysis(self) -> None:
-        """Context should include AST analysis when provided."""
+    def test_build_review_prompt_body_with_observation(self) -> None:
+        """Context should include validated review evidence when provided."""
         with patch("vibe3.agents.review_prompt.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
 
             scope = ReviewScope.for_base("main")
             request = ReviewRequest(
                 scope=scope,
-                changed_symbols={"src/review.py": ["build_review_prompt_body"]},
+                observation=ReviewObservation(status="ready"),
             )
             context = build_review_prompt_body(request)
 
-        # Should include AST analysis
-        assert "Changed Functions" in context
-        assert "build_review_prompt_body" in context
+        assert "Review Observation" in context
+        assert "benchmark_gate_failed" in context
 
     def test_build_review_prompt_body_includes_verdict_format(self) -> None:
         """Context should specify VERDICT output format."""

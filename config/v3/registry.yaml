@@ -58,11 +58,8 @@ doc_limits:
 review_scope:
   source_file: "config/v3/settings.yaml"
   schema: "src/vibe3/config/settings.py:ReviewScopeConfig"
-  consumers:
-    - "src/vibe3/services/pr_scoring_service.py"
-    - "src/vibe3/commands/inspect_cmd.py"
-  tests:
-    - "tests/vibe3/services/test_pr_scoring_service.py"
+  consumers: []
+  tests: []
   status: "active"
 
 quality:
@@ -73,16 +70,6 @@ quality:
   status: "active"
   notes:
     - "Test coverage requirements - not yet enforced in CI"
-
-pr_scoring:
-  source_file: "config/v3/settings.yaml"
-  schema: "src/vibe3/config/settings.py:PRScoringConfig"
-  consumers:
-    - "src/vibe3/services/pr_scoring_service.py"
-    - "scripts/hooks/pre-push.sh"
-  tests:
-    - "tests/vibe3/services/test_pr_scoring_service.py"
-  status: "active"
 
 review:
   source_file: "config/v3/settings.yaml"

@@ -19,7 +19,6 @@ _SYMBOL_MODULES = {
 
 # Lazy import mapping for function re-exports from submodules
 _SOURCE_SYMBOLS: dict[str, str] = {
-    "suggest_next_step": "vibe3.commands.inspect_helpers",
     "render_blocked_items": "vibe3.commands.status_render",
     "render_completed_flows": "vibe3.commands.status_render",
     "render_epic_items": "vibe3.commands.status_render",
@@ -33,7 +32,6 @@ _SOURCE_SYMBOLS: dict[str, str] = {
 }
 
 if TYPE_CHECKING:
-    from vibe3.commands.inspect_helpers import suggest_next_step
     from vibe3.commands.status_render import (
         render_blocked_items,
         render_completed_flows,
@@ -83,7 +81,6 @@ __all__ = [
     "pr",
     "review",
     "run",
-    "suggest_next_step",
     "render_blocked_items",
     "render_completed_flows",
     "render_epic_items",

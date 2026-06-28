@@ -6,7 +6,6 @@ import subprocess
 from collections.abc import Generator
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -33,79 +32,6 @@ def temp_store(tmp_path: Path) -> SQLiteClient:
     init_schema(conn)
     conn.close()
     return SQLiteClient(db_path=str(db_path))
-
-
-@pytest.fixture
-def mock_all_dependencies() -> Generator[dict[str, MagicMock], None, None]:
-    """Mock all external dependencies for PR analysis."""
-    with (
-        patch("vibe3.services.pr.analysis._get_pr_changed_files") as mock_files,
-        patch("vibe3.services.pr.analysis._filter_critical_files") as mock_filter,
-        patch("vibe3.services.pr.analysis._analyze_critical_files") as mock_analyze,
-        patch("vibe3.services.pr.analysis._calculate_risk_score") as mock_score,
-        patch("vibe3.services.pr.analysis._get_recent_commits") as mock_commits,
-        patch("vibe3.services.pr.analysis._get_pr_commit_count") as mock_count,
-        patch("vibe3.services.pr.analysis.dag_service") as mock_dag,
-        patch("vibe3.clients.GitClient") as mock_git_client_class,
-        patch("vibe3.clients.GitHubClient") as mock_github_client_class,
-    ):
-        # Setup default returns
-        mock_files.return_value = [
-            "src/vibe3/config/settings.py",
-            "src/vibe3/utils/helpers.py",
-            "tests/test_foo.py",
-        ]
-
-        mock_filter.return_value = [
-            {
-                "path": "src/vibe3/config/settings.py",
-                "critical_path": True,
-                "public_api": False,
-            }
-        ]
-
-        mock_analyze.return_value = (
-            {"src/vibe3/config/settings.py": ["get_config", "ConfigPaths"]},
-            {"src/vibe3/config/settings.py": ["vibe3.config", "vibe3.utils"]},
-        )
-
-        mock_dag_result = MagicMock()
-        mock_dag_result.impacted_modules = ["vibe3.config", "vibe3.utils"]
-        mock_dag.expand_impacted_modules.return_value = mock_dag_result
-
-        mock_score.return_value = {
-            "score": 6,
-            "level": "MEDIUM",
-            "block": False,
-        }
-
-        mock_commits.return_value = [
-            {"sha": "abc1234", "message": "Add feature"},
-            {"sha": "def5678", "message": "Fix bug"},
-        ]
-
-        mock_count.return_value = 5
-
-        # Mock GitClient.get_diff to avoid GitHub API calls
-        mock_git_client = MagicMock()
-        mock_git_client.get_diff.return_value = "+line1\n-line2\n+line3"
-        mock_git_client_class.return_value = mock_git_client
-
-        # Mock GitHubClient to avoid gh CLI calls (requires GH_TOKEN in CI)
-        mock_github_client = MagicMock()
-        mock_github_client_class.return_value = mock_github_client
-
-        yield {
-            "files": mock_files,
-            "filter": mock_filter,
-            "analyze": mock_analyze,
-            "score": mock_score,
-            "commits": mock_commits,
-            "count": mock_count,
-            "dag": mock_dag,
-            "git_client": mock_git_client,
-            "github_client": mock_github_client,
-        }
 
 
 # ============================================================================
