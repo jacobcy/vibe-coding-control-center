@@ -136,9 +136,9 @@ def execute_check_mode(
 
     if mode == "all":
         if show_progress:
-            results = _run_with_progress(service, status="active")
+            results = _run_with_progress(service, status=["active", "blocked"])
         else:
-            results = service.verify_all_flows(status="active")
+            results = service.verify_all_flows(status=["active", "blocked"])
 
         invalid = [r for r in results if not r.is_valid]
         return ExecuteCheckResult(
@@ -154,9 +154,9 @@ def execute_check_mode(
 
     if mode == "fix_all":
         if show_progress:
-            results = _run_with_progress(service, status=["active", "stale"])
+            results = _run_with_progress(service, status=["active", "stale", "blocked"])
         else:
-            results = service.verify_all_flows(status=["active", "stale"])
+            results = service.verify_all_flows(status=["active", "stale", "blocked"])
 
         invalid_fix: list[CheckResult] = [r for r in results if not r.is_valid]
 
