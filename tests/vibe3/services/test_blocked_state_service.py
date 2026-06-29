@@ -408,3 +408,59 @@ def test_reconcile_blocked_resume_state(tmp_path: Path) -> None:
     assert store.get_flow_state("test-branch").get("flow_status") == "active"
 
 
+def test_reconcile_blocked_dependency_resolved(tmp_path: Path) -> None:
+    """Verify that when a dependency is resolved, reconcile_blocked unblocks the flow."""
+    from unittest.mock import patch
+    from vibe3.services.shared.dependency_resolution import DependencyResolution
+
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state(
+        "test-branch",
+        flow_slug="test",
+        flow_status="blocked",
+        blocked_by_issue=456,
+    )
+    store.add_issue_link("test-branch", 456, "dependency")
+
+    issue_body_blocked = (
+        "<!-- vibe3-flow-state-start -->\n\n"
+        "**Vibe3 Flow State**\n\n"
+        "- **State**: blocked\n"
+        "- **Blocked by**: #456\n\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
+    github = StubGitHubClient(issue_body=issue_body_blocked)
+    label_service = StubLabelService()
+    label_service.current_state = IssueState.BLOCKED
+
+    svc = BlockedStateService(store=store, github_client=github, label_service=label_service)
+
+    # Mock DependencyResolutionService.is_dependency_resolved to return resolved=True
+    with patch(
+        "vibe3.services.shared.dependency_resolution.DependencyResolutionService.is_dependency_resolved"
+    ) as mock_resolved:
+        mock_resolved.return_value = DependencyResolution(
+            resolved=True,
+            issue_number=456,
+            github_state="CLOSED",
+        )
+
+        target = svc.reconcile_blocked(123, "test-branch")
+
+    # Verify reconciliation unblocked the flow and updated target
+    assert target == IssueState.READY
+    assert label_service.current_state == IssueState.READY
+
+    # Verify database flow_state cache is updated
+    flow_state = store.get_flow_state("test-branch")
+    assert flow_state is not None
+    assert flow_state.get("flow_status") == "active"
+    assert flow_state.get("blocked_by_issue") is None
+
+    # Verify database flow_issue_links cache is cleared
+    links = store.get_dependency_links("test-branch")
+    assert 456 not in links
+    assert len(links) == 0
+
+
+

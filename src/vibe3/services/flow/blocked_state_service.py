@@ -114,7 +114,7 @@ class BlockedStateService:
             return
 
         is_blocked = bool(truth.blocked_reason) or bool(open_tasks)
-        blocked_by_issue = open_tasks[0] if open_tasks else (truth.blocked_by[0] if truth.blocked_by else None)
+        blocked_by_issue = open_tasks[0] if open_tasks else None
 
         # Update flow status pointer, reason, and main dependency
         self.store.update_flow_state(
@@ -127,8 +127,8 @@ class BlockedStateService:
 
         # Update flow_issue_links dependencies list
         current_deps = self.store.get_dependency_links(branch)
-        to_remove = set(current_deps) - set(truth.blocked_by)
-        to_add = set(truth.blocked_by) - set(current_deps)
+        to_remove = set(current_deps) - set(open_tasks)
+        to_add = set(open_tasks) - set(current_deps)
 
         for dep in to_remove:
             self.store.remove_issue_link(branch, dep, "dependency")
@@ -219,6 +219,7 @@ class BlockedStateService:
             )
             self._io.write_projection(issue_number, new_proj)
             self._io.write_label_state(issue_number, target, actor=actor, force=True)
+            truth = new_proj
 
         # 5. Rebuild Cache
         if branch:
