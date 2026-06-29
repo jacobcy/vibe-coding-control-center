@@ -187,9 +187,6 @@ class TestRemoteDependencies:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            # Mock dependency satisfaction check (both unresolved)
-            qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
-
             # Mock store methods for FlowService.block_flow()
             mock_store.get_flow_state.return_value = {
                 "branch": "task/issue-123-test",
@@ -242,9 +239,6 @@ class TestRemoteDependencies:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            # Mock dependency satisfaction check (unresolved)
-            qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
-
             # Mock store methods for FlowService.block_flow()
             mock_store.get_flow_state.return_value = {
                 "branch": "task/issue-123-test",
@@ -375,8 +369,6 @@ class TestProvenanceTracking:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
-
             # Mock store methods for FlowService.block_flow()
             qualify_gate_service._store.get_flow_state.return_value = {
                 "branch": "task/issue-123-test",

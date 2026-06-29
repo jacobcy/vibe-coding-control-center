@@ -22,9 +22,6 @@ def test_multi_dep_all_satisfied_unblocks():
         flow_manager=flow_manager,
     )
 
-    # Mock dependency checks: both #100 and #200 are closed
-    service._is_dependency_satisfied = MagicMock(side_effect=lambda dep: True)
-
     issue = IssueInfo(
         number=300,
         title="Test issue",
@@ -46,19 +43,25 @@ def test_multi_dep_all_satisfied_unblocks():
     with patch.object(
         service._coordination_resolver, "resolve_coordination", return_value=truth
     ):
-        # Mock unblock service
+        # Mock reconcile_blocked to simulate full unblock
         with patch(
             "vibe3.domain.qualify_gate.BlockedStateService"
         ) as mock_blocked_service:
-            mock_result = MagicMock()
-            mock_result.label_cleared = True
-            mock_blocked_service.return_value.unblock.return_value = mock_result
+            mock_instance = MagicMock()
+            mock_instance.reconcile_blocked.return_value = IssueState.IN_PROGRESS
+            mock_blocked_service.return_value = mock_instance
 
             result = service.qualify_blocked_issue(issue)
 
             # Should unblock because all dependencies are satisfied
             assert result is not None
             assert result != IssueState.BLOCKED
+            mock_instance.reconcile_blocked.assert_called_once_with(
+                issue_number=300,
+                branch="task/issue-300",
+                clear_reason=False,
+                actor="orchestra:dispatcher",
+            )
 
 
 def test_multi_dep_partial_satisfaction_remains_blocked():
@@ -73,11 +76,6 @@ def test_multi_dep_partial_satisfaction_remains_blocked():
         github=github,
         store=store,
         flow_manager=flow_manager,
-    )
-
-    # Mock dependency checks: #100 closed, #200 still open
-    service._is_dependency_satisfied = MagicMock(
-        side_effect=lambda dep: dep == 100  # Only #100 is satisfied
     )
 
     flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-300"}
@@ -100,10 +98,24 @@ def test_multi_dep_partial_satisfaction_remains_blocked():
     with patch.object(
         service._coordination_resolver, "resolve_coordination", return_value=truth
     ):
-        result = service.qualify_blocked_issue(issue)
+        # Mock reconcile_blocked to simulate still blocked (returns None)
+        with patch(
+            "vibe3.domain.qualify_gate.BlockedStateService"
+        ) as mock_blocked_service:
+            mock_instance = MagicMock()
+            mock_instance.reconcile_blocked.return_value = None
+            mock_blocked_service.return_value = mock_instance
 
-        # Should remain blocked because #200 is still open
-        assert result is None
+            result = service.qualify_blocked_issue(issue)
+
+            # Should remain blocked (reconcile_blocked returned None)
+            assert result is None
+            mock_instance.reconcile_blocked.assert_called_once_with(
+                issue_number=300,
+                branch="task/issue-300",
+                clear_reason=False,
+                actor="orchestra:dispatcher",
+            )
 
 
 def test_single_dep_satisfied_unblocks_backward_compat():
@@ -119,9 +131,6 @@ def test_single_dep_satisfied_unblocks_backward_compat():
         store=store,
         flow_manager=flow_manager,
     )
-
-    # Mock dependency check: #100 is closed
-    service._is_dependency_satisfied = MagicMock(return_value=True)
 
     issue = IssueInfo(
         number=300,
@@ -144,19 +153,25 @@ def test_single_dep_satisfied_unblocks_backward_compat():
     with patch.object(
         service._coordination_resolver, "resolve_coordination", return_value=truth
     ):
-        # Mock unblock service
+        # Mock reconcile_blocked to simulate unblock
         with patch(
             "vibe3.domain.qualify_gate.BlockedStateService"
         ) as mock_blocked_service:
-            mock_result = MagicMock()
-            mock_result.label_cleared = True
-            mock_blocked_service.return_value.unblock.return_value = mock_result
+            mock_instance = MagicMock()
+            mock_instance.reconcile_blocked.return_value = IssueState.IN_PROGRESS
+            mock_blocked_service.return_value = mock_instance
 
             result = service.qualify_blocked_issue(issue)
 
             # Should unblock (single dependency regression test)
             assert result is not None
             assert result != IssueState.BLOCKED
+            mock_instance.reconcile_blocked.assert_called_once_with(
+                issue_number=300,
+                branch="task/issue-300",
+                clear_reason=False,
+                actor="orchestra:dispatcher",
+            )
 
 
 def test_blocked_by_issue_computed_property_single():
