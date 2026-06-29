@@ -11,6 +11,7 @@ Design Principles:
 
 from __future__ import annotations
 
+import sqlite3
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -21,9 +22,7 @@ from vibe3.services.flow.blocked_state_io import BlockedStateIO
 from vibe3.services.flow.blocked_state_types import (
     BlockedState,
     ConsistencyReport,
-    UnblockResult,
 )
-from vibe3.services.flow.timeline import FlowTimelineService
 from vibe3.services.shared.label_service import LabelService
 
 if TYPE_CHECKING:
@@ -65,10 +64,12 @@ class BlockedStateService:
         tasks: list[int] | None = None,
         actor: str = "system",
     ) -> None:
-        """Authoritatively block flow by writing to remote body truth, then reconcile."""
+        """Authoritatively block flow by writing body truth, then reconcile."""
         # Graceful degradation: no issue number -> write local cache only
         if issue_number is None:
-            self._io.write_database_cache(branch, reason, tasks[0] if tasks else None, actor)
+            self._io.write_database_cache(
+                branch, reason, tasks[0] if tasks else None, actor
+            )
             return
 
         try:
@@ -76,6 +77,7 @@ class BlockedStateService:
             if current_body is None:
                 raise RuntimeError(f"Issue #{issue_number} body is None")
             from vibe3.services.issue.body import parse_projection
+
             projection = parse_projection(current_body)
         except Exception:
             projection = FlowStateProjection()
@@ -84,15 +86,15 @@ class BlockedStateService:
         new_blocked_by = set(projection.blocked_by)
         if tasks:
             new_blocked_by.update(tasks)
-        
+
         new_reason = reason or projection.blocked_reason
-        
+
         new_projection = FlowStateProjection(
             state="blocked",
             blocked_by=sorted(list(new_blocked_by)),
             blocked_reason=new_reason,
         )
-        
+
         self._io.write_projection(issue_number, new_projection)
         self.reconcile_blocked(issue_number, branch, clear_reason=False, actor=actor)
 
@@ -105,7 +107,9 @@ class BlockedStateService:
         actor: str = "system",
     ) -> None:
         """Clear block status by invoking reconcile_blocked."""
-        self.reconcile_blocked(issue_number, branch, clear_reason=clear_reason, actor=actor)
+        self.reconcile_blocked(
+            issue_number, branch, clear_reason=clear_reason, actor=actor
+        )
 
     def rebuild_cache_from_truth(
         self,
@@ -137,12 +141,10 @@ class BlockedStateService:
 
         # Clear transition history on unblock to reset per-pair loop detection
         if not is_blocked:
-            import sqlite3
             try:
                 with sqlite3.connect(self.store.db_path) as conn:
                     self.store.clear_transition_history(conn, branch)
             except Exception as exc:
-                from loguru import logger
                 logger.bind(
                     domain="blocked_state",
                     action="rebuild_cache",
@@ -168,11 +170,11 @@ class BlockedStateService:
         actor: str = "system",
     ) -> IssueState | None:
         """Authoritatively reconcile blocked state across body, labels, and cache."""
+        from vibe3.models import FlowState
+        from vibe3.observability import DegradedModeReason, get_degraded_manager
+        from vibe3.services.flow.resume_resolver import infer_resume_label
         from vibe3.services.issue.body import parse_projection
         from vibe3.services.shared import DependencyResolutionService
-        from vibe3.observability import get_degraded_manager, DegradedModeReason
-        from vibe3.services.flow.resume_resolver import infer_resume_label
-        from vibe3.models import FlowState
 
         # 1. Read Remote Truth (handling Degraded Mode)
         try:
@@ -182,14 +184,16 @@ class BlockedStateService:
             truth = parse_projection(body)
             get_degraded_manager().exit_degraded_mode()
         except Exception as exc:
-            get_degraded_manager().enter_degraded_mode(DegradedModeReason.GITHUB_API_ERROR)
+            get_degraded_manager().enter_degraded_mode(
+                DegradedModeReason.GITHUB_API_ERROR
+            )
             logger.bind(
                 domain="blocked_state",
                 action="reconcile_blocked",
                 issue_number=issue_number,
                 error=str(exc),
             ).warning("GitHub read failed; falling back to DB cache")
-            # Return None to conservative-block, skip cache rebuilding during degraded mode
+            # Return None: conservative-block, skip cache rebuild in degraded
             return None
 
         # 2. Clear Reason if requested (e.g. manual resume)
@@ -203,7 +207,7 @@ class BlockedStateService:
             self._io.write_projection(issue_number, new_proj)
 
         # 3. Check for open dependencies
-        open_tasks = []
+        open_tasks: list[int] = []
         for task in truth.blocked_by:
             res = DependencyResolutionService.is_dependency_resolved(
                 task,
@@ -228,13 +232,16 @@ class BlockedStateService:
         else:
             # Determine resume target
             target = IssueState.READY
-            fs_dict = self.store.get_flow_state(branch) if (branch and self.store) else None
+            if branch and self.store:
+                fs_dict = self.store.get_flow_state(branch)
+            else:
+                fs_dict = None
             if fs_dict:
                 try:
                     target = infer_resume_label(FlowState.model_validate(fs_dict))
                 except Exception:
                     target = IssueState.READY
-            
+
             # Clear remote body state section
             new_proj = FlowStateProjection(
                 state="active",
@@ -303,6 +310,7 @@ class BlockedStateService:
     ) -> BlockedState:
         """Resolve authoritative truth, fallback to database in degraded mode."""
         from vibe3.services.issue.body import parse_projection
+
         try:
             body = self._io.github.get_issue_body(issue_number)
             if body is None:
@@ -328,4 +336,3 @@ class BlockedStateService:
             body_state=self._io.read_body_projection(issue_number),
             label_state=self._io.read_label_state(issue_number),
         )
-

@@ -27,7 +27,5 @@ class FlowStateProjection(BaseModel):
     def is_empty(self) -> bool:
         """Check if projection has any meaningful data."""
         return (
-            self.state == "active"
-            and not self.blocked_by
-            and not self.blocked_reason
+            self.state == "active" and not self.blocked_by and not self.blocked_reason
         )

@@ -162,9 +162,7 @@ def rule_stale_blocked_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
     try:
         from vibe3.services.flow import BlockedStateService
 
-        service = BlockedStateService(
-            github_client=svc.github_client, store=svc.store
-        )
+        service = BlockedStateService(github_client=svc.github_client, store=svc.store)
         target = service.reconcile_blocked(
             issue_number=ctx.task_issue,
             branch=ctx.branch,
@@ -204,9 +202,7 @@ def rule_blocked_label_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
     try:
         from vibe3.services.flow import BlockedStateService
 
-        service = BlockedStateService(
-            github_client=svc.github_client, store=svc.store
-        )
+        service = BlockedStateService(github_client=svc.github_client, store=svc.store)
         service.reconcile_blocked(
             issue_number=ctx.task_issue,
             branch=ctx.branch,

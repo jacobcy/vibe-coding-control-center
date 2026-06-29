@@ -371,7 +371,7 @@ class TaskResumeCandidates:
         service = BlockedStateService(github_client=self._github_client)
         body_state = service.resolve_truth(branch="", issue_number=issue_number)
 
-        for dep in (body_state.blocked_by or []):
+        for dep in body_state.blocked_by or []:
             resolution = DependencyResolutionService.is_dependency_resolved(
                 dep,
                 github_client=self._github_client,

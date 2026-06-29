@@ -211,7 +211,13 @@ class FlowRecoveryService:
             detail="Fallback: cleared blocked markers",
         )
 
-    def _do_resume(self, branch: str, issue_number: int, reason: str, clear_reason: bool = False) -> None:
+    def _do_resume(
+        self,
+        branch: str,
+        issue_number: int,
+        reason: str,
+        clear_reason: bool = False,
+    ) -> None:
         """Clear blocked markers via reconcile_blocked."""
         from vibe3.services.flow.blocked_state_service import BlockedStateService
 

@@ -48,9 +48,7 @@ class BlockedStateIO:
         """Write complete flow-state projection to issue body."""
         current_body = self.github.get_issue_body(issue_number)
         if current_body is None:
-            raise RuntimeError(
-                f"Failed to read issue body: issue #{issue_number}"
-            )
+            raise RuntimeError(f"Failed to read issue body: issue #{issue_number}")
         merged = merge_projection(current_body, projection)
         if merged == current_body:
             return
@@ -110,8 +108,6 @@ class BlockedStateIO:
             raise RuntimeError(
                 f"Failed to read issue body for projection: issue #{issue_number}"
             )
-
-        projection = parse_projection(current_body)
 
         new_projection = FlowStateProjection(
             state="active",

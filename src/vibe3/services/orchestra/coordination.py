@@ -106,32 +106,41 @@ class CoordinationResolver:
         if remote_success:
             blocked_by_issues = blocked_by_issues_remote
         else:
-            blocked_by_issues = self.store.get_dependency_links(branch) if branch else []
+            if branch:
+                blocked_by_issues = self.store.get_dependency_links(branch)
+            else:
+                blocked_by_issues = []
             if flow_state:
                 local_blocked_by = flow_state.get("blocked_by_issue")
-                if local_blocked_by is not None and local_blocked_by not in blocked_by_issues:
+                if (
+                    local_blocked_by is not None
+                    and local_blocked_by not in blocked_by_issues
+                ):
                     blocked_by_issues = [local_blocked_by] + blocked_by_issues
+
+        # Source provenance: remote-first with local fallback
+        body_fallback = DataSource.ISSUE_BODY_FALLBACK
+        local_fallback = DataSource.LOCAL_SQLITE
+
+        def _source(has_signal: bool) -> DataSource | None:
+            if remote_success:
+                return body_fallback
+            return local_fallback if has_signal else None
 
         truth = CoordinationTruth(
             # Issue body projection state (remote-first)
             projection_state=projection_state,
-            projection_state_source=(
-                DataSource.ISSUE_BODY_FALLBACK
-                if remote_success
-                else DataSource.LOCAL_SQLITE if (flow_state or projection_state is not None) else None
+            projection_state_source=_source(
+                bool(flow_state) or projection_state is not None
             ),
             # Collaboration: remote-first, fallback to local
             blocked_reason=blocked_reason,
-            blocked_reason_source=(
-                DataSource.ISSUE_BODY_FALLBACK
-                if remote_success
-                else DataSource.LOCAL_SQLITE if (flow_state or blocked_reason is not None) else None
+            blocked_reason_source=_source(
+                bool(flow_state) or blocked_reason is not None
             ),
             blocked_by_issues=blocked_by_issues,
-            blocked_by_issue_source=(
-                DataSource.ISSUE_BODY_FALLBACK
-                if remote_success
-                else DataSource.LOCAL_SQLITE if (flow_state or blocked_by_issues) else None
+            blocked_by_issue_source=_source(
+                bool(flow_state) or bool(blocked_by_issues)
             ),
             # Execution: local-only
             worktree_path=(flow_state.get("worktree_path") if flow_state else None),
