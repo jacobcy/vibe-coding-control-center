@@ -69,15 +69,12 @@ class BlockedStateService:
         Caller MUST resolve issue_number to a non-None int before calling;
         cache-only writes (no issue context) should use ``write_cache`` instead.
         """
-        try:
-            current_body = self._io.github.get_issue_body(issue_number)
-            if current_body is None:
-                raise RuntimeError(f"Issue #{issue_number} body is None")
-            from vibe3.services.issue.body import parse_projection
+        current_body = self._io.github.get_issue_body(issue_number)
+        if current_body is None:
+            raise RuntimeError(f"Issue #{issue_number} body is None")
+        from vibe3.services.issue.body import parse_projection
 
-            projection = parse_projection(current_body)
-        except Exception:
-            projection = FlowStateProjection()
+        projection = parse_projection(current_body)
 
         # Merge fields
         new_blocked_by = set(projection.blocked_by)

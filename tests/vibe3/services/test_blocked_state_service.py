@@ -3,6 +3,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow.blocked_state_service import (
@@ -354,6 +356,55 @@ def test_parse_projection_merges_legacy_dependencies() -> None:
     assert sorted(proj.blocked_by) == [101, 456, 789]
     # Check that dependencies attribute is retired
     assert not hasattr(proj, "dependencies")
+
+
+class TransientFailGitHub(StubGitHubClient):
+    """Simulates transient GitHub failure: first call raises, second succeeds."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._call_count = 0
+
+    def get_issue_body(self, issue_number: int) -> str | None:
+        self._call_count += 1
+        if self._call_count == 1:
+            raise RuntimeError("transient network error")
+        return super().get_issue_body(issue_number)
+
+
+def test_set_block_fails_closed_on_read_error(tmp_path: Path) -> None:
+    """set_block MUST raise on body read failure — must not write empty projection."""
+    from vibe3.services.flow.blocked_state_io import BlockedStateIO
+
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("task/issue-100", flow_slug="test")
+
+    existing_body = (
+        "## Flow State\nstate: blocked\n"
+        "blocked_reason: existing reason\nblocked_by: #456"
+    )
+    github = TransientFailGitHub(issue_body=existing_body)
+    label_service = StubLabelService()
+    io = BlockedStateIO(
+        github_client=github,
+        label_service=label_service,
+        store=store,
+    )
+    svc = BlockedStateService(store=store)
+    svc._io = io
+
+    with pytest.raises(Exception, match="transient network error|body"):
+        svc.set_block(
+            issue_number=100,
+            branch="task/issue-100",
+            reason="new reason",
+        )
+
+    # Existing body must NOT be overwritten with empty projection
+    body_after = github.get_issue_body(100)
+    assert "existing reason" in (
+        body_after or ""
+    ), f"Existing body was overwritten. Got: {body_after!r}"
 
 
 def test_reconcile_blocked_blocked_state(tmp_path: Path) -> None:
