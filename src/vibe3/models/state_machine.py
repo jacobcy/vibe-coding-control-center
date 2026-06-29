@@ -39,6 +39,7 @@ def get_highest_priority_state_label(labels: list[str]) -> str | None:
             return candidate
     return None
 
+
 STATE_LABEL_META: dict[IssueState, tuple[str, str]] = {
     IssueState.READY: ("0E8A16", "Ready for manager dispatch"),
     IssueState.CLAIMED: ("1D76DB", "Claimed and waiting for planning"),
