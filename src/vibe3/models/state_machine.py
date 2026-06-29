@@ -14,6 +14,31 @@ from vibe3.models import ALLOWED_TRANSITIONS, FORBIDDEN_TRANSITIONS, IssueState
 
 VIBE_TASK_LABEL = "vibe-task"
 
+STATE_PRIORITY_ORDER: tuple[str, ...] = (
+    "blocked",
+    "done",
+    "merge-ready",
+    "review",
+    "in-progress",
+    "handoff",
+    "claimed",
+    "ready",
+)
+
+
+def get_highest_priority_state_label(labels: list[str]) -> str | None:
+    """Return the highest-priority ``state/*`` label from *labels*, or ``None``.
+
+    Priority order: blocked > done > merge-ready > review > in-progress >
+    handoff > claimed > ready.
+    """
+    state_set = {lb for lb in labels if lb.startswith("state/")}
+    for priority in STATE_PRIORITY_ORDER:
+        candidate = f"state/{priority}"
+        if candidate in state_set:
+            return candidate
+    return None
+
 STATE_LABEL_META: dict[IssueState, tuple[str, str]] = {
     IssueState.READY: ("0E8A16", "Ready for manager dispatch"),
     IssueState.CLAIMED: ("1D76DB", "Claimed and waiting for planning"),

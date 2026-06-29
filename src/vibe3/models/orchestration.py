@@ -208,12 +208,10 @@ class IssueInfo(BaseModel):
         try:
             labels = [lb["name"] for lb in payload.get("labels", [])]
 
-            state = None
-            for lb in labels:
-                parsed = IssueState.from_label(lb)
-                if parsed is not None:
-                    state = parsed
-                    break
+            from vibe3.models.state_machine import get_highest_priority_state_label
+
+            highest = get_highest_priority_state_label(labels)
+            state = IssueState.from_label(highest) if highest else None
 
             # Parse GitHub milestone
             milestone = None

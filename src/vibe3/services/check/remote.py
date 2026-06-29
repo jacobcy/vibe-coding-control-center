@@ -9,6 +9,7 @@ from loguru import logger
 
 from vibe3.clients import parse_linked_issues
 from vibe3.models import IssueLink, IssueState
+from vibe3.models.state_machine import get_highest_priority_state_label
 
 
 @dataclass
@@ -26,22 +27,28 @@ if TYPE_CHECKING:
 
 
 def issue_state_from_payload(issue: object) -> IssueState | None:
-    """Extract issue state from GitHub payload."""
+    """Extract issue state from GitHub payload.
+
+    When multiple ``state/*`` labels are present, the highest-priority one
+    wins (blocked > done > merge-ready > … > ready) instead of relying on
+    the non-deterministic label ordering returned by the GitHub API.
+    """
     if not isinstance(issue, dict):
         return None
     labels = issue.get("labels")
     if not isinstance(labels, list):
         return None
+
+    label_names: list[str] = []
     for item in labels:
         if not isinstance(item, dict):
             continue
         name = item.get("name")
-        if not isinstance(name, str):
-            continue
-        parsed = IssueState.from_label(name)
-        if parsed is not None:
-            return parsed
-    return None
+        if isinstance(name, str):
+            label_names.append(name)
+
+    highest = get_highest_priority_state_label(label_names)
+    return IssueState.from_label(highest) if highest else None
 
 
 def requires_handoff(issue_state: IssueState | None) -> bool:

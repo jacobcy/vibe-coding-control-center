@@ -125,8 +125,10 @@ if TYPE_CHECKING:
     from vibe3.models.session_types import SessionRole
     from vibe3.models.state_machine import (
         STATE_LABEL_META,
+        STATE_PRIORITY_ORDER,
         VIBE_TASK_LABEL,
         can_transition,
+        get_highest_priority_state_label,
         validate_transition,
     )
     from vibe3.models.trace import ExecutionStep, TraceOutput, format_result_entries

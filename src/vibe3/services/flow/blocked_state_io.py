@@ -93,13 +93,11 @@ class BlockedStateIO:
                 f"Failed to read issue body for projection: issue #{issue_number}"
             )
 
-        projection = parse_projection(current_body)
-
         new_projection = FlowStateProjection(
             state="active",
             blocked_by=[],
             blocked_reason=None,
-            dependencies=projection.dependencies,
+            dependencies=[],
         )
 
         merged = merge_projection(current_body, new_projection)

@@ -20,6 +20,7 @@ from vibe3.models import (
     StateTransition,
     validate_transition,
 )
+from vibe3.models.state_machine import get_highest_priority_state_label
 
 
 class LabelService:
@@ -36,6 +37,10 @@ class LabelService:
 
     def get_state(self, issue_number: int) -> IssueState | None:
         """Get current orchestration state of an issue.
+
+        When multiple ``state/*`` labels are present the highest-priority one
+        is returned (blocked > done > … > ready) so that callers always see
+        the most authoritative state rather than an arbitrary first-match.
 
         Args:
             issue_number: GitHub issue number
@@ -57,12 +62,8 @@ class LabelService:
             )
             return None
 
-        for name in labels:
-            state = IssueState.from_label(name)
-            if state:
-                return state
-
-        return None
+        highest = get_highest_priority_state_label(labels)
+        return IssueState.from_label(highest) if highest else None
 
     def transition(
         self,
@@ -118,9 +119,20 @@ class LabelService:
         actor: str,
         force: bool = False,
     ) -> Literal["confirmed", "advanced", "blocked"]:
-        """Confirm target issue state with minimum action."""
+        """Confirm target issue state with minimum action.
+
+        If the highest-priority state already matches *to_state* but extra
+        ``state/*`` labels are present (multi-label anomaly), they are
+        cleaned up via :meth:`set_state` so that a single canonical label
+        remains.
+        """
         current_state = self.get_state(issue_number)
         if current_state == to_state:
+            # Clean up any lingering extra state labels (e.g. state/blocked
+            # left over from a prior block that was auto-resumed).
+            all_state_labels = self._get_all_state_labels(issue_number)
+            if len(all_state_labels) > 1:
+                self.set_state(issue_number, to_state)
             return "confirmed"
         try:
             self.transition(issue_number, to_state, actor=actor, force=force)

@@ -15,6 +15,10 @@ from vibe3.clients import (
     normalize_labels,
 )
 from vibe3.models import OrchestraConfig
+from vibe3.models.state_machine import (
+    STATE_PRIORITY_ORDER as _STATE_PRIORITY_ORDER,
+    get_highest_priority_state_label,
+)
 
 if TYPE_CHECKING:
     from vibe3.models import DispatchExclusion, IssueInfo
@@ -115,16 +119,6 @@ def clean_old_state_labels(
 
 _ROADMAP_LABELS = frozenset({"roadmap/rfc", "roadmap/epic"})
 EXECUTION_STATES = frozenset({"merge-ready", "review", "in-progress", "claimed"})
-_STATE_PRIORITY_ORDER = (
-    "blocked",
-    "done",
-    "merge-ready",
-    "review",
-    "in-progress",
-    "handoff",
-    "claimed",
-    "ready",
-)
 
 ORCHESTRA_GOVERNED_LABEL = "orchestra-governed"
 
@@ -166,12 +160,7 @@ def get_state_labels(labels: list[str]) -> list[str]:
 
 def get_highest_priority_state(labels: list[str]) -> str | None:
     """Return highest-priority state/* label from labels, or None."""
-    state_set = set(get_state_labels(labels))
-    for priority_state in _STATE_PRIORITY_ORDER:
-        candidate = f"state/{priority_state}"
-        if candidate in state_set:
-            return candidate
-    return None
+    return get_highest_priority_state_label(labels)
 
 
 def get_conflicting_states(labels: list[str]) -> list[str]:
