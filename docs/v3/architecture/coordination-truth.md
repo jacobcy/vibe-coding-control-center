@@ -10,13 +10,13 @@ This document describes the remote-first coordination truth implementation for o
 
 **Collaboration Fields (Remote-First):**
 - `blocked_reason` - Issue Body Projection > Local SQLite
-- `blocked_by_issue` - Issue Body Projection > Local SQLite
 - `blocked_by` (multi-value) - Issue Body Projection > Local SQLite
 
 **Execution Fields (Local-Only):**
 - `worktree_path` - Local SQLite only
 - `actor` - Local SQLite only
 - `flow_status` - Derived pointer (reconciled from body truth; see §2.3 of the standard)
+- `blocked_by_issue` - Derived single-value cache (reconciled from body truth)
 
 ### Data Sources
 

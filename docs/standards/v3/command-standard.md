@@ -171,13 +171,11 @@ related_docs:
 
 ### 4.3 `flow blocked`
 
-`flow blocked` 只负责：
+`flow blocked` (以及所有写入/清除操作) 遵循远端单一真源与统一底层原语原则：
 
-- 标记本地 flow 为 blocked
-- 记录阻塞原因
-- 可选补充 dependency 关系
-
-若存在远端标签同步，它只是兼容性副作用，不构成共享状态域的首要语义。
+- 必须调用统一底层原语 `set_block` 修改远端 GitHub Issue Body 托管投影（唯一真源）。
+- 随后由对账机制 `reconcile_blocked` 重新生成本地 SQLite 缓存（更新 `flow_state.flow_status` / `blocked_reason` / `blocked_by_issue`）以及同步远端 `state/blocked` 标签。
+- 禁止绕过 body 投影直接写入本地 DB。标签同步是基于对账事实的强制一致性同步，而非瞬态副作用。
 
 ### 4.4 `flow show` / `flow status`
 
