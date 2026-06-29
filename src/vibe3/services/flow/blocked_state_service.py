@@ -219,14 +219,18 @@ class BlockedStateService:
         effective_blocked = bool(truth.blocked_reason) or bool(open_tasks)
         if effective_blocked:
             target = None
-            if truth.state != "blocked":
-                truth.state = "blocked"
+            # R5: Prune closed deps from body so they aren't re-checked each cycle.
+            body_needs_update = truth.state != "blocked" or set(open_tasks) != set(
+                truth.blocked_by
+            )
+            if body_needs_update:
                 new_proj = FlowStateProjection(
                     state="blocked",
-                    blocked_by=truth.blocked_by,
+                    blocked_by=sorted(open_tasks),
                     blocked_reason=truth.blocked_reason,
                 )
                 self._io.write_projection(issue_number, new_proj)
+                truth = new_proj
             self._io.write_label_state(issue_number, IssueState.BLOCKED, actor=actor)
         else:
             # Determine resume target

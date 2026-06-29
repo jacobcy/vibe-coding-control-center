@@ -232,8 +232,17 @@ class FlowRecoveryService:
             actor="recovery:resume",
         )
         if target_state is None and clear_reason:
-            raise RuntimeError(
-                f"Cannot resume issue #{issue_number} due to open dependencies."
+            # None means either open dependencies remain or GitHub is unreachable
+            # (degraded mode).  Either way we must NOT raise — keeping the flow
+            # blocked is the correct conservative outcome (§6.2 / §6.4).
+            logger.bind(
+                domain="recovery",
+                action="_do_resume",
+                issue_number=issue_number,
+                branch=branch,
+            ).warning(
+                "reconcile_blocked returned None after clear_reason; "
+                "flow remains blocked (open deps or GitHub degraded)"
             )
 
     def _do_rebuild(

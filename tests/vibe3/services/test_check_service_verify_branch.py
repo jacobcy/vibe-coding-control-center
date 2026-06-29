@@ -442,13 +442,14 @@ def test_dependency_check_reports_unresolved_warnings(tmp_path: Path) -> None:
 
     # Mock GitHub client
     mock_github = MagicMock(spec=GitHubClient)
-    # Task issue is open
+    # Task issue is open; body has state/active so reconcile rules short-circuit
     mock_github.view_issue.side_effect = lambda issue_num: {
         "state": "OPEN",
         "title": "Test Issue",
         "body": "",
         "labels": [],
     }
+    mock_github.get_issue_body.return_value = ""  # active projection, no blocked state
     mock_github.list_all_prs.return_value = []
     mock_github.list_prs_for_branch.return_value = []
 

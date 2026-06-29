@@ -220,6 +220,49 @@ def rule_blocked_label_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
         return None
 
 
+def rule_blocked_flow_reconcile(ctx: CheckContext, svc: Any) -> CheckResult | None:
+    """Unconditionally reconcile any active blocked flow against body truth.
+
+    R1: rule_stale_blocked_sync and rule_blocked_label_sync only fire on
+    label/cache *divergence*.  When both label and cache agree on 'blocked'
+    but the body truth has all deps closed, no rule was firing and vibe-check
+    would never recover the flow.  This rule closes that gap by running
+    reconcile_blocked for every blocked active flow so vibe-check and the
+    periodic health-check are equivalent to orchestra qualify (§6.1).
+    """
+    if not svc._sync_rules.local.blocked_label_sync.enabled:
+        return None
+    if not (ctx.flow_status == "blocked" and ctx.task_issue and ctx.is_active_flow):
+        return None
+
+    from vibe3.services.check.service import CheckResult
+
+    try:
+        from vibe3.services.flow import BlockedStateService
+
+        service = BlockedStateService(github_client=svc.github_client, store=svc.store)
+        target = service.reconcile_blocked(
+            issue_number=ctx.task_issue,
+            branch=ctx.branch,
+            clear_reason=False,
+            actor="check:blocked_flow_reconcile",
+        )
+        if target is not None:
+            logger.info(
+                f"Recovered blocked flow to {target}",
+                branch=ctx.branch,
+            )
+        return CheckResult(is_valid=True, branch=ctx.branch, issues=[])
+    except Exception as e:
+        logger.error(
+            "Failed to reconcile blocked flow",
+            branch=ctx.branch,
+            error=str(e),
+        )
+        ctx.issues.append(f"Blocked flow reconcile failed: {e}")
+        return None
+
+
 def rule_stale_ready_rebuild(ctx: CheckContext, svc: Any) -> CheckResult | None:
     """Rebuild stale ready flow from remote issue state."""
     if not svc._sync_rules.local.stale_ready_rebuild.enabled:
@@ -509,6 +552,7 @@ RULES = [
     rule_aborted_flow_done_reconcile,  # NEW
     rule_stale_blocked_sync,
     rule_blocked_label_sync,
+    rule_blocked_flow_reconcile,
     rule_stale_ready_rebuild,
     rule_missing_branch_cleanup,
     rule_orphaned_flow_cleanup,

@@ -102,11 +102,16 @@ class QualifyGateService:
                 clear_reason=False,
                 actor="orchestra:dispatcher",
             )
+            # R2: reconcile returns None on degraded mode OR still-blocked.
+            # Either way we must NOT dispatch — conservative blocking (§6.4).
+            if reconcile_result is None:
+                return None
+            # reconcile resolved the block: proceed through worktree health check
+            # before dispatching (R4: restore the health check that was bypassed).
             flow_state = self._store.get_flow_state(branch)
-            if not flow_state or flow_state.get("flow_status") == "blocked":
-                return None  # 仍阻塞或降级 -> 不派发
-            if reconcile_result is not None:
-                return reconcile_result  # 已解除阻塞 -> 派发重建后的目标状态
+            if flow_state and not self._check_worktree_health(issue, branch, truth):
+                return None
+            return reconcile_result  # 已解除阻塞 -> 派发重建后的目标状态
 
         if not flow_state:
             return trigger_state if trigger_state.to_label() in labels else None
