@@ -547,3 +547,60 @@ def test_reconcile_degraded_stays_blocked(tmp_path: Path) -> None:
     flow_state = store.get_flow_state("task/issue-100")
     assert flow_state is not None
     assert flow_state.get("flow_status") == "blocked"
+
+
+class TrackingLabelService(StubLabelService):
+    """Track all confirm_issue_state calls."""
+
+    def __init__(self):
+        super().__init__()
+        self.confirm_calls: list[tuple[int, IssueState, str, bool]] = []
+
+    def confirm_issue_state(
+        self,
+        issue_number: int,
+        state: IssueState,
+        actor: str = "system",
+        force: bool = False,
+    ) -> str:
+        self.confirm_calls.append((issue_number, state, actor, force))
+        return super().confirm_issue_state(issue_number, state, actor, force)
+
+
+def test_reconcile_blocked_restores_missing_remote_label(tmp_path: Path) -> None:
+    """Label must be written when body/cache are blocked but remote label missing."""
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("task/issue-100", flow_slug="test")
+    # Pre-populate cache to look "already blocked"
+    store.update_flow_state(
+        "task/issue-100",
+        flow_status="blocked",
+        blocked_reason="some reason",
+    )
+
+    # Body is also blocked (no open dependencies, but blocked_reason is set)
+    issue_body_blocked = (
+        "<!-- vibe3-flow-state-start -->\n\n"
+        "**Vibe3 Flow State**\n\n"
+        "- **State**: blocked\n"
+        "- **Blocked reason**: some reason\n\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
+    github = StubGitHubClient(issue_body=issue_body_blocked)
+    label_service = TrackingLabelService()
+
+    svc = BlockedStateService(
+        store=store,
+        github_client=github,
+        label_service=label_service,
+    )
+
+    svc.reconcile_blocked(100, "task/issue-100", clear_reason=False)
+
+    assert len(label_service.confirm_calls) > 0, (
+        "Expected confirm_issue_state to be called with IssueState.BLOCKED "
+        "when remote label is missing, but no calls happened"
+    )
+    assert (
+        label_service.confirm_calls[-1][1] == IssueState.BLOCKED
+    ), f"Last label call was {label_service.confirm_calls[-1][1]}, expected BLOCKED"
