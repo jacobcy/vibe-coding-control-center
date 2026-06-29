@@ -201,17 +201,27 @@ def find_repo_root() -> Path:
         git_common = get_git_common_dir()
         if git_common:
             git_common_path = Path(git_common)
-            # Check if this is a bare repository. In a bare repository, core.bare = true is in config,
-            # and git_common itself is the repository directory.
+            # Check if this is a bare repository. In a bare repository,
+            # core.bare = true in config and git_common IS the repo directory.
+            # Use 'git config' for authoritative reading (handles comments,
+            # includes, and whitespace variants robustly).
             config_path = git_common_path / "config"
             is_bare = False
             if config_path.is_file():
                 try:
-                    content = config_path.read_text()
-                    if "bare = true" in content:
-                        is_bare = True
-                except Exception:
-                    pass
+                    result = subprocess.run(
+                        ["git", "config", "--file", str(config_path), "--get", "core.bare"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    is_bare = result.returncode == 0 and result.stdout.strip() == "true"
+                except (OSError, UnicodeDecodeError, subprocess.TimeoutExpired) as exc:
+                    logger.bind(
+                        domain="git",
+                        subdomain="find_repo_root",
+                        path=str(config_path),
+                    ).debug("Failed to read git config for bare detection: {}", exc)
             if is_bare:
                 return git_common_path
             return git_common_path.parent
