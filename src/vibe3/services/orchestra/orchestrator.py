@@ -9,7 +9,13 @@ from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
-from vibe3.clients import GitClient, GitHubClient, GitHubClientProtocol, SQLiteClient
+from vibe3.clients import (
+    GitClient,
+    GitHubClient,
+    GitHubClientProtocol,
+    SQLiteClient,
+    find_repo_root,
+)
 from vibe3.environment import WorktreeManager
 from vibe3.exceptions import GitError, is_transient_git_error
 from vibe3.models import PRState
@@ -207,7 +213,7 @@ class FlowOrchestratorService:
             if ensure_worktree:
                 worktree_manager = WorktreeManager(
                     self.config,
-                    repo_path=Path(self.git.get_git_common_dir()).parent,
+                    repo_path=self.git.find_repo_root(),
                 )
                 worktree_ctx = worktree_manager.resolve_bootstrap_worktree_context(
                     branch=branch,
