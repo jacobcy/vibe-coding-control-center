@@ -138,7 +138,7 @@ class TestRunQualifyGate:
         mock_truth.is_blocked = True
         mock_truth.blocked_reason = "Manual intervention required"
         mock_truth.blocked_by_issue = None
-        mock_truth.dependencies = []
+        mock_truth.blocked_by_issues = []
 
         with patch.object(
             qualify_gate_service._coordination_resolver,
@@ -182,7 +182,7 @@ class TestRunQualifyGate:
             mock_truth.is_blocked = True
             mock_truth.blocked_reason = "Manual intervention required"
             mock_truth.blocked_by_issue = None
-            mock_truth.dependencies = []
+            mock_truth.blocked_by_issues = []
 
             with patch.object(
                 qualify_gate_service._coordination_resolver,
@@ -219,7 +219,7 @@ class TestRunQualifyGate:
         mock_truth.is_blocked = False
         mock_truth.blocked_reason = None
         mock_truth.blocked_by_issue = None
-        mock_truth.dependencies = [456]
+        mock_truth.blocked_by_issues = [456]
         mock_truth.worktree_path = None
 
         mock_github.get_issue_body.return_value = "User content"
@@ -256,7 +256,7 @@ class TestRunQualifyGate:
         mock_truth.is_blocked = False
         mock_truth.blocked_reason = None
         mock_truth.blocked_by_issue = None
-        mock_truth.dependencies = [456]
+        mock_truth.blocked_by_issues = [456]
         mock_truth.worktree_path = None
 
         with patch.object(
@@ -296,7 +296,7 @@ class TestRunQualifyGate:
         mock_truth.is_blocked = False
         mock_truth.blocked_reason = None
         mock_truth.blocked_by_issue = None
-        mock_truth.dependencies = []
+        mock_truth.blocked_by_issues = []
         mock_truth.worktree_path = None
 
         with patch.object(
@@ -357,7 +357,7 @@ class TestRunQualifyGate:
         mock_truth.is_blocked = False
         mock_truth.blocked_reason = None
         mock_truth.blocked_by_issue = None
-        mock_truth.dependencies = []
+        mock_truth.blocked_by_issues = []
         mock_truth.worktree_path = None
 
         mock_github.get_issue_body.return_value = "User content"

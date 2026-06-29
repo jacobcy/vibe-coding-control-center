@@ -105,13 +105,8 @@ class CoordinationResolver:
         # Handle blocked_by_issues with proper type narrowing
         if remote_success:
             blocked_by_issues = blocked_by_issues_remote
-        elif flow_state:
-            local_blocked_by = flow_state.get("blocked_by_issue")
-            blocked_by_issues = (
-                [local_blocked_by] if local_blocked_by is not None else []
-            )
         else:
-            blocked_by_issues = []
+            blocked_by_issues = self.store.get_dependency_links(branch)
 
         truth = CoordinationTruth(
             # Issue body projection state (remote-first)
