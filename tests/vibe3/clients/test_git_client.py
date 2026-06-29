@@ -459,3 +459,55 @@ class TestResolveSource:
         # UncommittedSource
         us = UncommittedSource()
         assert client._resolve_source(us) is us
+
+
+class TestFetchRefspecConstruction:
+    """Verify fetch() constructs correct refspecs after PR #3246 fix."""
+
+    def test_fetch_bare_branch_adds_refspec(self):
+        """fetch('origin', 'main') constructs 'main:refs/remotes/origin/main'."""
+        client = GitClient()
+        captured_args = []
+
+        def fake_run(args, cwd=None):
+            if args[0] == "fetch":
+                captured_args.append(args[:])
+
+        with patch.object(client, "_run", side_effect=fake_run):
+            client.fetch("origin", "main")
+
+        assert len(captured_args) == 1
+        fetch_args = captured_args[0]
+        assert "main:refs/remotes/origin/main" in fetch_args
+
+    def test_fetch_full_ref_passed_through(self):
+        """fetch('origin', 'refs/tags/v1') is passed through unchanged."""
+        client = GitClient()
+        captured_args = []
+
+        def fake_run(args, cwd=None):
+            if args[0] == "fetch":
+                captured_args.append(args[:])
+
+        with patch.object(client, "_run", side_effect=fake_run):
+            client.fetch("origin", "refs/tags/v1")
+
+        assert len(captured_args) == 1
+        fetch_args = captured_args[0]
+        assert "refs/tags/v1" in fetch_args
+
+    def test_fetch_refspec_with_colon_passed_through(self):
+        """fetch('origin', 'a:b') is passed through unchanged (already colon-separated)."""
+        client = GitClient()
+        captured_args = []
+
+        def fake_run(args, cwd=None):
+            if args[0] == "fetch":
+                captured_args.append(args[:])
+
+        with patch.object(client, "_run", side_effect=fake_run):
+            client.fetch("origin", "a:b")
+
+        assert len(captured_args) == 1
+        fetch_args = captured_args[0]
+        assert "a:b" in fetch_args
