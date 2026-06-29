@@ -80,6 +80,10 @@ def test_start_async_spawns_tmux_session(monkeypatch) -> None:
             "vibe3.config.settings.VibeConfig.get_defaults",
             return_value=mock_vibe_config,
         ),
+        patch(
+            "vibe3.utils.git_helpers.find_repo_root",
+            return_value=Path.cwd(),
+        ),
     ):
         runner = CliRunner()
         result = runner.invoke(app, ["serve", "start"])

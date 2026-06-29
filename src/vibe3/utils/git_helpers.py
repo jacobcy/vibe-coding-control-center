@@ -2,6 +2,7 @@
 
 import functools
 import hashlib
+import re
 import subprocess
 from pathlib import Path
 
@@ -203,27 +204,20 @@ def find_repo_root() -> Path:
             git_common_path = Path(git_common)
             # Check if this is a bare repository. In a bare repository,
             # core.bare = true in config and git_common IS the repo directory.
-            # Use 'git config' for authoritative reading (handles comments,
-            # includes, and whitespace variants robustly).
+            # Parse config directly (no subprocess) to avoid polluting test mocks.
             config_path = git_common_path / "config"
             is_bare = False
             if config_path.is_file():
                 try:
-                    result = subprocess.run(
-                        [
-                            "git",
-                            "config",
-                            "--file",
-                            str(config_path),
-                            "--get",
-                            "core.bare",
-                        ],
-                        capture_output=True,
-                        text=True,
-                        timeout=5,
+                    content = config_path.read_text()
+                    # Match only uncommented 'bare = true' (handles tab/space variants).
+                    # Comments in git config use '#' or ';' at line start.
+                    is_bare = any(
+                        re.fullmatch(r"\s*bare\s*=\s*true\s*", line)
+                        for line in content.splitlines()
+                        if line.strip() and line.strip()[0] not in ("#", ";")
                     )
-                    is_bare = result.returncode == 0 and result.stdout.strip() == "true"
-                except (OSError, UnicodeDecodeError, subprocess.TimeoutExpired) as exc:
+                except (OSError, UnicodeDecodeError) as exc:
                     logger.bind(
                         domain="git",
                         subdomain="find_repo_root",
