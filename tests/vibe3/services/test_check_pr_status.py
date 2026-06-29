@@ -230,11 +230,9 @@ class TestMergedPRCacheIntegration:
             }
         )
 
-        with patch("vibe3.clients.pr_status_checker.GitClient") as mock_git_client_cls:
-            mock_git_client = MagicMock()
-            mock_git_client.get_git_common_dir.return_value = str(tmp_path / ".git")
-            mock_git_client_cls.return_value = mock_git_client
-
+        with patch(
+            "vibe3.clients.pr_status_checker._resolve_repo_path", return_value=tmp_path
+        ):
             with patch(
                 "vibe3.clients.pr_status_checker.GitHubClient"
             ) as mock_client_class:
@@ -252,10 +250,9 @@ class TestMergedPRCacheIntegration:
         """When cache misses, get_merged_pr_for_issue should sync and return result."""
         from vibe3.clients import get_merged_pr_for_issue
 
-        with patch("vibe3.clients.pr_status_checker.GitClient") as mock_git_client_cls:
-            mock_git_client = MagicMock()
-            mock_git_client.get_git_common_dir.return_value = str(tmp_path / ".git")
-            mock_git_client_cls.return_value = mock_git_client
+        with patch(
+            "vibe3.clients.pr_status_checker._resolve_repo_path", return_value=tmp_path
+        ):
 
             # Mock GitHubClient
             with patch(
@@ -287,11 +284,9 @@ class TestMergedPRCacheIntegration:
         """Cache sync API failures should be logged, not silently swallowed."""
         from vibe3.clients import get_merged_pr_for_issue
 
-        with patch("vibe3.clients.pr_status_checker.GitClient") as mock_git_client_cls:
-            mock_git_client = MagicMock()
-            mock_git_client.get_git_common_dir.return_value = str(tmp_path / ".git")
-            mock_git_client_cls.return_value = mock_git_client
-
+        with patch(
+            "vibe3.clients.pr_status_checker._resolve_repo_path", return_value=tmp_path
+        ):
             with patch(
                 "vibe3.clients.pr_status_checker.GitHubClient"
             ) as mock_client_class:

@@ -239,11 +239,12 @@ def validate_governance_material_consistency(
             return issues
     explicit_repo_root = repo_root is not None
     if repo_root is None:
-        from vibe3.clients import GitClient
+        from vibe3.clients import find_repo_root
 
-        git_client = GitClient()
-        git_common_dir = git_client.get_git_common_dir()
-        repo_root = Path(git_common_dir).parent if git_common_dir else Path.cwd()
+        try:
+            repo_root = find_repo_root()
+        except Exception:
+            repo_root = Path.cwd()
 
     # Load material catalog from prompt manifest
     try:

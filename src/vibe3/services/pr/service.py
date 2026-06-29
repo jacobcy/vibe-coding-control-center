@@ -75,17 +75,23 @@ class PRService:
 
     @property
     def recent_pr_cache(self) -> RecentPRCache:
-        """Persistent recent PR cache rooted at the repository common dir."""
+        """Persistent recent PR cache rooted at the repository root."""
         if self._recent_pr_cache_client is None:
             try:
-                git_common_dir = self.git_client.get_git_common_dir()
-                repo_path = (
-                    Path(git_common_dir).parent
-                    if isinstance(git_common_dir, (str, PathLike)) and git_common_dir
-                    else Path.cwd()
-                )
+                repo_path = self.git_client.find_repo_root()
+                if not isinstance(repo_path, Path):
+                    raise TypeError(f"Expected Path, got {type(repo_path)}")
             except Exception:
-                repo_path = Path.cwd()
+                try:
+                    git_common_dir = self.git_client.get_git_common_dir()
+                    repo_path = (
+                        Path(git_common_dir).parent
+                        if git_common_dir
+                        and isinstance(git_common_dir, (str, PathLike))
+                        else Path.cwd()
+                    )
+                except Exception:
+                    repo_path = Path.cwd()
             self._recent_pr_cache_client = RecentPRCache(repo_path)
         return self._recent_pr_cache_client
 

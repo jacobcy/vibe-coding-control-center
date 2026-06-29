@@ -16,18 +16,21 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.clients import GitClient, GitHubClient, MergedPRCache
+# GitClient imported for backward compatibility — tests patch this module's namespace
+from vibe3.clients import (  # noqa: F401
+    GitClient,
+    GitHubClient,
+    MergedPRCache,
+    find_repo_root,
+)
 
 
 def _resolve_repo_path() -> Path:
     """Resolve the repository root path for cache operations."""
     try:
-        git_common_dir = GitClient().get_git_common_dir()
-        if git_common_dir:
-            return Path(git_common_dir).parent
-    except (OSError, ValueError):
-        pass
-    return Path.cwd()
+        return find_repo_root()
+    except Exception:
+        return Path.cwd()
 
 
 def get_merged_pr_for_issue(
