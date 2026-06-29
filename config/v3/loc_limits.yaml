@@ -30,8 +30,8 @@ code_limits:
         limit: 680
         reason: "校验聚合 + 规则编排；sync rules 实现已提取至 rule_checks.py，_check_branch 精简为编排器；#2912 新增 enforce_label_constraints_remote 方法（+116 行）实现远程 issue 标签约束扫描"
       - path: "src/vibe3/services/check/rule_checks.py"
-        limit: 550
-        reason: "Check 规则实现文件，含 13 条规则函数；#2912 新增 rule_label_constraint_enforcement（+82 行）实现标签约束自动修复；#3167 新增 rule_aborted_flow_done_reconcile（+47 行）实现 aborted→done 流状态转换协调"
+        limit: 600
+        reason: "Check 规则实现文件，含 14 条规则函数；#2912 新增 rule_label_constraint_enforcement（+82 行）；#3167 新增 rule_aborted_flow_done_reconcile（+47 行）；#3238 新增 rule_blocked_flow_reconcile（+44 行）实现 blocked flow 无条件 reconcile"
 
       # Exceptions 聚合 —— 允许 480-600
       # Domain 层

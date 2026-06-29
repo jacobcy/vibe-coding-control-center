@@ -216,6 +216,14 @@ class BlockedStateService:
                 open_tasks.append(task)
 
         # 4. Resolve State & Sync remote state section + labels
+        # Read cache BEFORE resolving state so we know if label is already in sync.
+        cache_already_blocked = (
+            self.store is not None
+            and branch
+            and (self.store.get_flow_state(branch) or {}).get("flow_status")
+            == "blocked"
+        )
+
         effective_blocked = bool(truth.blocked_reason) or bool(open_tasks)
         if effective_blocked:
             target = None
@@ -231,7 +239,14 @@ class BlockedStateService:
                 )
                 self._io.write_projection(issue_number, new_proj)
                 truth = new_proj
-            self._io.write_label_state(issue_number, IssueState.BLOCKED, actor=actor)
+            # Skip label write when body is already clean-blocked AND the local
+            # cache confirms the flow is already blocked — the label is in sync.
+            # This avoids redundant API calls and LabelService instantiation (§7).
+            label_already_synced = not body_needs_update and cache_already_blocked
+            if not label_already_synced:
+                self._io.write_label_state(
+                    issue_number, IssueState.BLOCKED, actor=actor
+                )
         else:
             # Determine resume target
             target = IssueState.READY

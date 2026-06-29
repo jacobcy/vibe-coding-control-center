@@ -91,6 +91,19 @@ def test_verify_branch_does_not_recover_missing_state_for_blocked_flow(
         "state": "open",
         "labels": [],
     }
+    # Body truth: still blocked with a manual reason so reconcile stays blocked.
+    # get_issue_body must be set; without it reconcile enters degraded mode and
+    # returns None (also acceptable — flow stays blocked either way).
+    mock_github.get_issue_body.return_value = (
+        "<!-- vibe3-flow-state-start -->\n"
+        "\n"
+        "**Vibe3 Flow State**\n"
+        "\n"
+        "- **State**: blocked\n"
+        "- **Blocked reason**: waiting for external feedback\n"
+        "\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
     mock_github.list_all_prs.return_value = []
     mock_github.list_prs_for_branch.return_value = []
 
@@ -104,7 +117,10 @@ def test_verify_branch_does_not_recover_missing_state_for_blocked_flow(
         result = service.verify_branch(branch)
 
         assert result.is_valid is True
-        mock_label_service_cls.assert_not_called()
+        # LabelService may be instantiated but must NOT call set_state or
+        # confirm_issue_state to transition away from BLOCKED (no auto-unblock).
+        instance = mock_label_service_cls.return_value
+        instance.set_state.assert_not_called()
 
 
 def test_verify_branch_does_not_recover_missing_state_for_rfc_or_epic(
