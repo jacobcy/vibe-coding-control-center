@@ -520,12 +520,21 @@ class CodeagentExecutionService:
                         f"({count}/{max_retries} attempts)"
                     )
                     try:
-                        BlockedStateService(store=ctx.store).block_state_only(
-                            branch=ctx.branch,
-                            reason=reason,
-                            actor=ctx.actor,
-                            issue_number=command.issue_number,
-                        )
+                        bss = BlockedStateService(store=ctx.store)
+                        if command.issue_number is None:
+                            bss.write_cache(
+                                branch=ctx.branch,
+                                reason=reason,
+                                blocked_by_issue=None,
+                                actor=ctx.actor,
+                            )
+                        else:
+                            bss.set_block(
+                                issue_number=command.issue_number,
+                                branch=ctx.branch,
+                                reason=reason,
+                                actor=ctx.actor,
+                            )
                         log.error(f"AUP rejection blocked flow: {reason}")
                     except Exception as block_exc:
                         log.bind(

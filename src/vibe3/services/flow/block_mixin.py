@@ -10,6 +10,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.exceptions import UserError
 from vibe3.services.shared.signatures import SignatureService
 
+
 class FlowLifecycleMixin:
     """Mixin providing flow lifecycle operations."""
 
@@ -64,13 +65,26 @@ class FlowLifecycleMixin:
         issue_number = issue_flow_service.resolve_task_issue_number(branch)
 
         service = BlockedStateService(store=self.store)
-        service.set_block(
-            issue_number=issue_number,
-            branch=branch,
-            reason=reason,
-            tasks=[blocked_by_issue] if blocked_by_issue else [],
-            actor=effective_actor,
-        )
+        if issue_number is None:
+            logger.bind(
+                domain="flow",
+                action="block",
+                branch=branch,
+            ).warning("No task issue linked; writing cache-only blocked state")
+            service.write_cache(
+                branch=branch,
+                reason=reason,
+                blocked_by_issue=blocked_by_issue,
+                actor=effective_actor,
+            )
+        else:
+            service.set_block(
+                issue_number=issue_number,
+                branch=branch,
+                reason=reason,
+                tasks=[blocked_by_issue] if blocked_by_issue else [],
+                actor=effective_actor,
+            )
 
         # Publish FlowBlocked event if we have a valid issue context
         if issue_number is not None:
