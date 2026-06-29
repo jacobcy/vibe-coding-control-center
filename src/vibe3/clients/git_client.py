@@ -137,6 +137,8 @@ class GitClientProtocol(Protocol):
 
     def get_current_branch(self) -> str: ...
 
+    def find_repo_root(self) -> Path: ...
+
     def get_commit_subjects(
         self, base_ref: str, head_ref: str = "HEAD"
     ) -> list[str]: ...
@@ -227,6 +229,10 @@ class GitClient:
         if self._git_common_dir is None:
             self._git_common_dir = _get_git_common_dir(self._run)
         return self._git_common_dir
+
+    def find_repo_root(self) -> Path:
+        """Resolve the main repository root deterministically."""
+        return find_repo_root()
 
     def get_remote_url(self, name: str = "origin") -> str | None:
         """Get the URL of a git remote.
@@ -501,7 +507,10 @@ class GitClient:
         """
         args = ["fetch", remote]
         if ref:
-            args.append(ref)
+            if ":" not in ref and not ref.startswith("refs/"):
+                args.append(f"{ref}:refs/remotes/{remote}/{ref}")
+            else:
+                args.append(ref)
         self._run(args)
 
     def pack_refs_all(self) -> None:
