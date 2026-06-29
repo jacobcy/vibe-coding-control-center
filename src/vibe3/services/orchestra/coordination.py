@@ -118,20 +118,20 @@ class CoordinationResolver:
             projection_state_source=(
                 DataSource.ISSUE_BODY_FALLBACK
                 if remote_success
-                else DataSource.LOCAL_SQLITE if flow_state else None
+                else DataSource.LOCAL_SQLITE if (flow_state or projection_state is not None) else None
             ),
             # Collaboration: remote-first, fallback to local
             blocked_reason=blocked_reason,
             blocked_reason_source=(
                 DataSource.ISSUE_BODY_FALLBACK
                 if remote_success
-                else DataSource.LOCAL_SQLITE if flow_state else None
+                else DataSource.LOCAL_SQLITE if (flow_state or blocked_reason is not None) else None
             ),
             blocked_by_issues=blocked_by_issues,
             blocked_by_issue_source=(
                 DataSource.ISSUE_BODY_FALLBACK
                 if remote_success
-                else DataSource.LOCAL_SQLITE if flow_state else None
+                else DataSource.LOCAL_SQLITE if (flow_state or blocked_by_issues) else None
             ),
             # Execution: local-only
             worktree_path=(flow_state.get("worktree_path") if flow_state else None),

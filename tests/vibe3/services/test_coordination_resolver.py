@@ -89,3 +89,26 @@ def test_resolve_coordination_no_issue_number():
 
     assert truth.blocked_reason == "Local only"
     assert truth.blocked_reason_source == DataSource.LOCAL_SQLITE
+
+
+def test_resolve_coordination_fallback_to_local_no_flow_state_but_dependencies():
+    """Test validation passes and source is set when flow_state is None but dependency links exist."""
+    store = MagicMock(spec=SQLiteClient)
+    store.get_flow_state.return_value = None
+    store.get_dependency_links.return_value = [789]
+
+    resolver = CoordinationResolver(store=store)
+
+    with patch(
+        "vibe3.services.orchestra.coordination.CoordinationResolver._read_remote_collaboration"
+    ) as mock_remote:
+        mock_remote.return_value = None
+
+        truth = resolver.resolve_coordination(
+            branch="dev/issue-946",
+            issue_number=946,
+        )
+
+        assert truth.blocked_by_issues == [789]
+        assert truth.blocked_by_issue_source == DataSource.LOCAL_SQLITE
+
