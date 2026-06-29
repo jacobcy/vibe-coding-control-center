@@ -13,7 +13,6 @@ from vibe3.clients import (
     GitHubClientProtocol,
     RecentPRCache,
     SQLiteClient,
-    find_repo_root,
 )
 from vibe3.exceptions import GitError, PRNotFoundError, UserError
 from vibe3.models import (
@@ -78,7 +77,7 @@ class PRService:
         """Persistent recent PR cache rooted at the repository root."""
         if self._recent_pr_cache_client is None:
             try:
-                repo_path = find_repo_root()
+                repo_path = self.git_client.find_repo_root()
             except Exception:
                 repo_path = Path.cwd()
             self._recent_pr_cache_client = RecentPRCache(repo_path)
