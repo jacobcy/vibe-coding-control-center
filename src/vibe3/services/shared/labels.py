@@ -16,7 +16,6 @@ from vibe3.clients import (
 )
 from vibe3.models import OrchestraConfig
 from vibe3.models.state_machine import (
-    STATE_PRIORITY_ORDER as _STATE_PRIORITY_ORDER,
     get_highest_priority_state_label,
 )
 
