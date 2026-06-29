@@ -70,23 +70,6 @@ class FlowLifecycleMixin:
             flow_actor=flow_data.get("latest_actor"),
         )
 
-        if blocked_by_issue:
-            svc = self._get_task_service()
-            if svc is not None:
-                svc.link_issue(
-                    branch,
-                    blocked_by_issue,
-                    role="dependency",
-                    actor=effective_actor,
-                )
-            else:
-                logger.bind(
-                    domain="flow",
-                    action="block",
-                    branch=branch,
-                    blocked_by_issue=blocked_by_issue,
-                ).warning("TaskService not injected, skipping dependency link")
-
         issue_number: int | None = None
         from vibe3.services.issue.flow import IssueFlowService
 
@@ -94,12 +77,12 @@ class FlowLifecycleMixin:
         issue_number = issue_flow_service.resolve_task_issue_number(branch)
 
         service = BlockedStateService(store=self.store)
-        service.block_state_only(
+        service.set_block(
+            issue_number=issue_number,
             branch=branch,
             reason=reason,
-            blocked_by_issue=blocked_by_issue,
+            tasks=[blocked_by_issue] if blocked_by_issue else [],
             actor=effective_actor,
-            issue_number=issue_number,
         )
 
         # Publish FlowBlocked event if we have a valid issue context
