@@ -27,42 +27,33 @@
 
 ## 2. 依赖关系真源 (Truth Source)
 
-### 2.1 依赖关系的权威来源
+### 2.1 单一真源模型
 
-Issue 依赖关系由**两个互补源**共同定义：
+Issue 依赖关系只有一个真源：**GitHub issue body 托管投影的 `Blocked by` 行**。
 
-1. **数据库层**：`flow_issue_links` 表
-   - 存储本地 SQLite 中的 issue-flow 绑定关系
-   - 包含 `blocked_by` 字段，记录阻塞依赖链
-   - 由 `vibe3 flow bind` 自动维护
+详细真源/缓存/信号三层模型见 [v3/blocked-dependency-reconciliation-standard.md](v3/blocked-dependency-reconciliation-standard.md) §2。本文只摘要：
 
-2. **GitHub 层**：Issue body 的 `## Dependencies` section
-   - 人类可读的依赖关系声明
-   - 用于跨仓库依赖、外部系统依赖等场景
-   - 由 agent 或人工手动维护
+| 角色 | 说明 |
+|------|------|
+| **真源** | body 托管投影 `Blocked by: #N, #M`（由 `set_block` 原语写入） |
+| **缓存** | SQLite `flow_issue_links(role=dependency)`，由 reconcile 从 body 重建 |
+| **信号** | GitHub `state/blocked` label，由 reconcile 同步 |
 
-**优先级规则**：
-- 本地执行引擎（manager、plan/run agents）优先读取 `flow_issue_links`
-- 跨系统可见性（GitHub Projects、外部工具）依赖 `## Dependencies` section
-- 两者应保持一致，若冲突以 `flow_issue_links` 为准
+**变更对照**（与旧版相比）：
 
-### 2.2 依赖关系的表示约定
+- ❌ `flow_issue_links` 不再是真源，它是 **缓存**（由 reconcile 重建）
+- ❌ 不再使用 body `## Dependencies` 段作为真源。依赖声明统一用 `Blocked by` 托管投影（见标准 §2.2 投影字段规范）
+- ✅ Body `## Dependencies` 人类段可以保留作为可选展示，但**不是真源**
 
-**数据库层格式**（`flow_issue_links.blocked_by`）：
-```json
-{
-  "blocked_by": [123, 456],  // issue numbers
-  "blocked_reason": "等待 #123 完成 API 设计"
-}
-```
+### 2.2 遗留格式说明
 
-**GitHub 层格式**（Issue body）：
-```markdown
-## Dependencies
+旧版文档描述过 `## Dependencies` section 格式和数据库 `blocked_by` JSON 字段。这些已被标准废止：
 
-- Blocked by #123 (API 设计完成)
-- Blocked by #456 (数据库迁移)
-```
+- `flow_issue_links.blocked_by` JSON 字段不再写入（缓存已由 reconcile 重建）
+- `## Dependencies` 段不再作为机器解析的真源输入
+- Body 托管投影段（`<!-- vibe3-flow-state-start/end -->`）是唯一真源
+
+依赖关系模型的其余方面（Scope 拆分、Epic/RFC 标签、Comment marker）见下文 §3-6，不受真源变更影响。
 
 ---
 

@@ -29,15 +29,18 @@ related_docs:
 
 **数据模型** 见 [v3/data-model-standard.md](v3/data-model-standard.md)。
 
-## 1. 单一真源原则
+## 1. 真源模型
 
-Flow 生命周期涉及三个真源：
+生命周期真源采用**单一真源 + 缓存 + 信号**三层模型。详细 blocked/dependency 真源定义见 [v3/blocked-dependency-reconciliation-standard.md](v3/blocked-dependency-reconciliation-standard.md) §1-2，本文只摘要：
 
-- **GitHub Issue Label**: Orchestra 的唯一观察对象
-- **SQLite Flow State**: Manager 的执行现场记录
-- **Git Branch/Worktree**: Manager 的物理现场载体
+| 角色 | 内容 |
+|------|------|
+| **真源** | GitHub issue body 托管投影（`State` / `Blocked reason` / `Blocked by`） |
+| **缓存** | SQLite `flow_state`（含 `flow_status` 指针）+ `flow_issue_links` |
+| **信号** | GitHub `state/*` labels |
+| **物理现场** | Git branch / worktree（不属于真源系统，是现场载体） |
 
-跨层直接操作禁止：
+跨层直接操作禁止（不变）：
 - ❌ Orchestra 不直接写 flow_state
 - ❌ Manager 不直接改 issue label（通过 LabelService）
 - ❌ Check 不参与业务判断
@@ -219,7 +222,7 @@ def mark_flow_stale(self, branch: str, reason: str) -> None
 
 - **`blocked_reason`**：手动阻塞信号 — 在 QualifyGate 中**阻止自动解封**
 - **`blocked_by_issue`**：主要阻塞 issue 的快捷显示字段（不是完整依赖集合）
-- **`flow_issue_links(role='dependency')`**：完整依赖集合的**真源**
+- **`flow_issue_links(role='dependency')`**：完整依赖集合的**缓存**（真源为 body `Blocked by`，由 reconcile 重建）
 
 **关键规则**：`--reason` 和 `--task`（`blocked_by_issue`）在当前行为中实质互斥。
 
@@ -227,7 +230,7 @@ def mark_flow_stale(self, branch: str, reason: str) -> None
 
 ### 4.6 Qualify Gate 在 blocked 恢复中的角色
 
-QualifyGate 通过 `CoordinationTruth.is_blocked` 判断阻塞状态，其真源为 issue body projection 而非仅本地 DB。
+QualifyGate 通过 body 真源判断阻塞状态（见 [v3/blocked-dependency-reconciliation-standard.md](v3/blocked-dependency-reconciliation-standard.md) §6 — 统一 `reconcile_blocked` 核）。概要如下：
 
 **决策流程**：
 

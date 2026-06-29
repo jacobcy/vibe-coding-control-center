@@ -144,3 +144,5 @@ flowchart TB
 ```
 
 Key constraint: ERROR system writes to `error_log`, BLOCK system writes to `flow_state.blocked_reason`. The only coupling point is `FailedGate`, which reads `error_log` (read-only) and may trigger a BLOCK.
+
+For the authoritative truth model, reconcile semantics, and field ownership of the BLOCK system, see [Blocked/Dependency Reconciliation Standard](../../standards/v3/blocked-dependency-reconciliation-standard.md) §2/§6.

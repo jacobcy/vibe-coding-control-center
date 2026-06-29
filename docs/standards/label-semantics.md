@@ -95,6 +95,8 @@ related_docs:
 
 - `state/failed`: **已废弃**。统一并入 `state/blocked`。执行失败通过 `blocked_reason` 或 `error_log` 表达。
 
+> **真源说明**：`state/blocked` 是**信号层**，不是阻塞真源。阻塞/依赖的唯一真源是 GitHub issue body 托管投影（`State` / `Blocked reason` / `Blocked by`）。详见 [v3/blocked-dependency-reconciliation-standard.md](v3/blocked-dependency-reconciliation-standard.md) §2。
+
 ### 在 Orchestra 中的作用
 
 Orchestra 使用 `state/*` 标签进行核心调度决策：

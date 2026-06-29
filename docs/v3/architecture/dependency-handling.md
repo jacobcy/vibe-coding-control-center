@@ -4,6 +4,8 @@
 
 Vibe Center 3.0 支持声明式依赖管理。当一个 flow 依赖其他 issue 时，系统采用 **Active Probing（主动嗅探）** 机制来确保逻辑闭环：
 
+> **真源模型**：本文档中依赖的真源是 GitHub issue body 托管投影（`Blocked by` 行），本地 `flow_issue_links` 是 reconcile 重建的缓存。详见 [Blocked/Dependency Reconciliation Standard](../../standards/v3/blocked-dependency-reconciliation-standard.md) §2。
+
 1. **定义即阻塞**: 绑定依赖时，系统自动将 flow 标记为 `blocked` 并同步 GitHub `state/blocked` 标签。
 2. **主动巡逻**: Orchestra 调度器周期性巡检处于 `state/blocked` 的任务。
 3. **自动解套**: 当所有依赖 Issue 均已 `closed` 时，调度器自动解除阻塞，智能推断并恢复到正确状态（如 `state/handoff`）。
@@ -11,35 +13,34 @@ Vibe Center 3.0 支持声明式依赖管理。当一个 flow 依赖其他 issue 
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Orchestra Dispatcher (Qualify Gate)                             │
-│  - Active Polling: include state/blocked in collection           │
-│  - Lazy Evaluation: check dependencies at dispatch intent time    │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  GitHub Source of Truth                                          │
-│  - Satisfaction criterion: Issue must be CLOSED                  │
-│  - (Covers both Done and Aborted terminal states)                │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Flow Resume Resolver                                            │
-│  - Automatic Unblock: remove state/blocked label                 │
-│  - Intelligent Resume: infer next label based on local refs      │
-│  - (e.g., jump to state/handoff if PR already exists)            │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Worktree Manager                                                │
-│  - When creating worktree for unblocked flow                     │
-│  - Fetch PR head branch from dependency                          │
-│  - Create worktree from PR branch instead of origin/main         │
-└─────────────────────────────────────────────────────────────────┘
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph Orchestra["Orchestra Dispatcher (Qualify Gate)"]
+        direction TB
+        A1["Active Polling: include state/blocked in collection"]
+        A2["Lazy Evaluation: check dependencies at dispatch intent time"]
+    end
+
+    subgraph Truth["GitHub Source of Truth"]
+        B["Satisfaction criterion: Issue must be CLOSED<br/>(Covers both Done and Aborted terminal states)"]
+    end
+
+    subgraph Resume["Flow Resume Resolver"]
+        C1["Automatic Unblock: remove state/blocked label"]
+        C2["Intelligent Resume: infer next label based on local refs<br/>(e.g., jump to state/handoff if PR already exists)"]
+    end
+
+    subgraph Worktree["Worktree Manager"]
+        D1["When creating worktree for unblocked flow"]
+        D2["Fetch PR head branch from dependency"]
+        D3["Create worktree from PR branch instead of origin/main"]
+    end
+
+    Orchestra --> Truth
+    Truth --> Resume
+    Resume --> Worktree
 ```
 
 ## Key Components
@@ -48,7 +49,7 @@ Vibe Center 3.0 支持声明式依赖管理。当一个 flow 依赖其他 issue 
 
 **Location**: `src/vibe3/domain/qualify_gate.py`
 
-Orchestra 在发射派发意图前执行三步校验：
+Orchestra 在发射派发意图前执行阻塞校验。三步校验已统一收拢至标准 `reconcile_blocked`（见 [Blocked/Dependency Reconciliation Standard §6](../../standards/v3/blocked-dependency-reconciliation-standard.md)），差异仅 `clear_reason` 参数。概要如下：
 - **Step 1 (Manual)**: 检查本地 `blocked_reason`。如果有值，则保持阻塞。
 - **Step 2 (Dependency)**: 检查 `flow_issue_links`。
   - **唯一满足判据**: GitHub `issue.state == "closed"`。
@@ -83,7 +84,7 @@ Orchestra 在发射派发意图前执行三步校验：
 ### Tables
 
 - `flow_state`: 移除 `waiting` 状态，统一使用 `blocked`。
-- `flow_issue_links`: `issue_role = 'dependency'` 存储物理依赖关系（真源）。
+- `flow_issue_links`: `issue_role = 'dependency'` 存储依赖关系的本地缓存（真源为 body `Blocked by` 托管投影）。
 - `flow_events`: 
   - `flow_blocked` - 任务进入阻塞
   - `flow_unblocked` - 依赖满足，任务恢复（带 `source_pr` 引用）
@@ -106,8 +107,8 @@ Orchestra 在发射派发意图前执行三步校验：
 vibe3 flow bind <dependency-issue-id> --role dependency
 ```
 该命令会原子化地完成：
-1. 在 `flow_issue_links` 写入依赖真源。
-2. 调用 `block_flow` 标记本地 `blocked_by_issue` 并同步 GitHub `state/blocked`。
+1. 通过 `set_block` 原语写入 body 真源（`Blocked by #N`）。
+2. 缓存与 label 由 reconcile 从 body 重建。
 
 ## Fallback Behavior
 
