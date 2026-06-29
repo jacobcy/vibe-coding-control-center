@@ -497,7 +497,7 @@ class TestFetchRefspecConstruction:
         assert "refs/tags/v1" in fetch_args
 
     def test_fetch_refspec_with_colon_passed_through(self):
-        """fetch('origin', 'a:b') is passed through unchanged (already colon-separated)."""
+        """fetch('origin', 'a:b') passes through unchanged."""
         client = GitClient()
         captured_args = []
 

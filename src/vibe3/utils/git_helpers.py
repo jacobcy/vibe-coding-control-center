@@ -210,7 +210,14 @@ def find_repo_root() -> Path:
             if config_path.is_file():
                 try:
                     result = subprocess.run(
-                        ["git", "config", "--file", str(config_path), "--get", "core.bare"],
+                        [
+                            "git",
+                            "config",
+                            "--file",
+                            str(config_path),
+                            "--get",
+                            "core.bare",
+                        ],
                         capture_output=True,
                         text=True,
                         timeout=5,

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import subprocess
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
@@ -14,7 +13,6 @@ from vibe3.clients import (
     GitHubClient,
     GitHubClientProtocol,
     SQLiteClient,
-    find_repo_root,
 )
 from vibe3.environment import WorktreeManager
 from vibe3.exceptions import GitError, is_transient_git_error

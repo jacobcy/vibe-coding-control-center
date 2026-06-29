@@ -16,7 +16,13 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.clients import GitHubClient, MergedPRCache, find_repo_root
+# GitClient imported for backward compatibility — tests patch this module's namespace
+from vibe3.clients import (  # noqa: F401
+    GitClient,
+    GitHubClient,
+    MergedPRCache,
+    find_repo_root,
+)
 
 
 def _resolve_repo_path() -> Path:

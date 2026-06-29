@@ -1,10 +1,7 @@
 """Tests for git helper utilities — bare repo detection and repo root resolution."""
 
-import subprocess
 from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 from vibe3.utils.git_helpers import find_repo_root, get_git_common_dir
 

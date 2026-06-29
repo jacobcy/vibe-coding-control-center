@@ -2,6 +2,7 @@
 
 import time
 from datetime import datetime
+from os import PathLike
 from pathlib import Path
 from typing import cast
 
@@ -78,8 +79,19 @@ class PRService:
         if self._recent_pr_cache_client is None:
             try:
                 repo_path = self.git_client.find_repo_root()
+                if not isinstance(repo_path, Path):
+                    raise TypeError(f"Expected Path, got {type(repo_path)}")
             except Exception:
-                repo_path = Path.cwd()
+                try:
+                    git_common_dir = self.git_client.get_git_common_dir()
+                    repo_path = (
+                        Path(git_common_dir).parent
+                        if git_common_dir
+                        and isinstance(git_common_dir, (str, PathLike))
+                        else Path.cwd()
+                    )
+                except Exception:
+                    repo_path = Path.cwd()
             self._recent_pr_cache_client = RecentPRCache(repo_path)
         return self._recent_pr_cache_client
 
