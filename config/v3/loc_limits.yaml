@@ -364,8 +364,8 @@ code_limits:
         limit: 620
         reason: "Serve 命令测试集，覆盖 start/stop/status/resume/logs 命令、tmux session 管理、port auto-discovery、FailedGate resume 逻辑、全局单例实例管理等紧密耦合场景，新增 3 个集成测试（test_start_blocks_when_instance_running, test_status_displays_instance_directory, test_stop_clears_global_pid_file）验证全局单例行为；PR #1671 review 修复后略微超标"
       - path: "tests/vibe3/domain/test_qualify_gate_remote.py"
-        limit: 610
-        reason: "Qualify gate remote-first + E2E blocked reconciliation 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支、blocked state change via service layer (#1206)，包含 #994 类 E2E 回归场景，测试类结构清晰，拆分收益低"
+        limit: 650
+        reason: "Qualify gate remote-first + E2E blocked reconciliation 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支、blocked state change via service layer (#1206)，包含 #994 类 E2E 回归场景；PR #3247 收敛 run_qualify_gate 到 reconcile_blocked 后新增 TestConvergedDispatchGate E2E 回归测试（+20 行）"
       - path: "tests/vibe3/domain/test_qualify_gate.py"
         limit: 600
         reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment、blocked state change via service layer (#1206) 等场景，共享 fixture；PR #1983 已将 GitHub closed 检测测试拆分至 test_qualify_gate_closed.py；Issue #2242 新增 test_auto_resume_blocked_with_none_flow_state_returns_ready 测试验证 flow_state=None 路径返回 READY；Issue #2353 新增 test_qualify_blocked_issue_reuses_truth 测试验证 truth 参数传递优化（消除双重 resolve_coordination 调用）；PR #2667 将 open PR 检测测试拆分至 test_qualify_gate_open_pr.py（-294 行）"
@@ -382,8 +382,8 @@ code_limits:
         limit: 500
         reason: "Heartbeat server 测试集，覆盖 tick loop、error tracking cleanup、actor registry cleanup、debug max ticks、service registration 等紧密耦合场景，新增 actor cleanup 测试后超标（#2553）"
       - path: "tests/vibe3/services/test_blocked_state_service.py"
-        limit: 475
-        reason: "BlockedStateService 集成测试集，覆盖 set_block/clear_block/reconcile_blocked 三个统一原语的三源一致性（DB/body/label），包含 remove_issue_link、parse_projection_merges_legacy_dependencies、reconcile_blocked blocked/resume 状态转换等 13 个紧密耦合场景；Task 3 新增 reconcile_blocked/resolve_truth 测试后超标（+56 行）；Issue #3238 新增 reconciliation 集成测试（+207 行）"
+        limit: 510
+        reason: "BlockedStateService 集成测试集，覆盖 set_block/clear_block/reconcile_blocked 三个统一原语的三源一致性（DB/body/label），包含 remove_issue_link、parse_projection_merges_legacy_dependencies、reconcile_blocked blocked/resume 状态转换等紧密耦合场景；PR #3247 删除 set_block 真源旁路后新增 test_reconcile_degraded_stays_blocked 测试验证降级模式语义（+23 行）"
 
       - path: "tests/vibe3/test_modularity/test_services_reexport_surface.py"
         limit: 500
