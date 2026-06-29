@@ -381,6 +381,9 @@ code_limits:
       - path: "tests/vibe3/runtime/test_heartbeat.py"
         limit: 500
         reason: "Heartbeat server 测试集，覆盖 tick loop、error tracking cleanup、actor registry cleanup、debug max ticks、service registration 等紧密耦合场景，新增 actor cleanup 测试后超标（#2553）"
+      - path: "tests/vibe3/services/test_blocked_state_service.py"
+        limit: 475
+        reason: "BlockedStateService 集成测试集，覆盖 set_block/clear_block/reconcile_blocked 三个统一原语的三源一致性（DB/body/label），包含 remove_issue_link、parse_projection_merges_legacy_dependencies、reconcile_blocked blocked/resume 状态转换等 13 个紧密耦合场景；Task 3 新增 reconcile_blocked/resolve_truth 测试后超标（+56 行）；Issue #3238 新增 reconciliation 集成测试（+207 行）"
 
       - path: "tests/vibe3/test_modularity/test_services_reexport_surface.py"
         limit: 500
