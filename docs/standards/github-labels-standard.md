@@ -193,6 +193,8 @@
 
 > **注意**：`failed` 状态字面值已从核心模型中移除。目前的失败语义由 `active` 状态配合 `blocked_reason` 表达，或在基础设施错误时触发 `FailedGate`（由 Orchestra 监控）。
 
+> **阻塞真源说明**：`state/blocked` 标签是**信号层**，不是阻塞/依赖状态的真源。阻塞/依赖的唯一真源是 GitHub issue body 托管投影（`State` / `Blocked reason` / `Blocked by`），由 `reconcile_blocked` 统一管理。详见 [v3/blocked-dependency-reconciliation-standard.md](v3/blocked-dependency-reconciliation-standard.md) §2。
+
 #### 状态机约束
 
 1. 一个 issue 任一时刻只能有一个 `state/*` 标签

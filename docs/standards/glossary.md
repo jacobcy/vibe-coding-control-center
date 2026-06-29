@@ -325,7 +325,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
 - **`active`**：flow 正常执行中，准备就绪或正在处理。
 - **`blocked`**：flow 被阻塞（手动锁定或依赖未满足）。属于 **BLOCK 系统**，表示工作流暂停。
   - 场景 1：**手动阻塞**（由人或 Manager 标记 `blocked_reason`），需要手动 unblock（通过 `vibe3 task resume` 等）。`blocked_reason` 的存在会阻止 QualifyGate 的自动解封。
-  - 场景 2：**依赖阻塞**（`flow_issue_links` 中有未完成的依赖 Issue），由 Orchestra **自动恢复**。
+  - 场景 2：**依赖阻塞**（body `Blocked by` 中有未关闭的依赖 Issue），由 `reconcile_blocked` 统一解除。`flow_issue_links` 是此场景的本地缓存（不充当真源）。详见 [v3/blocked-dependency-reconciliation-standard.md](v3/blocked-dependency-reconciliation-standard.md)。
   - 判定标准：依赖项在 GitHub 上进入 `closed` 终态即视为满足。
 - **`done`**：flow 执行完成（PR 已合并）。
 - **`stale`**：flow 长期未活动或被系统标记为休眠。
@@ -346,9 +346,8 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
 - 定义：在 `flow_issue_links` 表中，`issue_role = 'dependency'` 表示该 issue 是当前 flow 所依赖的前置任务。
 - 语义：当前 flow 必须等待所有依赖 issue 完成（GitHub `issue.state == "closed"`）才能开始执行。
 - 机制：
-  - 依赖未满足 → flow 标记为 `blocked`。
-  - 自动巡逻：Orchestra 每轮轮询时会检查依赖 Issue 状态。
-  - 自动恢复：所有依赖满足后，Orchestra 自动移除阻塞，推断并恢复到正确状态。
+  - 依赖未满足 → body `Blocked by` 为真源，flow 标记为 `blocked`。
+  - 自动对账：`reconcile_blocked` 统一处理依赖检查、缓存重建和 label 同步（见 [标准 §6](v3/blocked-dependency-reconciliation-standard.md)）。
   - 继承分支：解封 flow 的 worktree 默认从依赖的 PR 分支创建，确保代码基于最新依赖。
 
 ### 5.5 `pr`
@@ -943,6 +942,7 @@ V3 采用 3-Tier 顶层架构模型，定义系统的战略职责边界。
 - 落点：
   - Orchestra Heartbeat 每轮轮询时检查 QualifyGate。
   - 自动恢复逻辑见 [command-standard.md](v3/command-standard.md)。
+  - 对账核已统一收拢至 [`reconcile_blocked`](v3/blocked-dependency-reconciliation-standard.md)（见标准 §6）。
 - 使用规则：
   - 讨论自动恢复、依赖解除时使用 `QualifyGate`。
 

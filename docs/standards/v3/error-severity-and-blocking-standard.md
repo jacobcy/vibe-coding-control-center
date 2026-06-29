@@ -81,7 +81,7 @@ Blocked states are managed across three data sources to ensure consistency and v
 2. **GitHub Issue Label (Signal):** Visual indicator of the blocked state.
 3. **Database (Cache):** Local performance optimization of the remote state.
 
-These sources are kept in sync by the `BlockedStateService`.
+These sources are kept in sync by the `BlockedStateService`. For the authoritative truth model and reconcile semantics, see [blocked-dependency-reconciliation-standard.md](blocked-dependency-reconciliation-standard.md) §2/§6.
 
 ## 3. Severity Definitions
 

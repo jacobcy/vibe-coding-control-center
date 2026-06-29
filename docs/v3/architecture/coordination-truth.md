@@ -10,13 +10,13 @@ This document describes the remote-first coordination truth implementation for o
 
 **Collaboration Fields (Remote-First):**
 - `blocked_reason` - Issue Body Projection > Local SQLite
-- `blocked_by_issue` - Issue Body Projection > Local SQLite
-- `dependencies` - Issue Body Projection > Local SQLite
+- `blocked_by` (multi-value) - Issue Body Projection > Local SQLite
 
 **Execution Fields (Local-Only):**
 - `worktree_path` - Local SQLite only
 - `actor` - Local SQLite only
-- `flow_status` - Local SQLite only
+- `flow_status` - Derived pointer (reconciled from body truth; see §2.3 of the standard)
+- `blocked_by_issue` - Derived single-value cache (reconciled from body truth)
 
 ### Data Sources
 
@@ -41,7 +41,7 @@ When GitHub API is unavailable:
 - Enter degraded mode via `DegradedModeManager`
 - Fall back to local SQLite for all reads
 - Log degradation event
-- Conservative blocking (prefer blocking over dispatching)
+- Conservative blocking (prefer blocking over dispatching) — see §6.4 of the [standard](../../standards/v3/blocked-dependency-reconciliation-standard.md) for degraded mode protocol
 
 ## Integration Points
 
@@ -54,3 +54,4 @@ When GitHub API is unavailable:
 - Issue #945: Source-aware flow reads
 - Issue #943: Issue body projection
 - Issue #942: Remote projection parent issue
+- [Blocked/Dependency Reconciliation Standard](../../standards/v3/blocked-dependency-reconciliation-standard.md) — authoritative truth model, unified reconcile primitive (§2/§6), and field ownership table
