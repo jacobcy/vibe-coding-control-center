@@ -522,19 +522,17 @@ class CodeagentExecutionService:
                     try:
                         bss = BlockedStateService(store=ctx.store)
                         if command.issue_number is None:
-                            bss.write_cache(
-                                branch=ctx.branch,
-                                reason=reason,
-                                blocked_by_issue=None,
-                                actor=ctx.actor,
+                            raise SystemError(
+                                f"AUP rejection: cannot block flow "
+                                f"'{ctx.branch}' — no task issue linked. "
+                                "Flow is in incomplete state."
                             )
-                        else:
-                            bss.set_block(
-                                issue_number=command.issue_number,
-                                branch=ctx.branch,
-                                reason=reason,
-                                actor=ctx.actor,
-                            )
+                        bss.set_block(
+                            issue_number=command.issue_number,
+                            branch=ctx.branch,
+                            reason=reason,
+                            actor=ctx.actor,
+                        )
                         log.error(f"AUP rejection blocked flow: {reason}")
                     except Exception as block_exc:
                         log.bind(

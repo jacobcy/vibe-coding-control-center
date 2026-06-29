@@ -230,6 +230,10 @@ class TestDependencyNotSatisfiedTriggersBlock:
             patch(
                 "vibe3.services.flow.blocked_state_io.LabelService"
             ) as mock_label_cls,
+            patch(
+                "vibe3.services.issue.flow.IssueFlowService.resolve_task_issue_number",
+                return_value=123,
+            ),
         ):
             mock_label = MagicMock()
             mock_label.confirm_issue_state.return_value = "advanced"
@@ -287,6 +291,10 @@ class TestErrorBlockOrthogonality:
             patch(
                 "vibe3.services.flow.blocked_state_io.LabelService"
             ) as mock_label_cls,
+            patch(
+                "vibe3.services.issue.flow.IssueFlowService.resolve_task_issue_number",
+                return_value=123,
+            ),
         ):
             mock_label = MagicMock()
             mock_label.confirm_issue_state.return_value = "advanced"
