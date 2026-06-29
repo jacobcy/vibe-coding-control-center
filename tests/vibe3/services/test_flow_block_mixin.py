@@ -2,10 +2,22 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from vibe3.services.flow.service import FlowService
 
 
-def test_block_flow_calls_set_block() -> None:
+@pytest.mark.parametrize(
+    ("blocked_by_issue", "expected_tasks"),
+    [
+        (456, [456]),
+        (None, []),
+    ],
+)
+def test_block_flow_calls_set_block(
+    blocked_by_issue: int | None,
+    expected_tasks: list[int],
+) -> None:
     """Test that block_flow calls BlockedStateService.set_block method."""
     service = FlowService()
 
@@ -36,7 +48,7 @@ def test_block_flow_calls_set_block() -> None:
         service.block_flow(
             branch="dev/issue-123",
             reason="API design pending",
-            blocked_by_issue=456,
+            blocked_by_issue=blocked_by_issue,
             actor="claude/sonnet-4.6",
         )
 
@@ -45,6 +57,6 @@ def test_block_flow_calls_set_block() -> None:
             issue_number=123,
             branch="dev/issue-123",
             reason="API design pending",
-            tasks=[456],
+            tasks=expected_tasks,
             actor="claude/sonnet-4.6",
         )

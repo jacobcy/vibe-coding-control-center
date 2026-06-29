@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Self
+from typing import Self
 
 from loguru import logger
 
@@ -10,23 +10,10 @@ from vibe3.clients import SQLiteClient
 from vibe3.exceptions import UserError
 from vibe3.services.shared.signatures import SignatureService
 
-if TYPE_CHECKING:
-    from vibe3.services.protocols import TaskQueryProtocol
-
-
 class FlowLifecycleMixin:
     """Mixin providing flow lifecycle operations."""
 
     store: SQLiteClient
-    _task_service: "TaskQueryProtocol | None" = None
-
-    def set_task_service(self, task_service: TaskQueryProtocol) -> None:
-        """Inject task service for dependency breaking."""
-        self._task_service = task_service
-
-    def _get_task_service(self) -> "TaskQueryProtocol | None":
-        """Return injected task service or None if not available."""
-        return self._task_service
 
     def block_flow(
         self: Self,
