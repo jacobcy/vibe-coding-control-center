@@ -37,17 +37,15 @@ def resolve_skill_content(
         return None
 
     # Resolve relative path against repo root for CWD-independent access
-    from vibe3.clients import GitClient
+    from vibe3.clients import find_repo_root
 
     try:
-        git_client = GitClient()
-        git_common_dir = git_client.get_git_common_dir()
-        if git_common_dir:
-            repo_root = Path(git_common_dir).parent
-            abs_path = repo_root / skill_path
-        else:
-            # Fallback to cwd-relative if not in git repo
-            abs_path = Path(skill_path)
+        repo_root = find_repo_root()
+        abs_path = repo_root / skill_path
+    except Exception:
+        # Fallback to cwd-relative if not in git repo
+        abs_path = Path(skill_path)
+    try:
         return abs_path.read_text(encoding="utf-8")
     except OSError:
         return None
