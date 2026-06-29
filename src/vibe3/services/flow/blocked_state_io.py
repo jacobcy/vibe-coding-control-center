@@ -40,6 +40,25 @@ class BlockedStateIO:
     # Write Operations
     # ========================================================================
 
+    def write_projection(
+        self,
+        issue_number: int,
+        projection: FlowStateProjection,
+    ) -> None:
+        """Write complete flow-state projection to issue body."""
+        current_body = self.github.get_issue_body(issue_number)
+        if current_body is None:
+            raise RuntimeError(
+                f"Failed to read issue body: issue #{issue_number}"
+            )
+        merged = merge_projection(current_body, projection)
+        if merged == current_body:
+            return
+        if not self.github.update_issue_body(issue_number, merged):
+            raise RuntimeError(
+                f"Failed to update issue body projection: issue #{issue_number}"
+            )
+
     def write_body_projection(
         self,
         issue_number: int,
