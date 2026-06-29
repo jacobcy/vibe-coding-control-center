@@ -34,8 +34,9 @@
 ### 2.1 真源分层
 
 - GitHub issue：任务身份真源
-- SQLite `flow_issue_links.issue_role`：issue 与 flow 的关系真源
-- GitHub `state/*` labels：编排状态真源
+- GitHub Issue Body 托管投影：阻塞与依赖状态的唯一真源 (见 [blocked-dependency-reconciliation-standard.md](../standards/v3/blocked-dependency-reconciliation-standard.md))
+- SQLite `flow_issue_links.issue_role`：本地 flow 与 issue 绑定的关系记录 (见 [issue-standard.md](../standards/issue-standard.md))
+- GitHub `state/*` labels：编排状态下游同步信号，并非真源
 - handoff：交接上下文，不是真源
 - GitHub Project：可视化 UI，不是真源
 

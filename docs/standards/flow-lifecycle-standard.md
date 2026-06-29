@@ -182,6 +182,7 @@ def block(
 3. GitHub：task issue label 转为 `state/blocked` (Signal)
 4. Event：通过 `FlowTimelineService` 写入 `flow_blocked` 事件
 
+
 ### 4.2 何时使用 block vs abort vs stale
 
 | 场景 | 动作 | API | 恢复路径 |
@@ -224,27 +225,23 @@ def mark_flow_stale(self, branch: str, reason: str) -> None
 - **`blocked_by_issue`**：主要阻塞 issue 的快捷显示字段（不是完整依赖集合）
 - **`flow_issue_links(role='dependency')`**：完整依赖集合的**缓存**（真源为 body `Blocked by`，由 reconcile 重建）
 
-**关键规则**：`--reason` 和 `--task`（`blocked_by_issue`）在当前行为中实质互斥。
+**关键规则**：`blocked_reason`（手工阻塞）与 `blocked_task`（依赖阻塞）相互独立并可共存。依据 [v3/blocked-dependency-reconciliation-standard.md](v3/blocked-dependency-reconciliation-standard.md) §3，只要存在手工阻塞原因，或存在任一未关闭的依赖任务，即判定为阻塞 (`effective_blocked = True`)。`blocked_reason` 的存在代表需要人工解封（通过 `task resume`），否则在依赖自动满足后系统无法自动唤醒。
 
-原因：`blocked_reason` 的存在会导致 QualifyGate 将 flow 视为手动阻塞，优先级高于依赖自动解封。即使同时指定 `--reason` 和 `--task`，`blocked_reason` 也会阻止依赖自动解封生效。
+### 4.6 Qualify Gate 与对账核机制
 
-### 4.6 Qualify Gate 在 blocked 恢复中的角色
+QualifyGate 在派发前不单独运行独立的阻塞校验，而是统一调用核心对账机制 `reconcile_blocked(clear_reason=False)`，依据 GitHub issue body 真源判断并同步阻塞状态（见 [v3/blocked-dependency-reconciliation-standard.md](v3/blocked-dependency-reconciliation-standard.md) §6）。
 
-QualifyGate 通过 body 真源判断阻塞状态（见 [v3/blocked-dependency-reconciliation-standard.md](v3/blocked-dependency-reconciliation-standard.md) §6 — 统一 `reconcile_blocked` 核）。概要如下：
+**对账核流程概要**：
 
-**决策流程**：
-
-1. **`resolve_coordination`** — 合并 remote issue body + local DB 出 `CoordinationTruth`
-2. **`is_blocked` 综合判断** — 任一为真即 blocked：`projection_state == 'blocked'` OR `blocked_reason` OR `blocked_by_issue`
-3. **若 blocked** → `_align_blocked_state` 并跳过（不继续后续检查）
-4. **若 NOT blocked 但 local/label stale** → `_auto_resume_blocked`（清除 local blocked 缓存，移除 label）
-5. **通过后运行 `_check_dependencies`** — 结构检查（非恢复判定）
-
-**自动解封副作用**（由 `_auto_resume_blocked` 执行）：
-
-- 清除 `blocked_by_issue`、`blocked_reason`
-- 写入 `flow_unblocked` 事件
-- 推断恢复目标 label（`infer_resume_label`），恢复 task issue label
+1. **读取真源**：从 GitHub issue body 托管段获取 `reason` 与 `blocked_by` 依赖列表。
+2. **依赖检查**：检查所有 `blocked_by` 关联任务，若任务全部关闭（Closed）则视为满足。
+3. **判定阻塞**：若 `reason` 有值或存在未关闭依赖，即 `effective_blocked` 为真：
+   - 保持 `state/blocked` 标签。
+   - `rebuild_cache_from_truth` 重建本地 DB 缓存（`flow_state` 及 `flow_issue_links` 依赖关系）。
+4. **自动解封**：若没有 `reason` 且依赖均满足，则：
+   - 推断恢复状态（`infer_resume_label`）并更新 GitHub 标签。
+   - 清除 body 托管段中的阻塞信息。
+   - 重建本地缓存，将本地 `flow_status` 指针回写更新。
 
 ### 4.7 各状态转换的 GitHub Label 管理
 
