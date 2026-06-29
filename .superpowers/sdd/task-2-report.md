@@ -22,12 +22,15 @@
 - **Review Updates (Post-Review)**:
   - Fixed mock expectations in `tests/vibe3/domain/test_qualify_gate.py` by replacing `mock_truth.dependencies = ...` with `mock_truth.blocked_by_issues = ...` on all mock objects where coordination truth is mocked.
   - Updated the local fallback logic for `blocked_by_issues` in `src/vibe3/services/orchestra/coordination.py` to merge the database dependency links (`self.store.get_dependency_links(branch)`) with the manual `blocked_by_issue` from `flow_state` (if present and not already in the list).
+  - Fixed Pydantic ValidationError risk in local fallback logic when `remote_success` is False: updated source fields (`blocked_by_issue_source`, `projection_state_source`, `blocked_reason_source`) in `src/vibe3/services/orchestra/coordination.py` to be robustly set when corresponding fields or `flow_state` exist. Added a unit test to verify this behavior.
 
 ## Commits
+- `b350ff277` fix(services): robustly set source fields in coordination fallback to prevent validation errors
+- `187e77b9e` docs: update task 2 report with coordination fallback merge details
 - `65dbed6f6` fix(services): merge database dependency links with local blocked_by_issue in coordination resolver fallback
 - `fb715a9d7` docs: update task 2 report with review details
 - `1c03007c8` fix(review): resolve mock expectations and update coordination fallback logic for blocked_by_issues
 - `66e24c772` refactor: retire dependencies field and merge legacy dependencies into blocked_by
 
 ## Verification Results
-- Verified that all service tests pass successfully: `uv run pytest tests/vibe3/services/` (918 passed, including `tests/vibe3/services/test_coordination_resolver.py`).
+- Verified that all service tests pass successfully: `uv run pytest tests/vibe3/services/` (919 passed, including `tests/vibe3/services/test_coordination_resolver.py` which now has 4 passed tests).
