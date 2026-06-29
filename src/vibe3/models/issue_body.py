@@ -23,10 +23,6 @@ class FlowStateProjection(BaseModel):
         default=None,
         description="Human-readable block reason",
     )
-    dependencies: list[int] = Field(
-        default_factory=list,
-        description="Linked dependency issue numbers",
-    )
 
     def is_empty(self) -> bool:
         """Check if projection has any meaningful data."""
@@ -34,5 +30,4 @@ class FlowStateProjection(BaseModel):
             self.state == "active"
             and not self.blocked_by
             and not self.blocked_reason
-            and not self.dependencies
         )

@@ -26,7 +26,6 @@ def test_resolve_coordination_remote_first():
         mock_remote.return_value = {
             "blocked_reason": "Remote reason",
             "blocked_by_issues": [222],
-            "dependencies": [123, 456],
         }
 
         truth = resolver.resolve_coordination(
@@ -39,7 +38,6 @@ def test_resolve_coordination_remote_first():
         assert truth.blocked_reason_source == DataSource.ISSUE_BODY_FALLBACK
         assert truth.blocked_by_issue == 222  # computed property returns first element
         assert truth.blocked_by_issue_source == DataSource.ISSUE_BODY_FALLBACK
-        assert truth.dependencies == [123, 456]
 
         # Execution fields from local
         assert truth.worktree_path == "/tmp/wt"
@@ -73,7 +71,6 @@ def test_resolve_coordination_fallback_to_local():
         assert truth.blocked_reason == "Local block"
         assert truth.blocked_reason_source == DataSource.LOCAL_SQLITE
         assert truth.blocked_by_issue == 333  # computed property from local fallback
-        assert truth.dependencies == [789]
 
 
 def test_resolve_coordination_no_issue_number():

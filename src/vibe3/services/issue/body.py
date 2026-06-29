@@ -35,7 +35,6 @@ def parse_projection(body: str) -> FlowStateProjection:
     state: str = "active"
     blocked_by: list[int] = []
     blocked_reason: str | None = None
-    dependencies: list[int] = []
 
     for line in section.split("\n"):
         line = line.strip()
@@ -49,20 +48,21 @@ def parse_projection(body: str) -> FlowStateProjection:
 
         elif line.startswith("- **Blocked by**:"):
             nums = line.split(":", 1)[1].strip()
-            blocked_by = [int(n) for n in re.findall(r"\d+", nums)]
+            blocked_by.extend([int(n) for n in re.findall(r"\d+", nums)])
 
         elif line.startswith("- **Blocked reason**:"):
             blocked_reason = line.split(":", 1)[1].strip() or None
 
         elif line.startswith("- **Dependencies**:"):
             nums = line.split(":", 1)[1].strip()
-            dependencies = [int(n) for n in re.findall(r"\d+", nums)]
+            blocked_by.extend([int(n) for n in re.findall(r"\d+", nums)])
+
+    blocked_by = sorted(list(set(blocked_by)))
 
     return FlowStateProjection(
         state=cast(Literal["active", "blocked", "done", "aborted"], state),
         blocked_by=blocked_by,
         blocked_reason=blocked_reason,
-        dependencies=dependencies,
     )
 
 
@@ -92,10 +92,6 @@ def render_projection(proj: FlowStateProjection) -> str:
 
     if proj.blocked_reason:
         lines.append(f"- **Blocked reason**: {proj.blocked_reason}")
-
-    if proj.dependencies:
-        deps_str = ", ".join(f"#{n}" for n in proj.dependencies)
-        lines.append(f"- **Dependencies**: {deps_str}")
 
     lines.extend(["", MANAGED_SECTION_END])
     return "\n".join(lines)

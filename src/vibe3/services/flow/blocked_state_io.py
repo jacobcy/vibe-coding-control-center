@@ -69,7 +69,6 @@ class BlockedStateIO:
             state="blocked",
             blocked_by=new_blocked_by,
             blocked_reason=reason,
-            dependencies=projection.dependencies,
         )
 
         merged = merge_projection(current_body, new_projection)
@@ -99,7 +98,6 @@ class BlockedStateIO:
             state="active",
             blocked_by=[],
             blocked_reason=None,
-            dependencies=projection.dependencies,
         )
 
         merged = merge_projection(current_body, new_projection)

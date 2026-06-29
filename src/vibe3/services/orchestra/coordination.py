@@ -57,7 +57,6 @@ class CoordinationResolver:
         projection_state_remote: str | None = None
         blocked_reason_remote = None
         blocked_by_issues_remote: list[int] = []
-        dependencies_remote: list[int] = []
         remote_success = False  # Track remote read success separately
 
         if issue_number:
@@ -69,7 +68,6 @@ class CoordinationResolver:
                     projection_state_remote = remote_truth.get("projection_state")
                     blocked_reason_remote = remote_truth.get("blocked_reason")
                     blocked_by_issues_remote = remote_truth.get("blocked_by_issues", [])
-                    dependencies_remote = remote_truth.get("dependencies", [])
             except Exception as e:
                 # GitHub API failure → enter degraded mode
                 degraded = get_degraded_manager()
@@ -114,11 +112,6 @@ class CoordinationResolver:
             )
         else:
             blocked_by_issues = []
-        dependencies = (
-            dependencies_remote
-            if remote_success
-            else (self.store.get_dependency_links(branch))
-        )
 
         truth = CoordinationTruth(
             # Issue body projection state (remote-first)
@@ -137,12 +130,6 @@ class CoordinationResolver:
             ),
             blocked_by_issues=blocked_by_issues,
             blocked_by_issue_source=(
-                DataSource.ISSUE_BODY_FALLBACK
-                if remote_success
-                else DataSource.LOCAL_SQLITE if flow_state else None
-            ),
-            dependencies=dependencies,
-            dependencies_source=(
                 DataSource.ISSUE_BODY_FALLBACK
                 if remote_success
                 else DataSource.LOCAL_SQLITE if flow_state else None
@@ -188,7 +175,6 @@ class CoordinationResolver:
                 "projection_state": projection.state,
                 "blocked_reason": projection.blocked_reason,
                 "blocked_by_issues": projection.blocked_by,
-                "dependencies": projection.dependencies,
             }
         except Exception:
             return None

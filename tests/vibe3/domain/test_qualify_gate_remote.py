@@ -75,10 +75,8 @@ class TestRemoteBlockedReason:
         mock_truth = CoordinationTruth(
             blocked_reason="Remote block from issue body",
             blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
-            blocked_by_issue=None,
+            blocked_by_issues=[],
             blocked_by_issue_source=None,
-            dependencies=[],
-            dependencies_source=None,
             worktree_path="/tmp/worktree",
             actor="executor",
         )
@@ -128,10 +126,8 @@ class TestRemoteBlockedReason:
         mock_truth = CoordinationTruth(
             blocked_reason="Local block from SQLite",
             blocked_reason_source=DataSource.LOCAL_SQLITE,
-            blocked_by_issue=None,
+            blocked_by_issues=[],
             blocked_by_issue_source=None,
-            dependencies=[],
-            dependencies_source=None,
             worktree_path="/tmp/worktree",
             actor="executor",
         )
@@ -180,10 +176,8 @@ class TestRemoteDependencies:
         mock_truth = CoordinationTruth(
             blocked_reason=None,
             blocked_reason_source=None,
-            blocked_by_issue=None,
-            blocked_by_issue_source=None,
-            dependencies=[456, 789],  # Remote dependencies
-            dependencies_source=DataSource.ISSUE_BODY_FALLBACK,
+            blocked_by_issues=[456, 789],  # Remote dependencies
+            blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
             worktree_path=None,
             actor="executor",
         )
@@ -237,10 +231,8 @@ class TestRemoteDependencies:
         mock_truth = CoordinationTruth(
             blocked_reason=None,
             blocked_reason_source=None,
-            blocked_by_issue=None,
-            blocked_by_issue_source=None,
-            dependencies=[456],  # Local dependencies
-            dependencies_source=DataSource.LOCAL_SQLITE,
+            blocked_by_issues=[456],  # Local dependencies
+            blocked_by_issue_source=DataSource.LOCAL_SQLITE,
             worktree_path=None,
             actor="executor",
         )
@@ -294,8 +286,6 @@ class TestRemoteDependencies:
             blocked_reason_source=None,
             blocked_by_issues=[456],
             blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
-            dependencies=[],
-            dependencies_source=None,
             worktree_path=None,
             actor="executor",
         )
@@ -341,10 +331,8 @@ class TestProvenanceTracking:
         mock_truth = CoordinationTruth(
             blocked_reason="Remote block",
             blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
-            blocked_by_issue=None,
+            blocked_by_issues=[],
             blocked_by_issue_source=None,
-            dependencies=[],
-            dependencies_source=None,
             worktree_path="/tmp/worktree",
             actor="executor",
         )
@@ -376,10 +364,8 @@ class TestProvenanceTracking:
         mock_truth = CoordinationTruth(
             blocked_reason=None,
             blocked_reason_source=None,
-            blocked_by_issue=None,
-            blocked_by_issue_source=None,
-            dependencies=[456],
-            dependencies_source=DataSource.LOCAL_SQLITE,
+            blocked_by_issues=[456],
+            blocked_by_issue_source=DataSource.LOCAL_SQLITE,
             worktree_path="/tmp/worktree",
             actor="executor",
         )
@@ -417,7 +403,7 @@ class TestProvenanceTracking:
                 truth = (
                     qualify_gate_service._coordination_resolver.resolve_coordination.return_value
                 )
-                assert truth.dependencies_source == DataSource.LOCAL_SQLITE
+                assert truth.blocked_by_issue_source == DataSource.LOCAL_SQLITE
 
 
 class TestE2EBlockedReconciliation:
@@ -447,10 +433,8 @@ class TestE2EBlockedReconciliation:
             projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
             blocked_reason="API design pending",
             blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
-            blocked_by_issue=None,
+            blocked_by_issues=[],
             blocked_by_issue_source=None,
-            dependencies=[],
-            dependencies_source=None,
             worktree_path=None,
             actor=None,
         )
@@ -500,10 +484,8 @@ class TestE2EBlockedReconciliation:
             projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
             blocked_reason=None,
             blocked_reason_source=None,
-            blocked_by_issue=None,
+            blocked_by_issues=[],
             blocked_by_issue_source=None,
-            dependencies=[],
-            dependencies_source=None,
             worktree_path=None,
             actor="executor",
         )
@@ -565,8 +547,6 @@ class TestE2EBlockedReconciliation:
             blocked_reason_source=None,
             blocked_by_issues=[456],
             blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
-            dependencies=[456],
-            dependencies_source=DataSource.ISSUE_BODY_FALLBACK,
             worktree_path=None,
             actor=None,
         )

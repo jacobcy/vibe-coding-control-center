@@ -47,15 +47,6 @@ class CoordinationTruth(BaseModel):
         description="Provenance: ISSUE_BODY_FALLBACK or LOCAL_SQLITE",
     )
 
-    dependencies: list[int] = Field(
-        default_factory=list,
-        description="Dependency issue numbers from issue body or local DB",
-    )
-    dependencies_source: DataSource | None = Field(
-        default=None,
-        description="Provenance: ISSUE_BODY_FALLBACK or LOCAL_SQLITE",
-    )
-
     # Execution fields (local-only)
     worktree_path: str | None = Field(
         default=None,
@@ -82,10 +73,7 @@ class CoordinationTruth(BaseModel):
                 "blocked_by_issue_source must be set when "
                 "blocked_by_issues are provided"
             )
-        if self.dependencies and self.dependencies_source is None:
-            raise ValueError(
-                "dependencies_source must be set when dependencies are provided"
-            )
+
         return self
 
     @computed_field  # type: ignore[prop-decorator]

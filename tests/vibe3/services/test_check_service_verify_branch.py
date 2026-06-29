@@ -469,8 +469,8 @@ def test_dependency_check_reports_unresolved_warnings(tmp_path: Path) -> None:
         mock_resolver = MagicMock()
         mock_resolver_cls.return_value = mock_resolver
         mock_resolver.resolve_coordination.return_value = CoordinationTruth(
-            dependencies=[200],
-            dependencies_source=DataSource.LOCAL_SQLITE,
+            blocked_by_issues=[200],
+            blocked_by_issue_source=DataSource.LOCAL_SQLITE,
         )
 
         # Need to update view_issue side_effect to handle dependency issue

@@ -401,3 +401,21 @@ def test_remove_issue_link(tmp_path: Path) -> None:
     links_after = store.get_dependency_links("test-branch")
     assert 101 not in links_after
 
+
+def test_parse_projection_merges_legacy_dependencies() -> None:
+    from vibe3.services.issue.body import parse_projection
+
+    legacy_body = (
+        "<!-- vibe3-flow-state-start -->\n\n"
+        "**Vibe3 Flow State**\n\n"
+        "- **State**: blocked\n"
+        "- **Blocked by**: #456\n"
+        "- **Dependencies**: #789, #101\n\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
+    proj = parse_projection(legacy_body)
+    # Check that legacy dependencies are merged into blocked_by
+    assert sorted(proj.blocked_by) == [101, 456, 789]
+    # Check that dependencies attribute is retired
+    assert not hasattr(proj, "dependencies")
+

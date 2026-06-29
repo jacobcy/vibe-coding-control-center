@@ -13,7 +13,6 @@ def test_default_truth():
     assert truth.is_blocked is False
     assert truth.blocked_reason is None
     assert truth.blocked_by_issue is None
-    assert truth.dependencies == []
 
 
 def test_blocked_truth_from_reason():
@@ -34,16 +33,6 @@ def test_blocked_truth_from_issue():
     )
     assert truth.is_blocked is True
     assert truth.blocked_by_issue == 456  # computed property for backward compat
-
-
-def test_truth_with_dependencies():
-    """Test truth tracks dependencies."""
-    truth = CoordinationTruth(
-        dependencies=[123, 789],
-        dependencies_source=DataSource.ISSUE_BODY_FALLBACK,
-    )
-    assert truth.dependencies == [123, 789]
-    assert truth.is_blocked is False  # Dependencies alone don't block
 
 
 def test_truth_provenance():
@@ -67,19 +56,6 @@ def test_source_required_for_blocked_by_issue():
     """Test that blocked_by_issues requires blocked_by_issue_source."""
     with pytest.raises(ValidationError, match="blocked_by_issue_source must be set"):
         CoordinationTruth(blocked_by_issues=[999])
-
-
-def test_source_required_for_dependencies():
-    """Test that dependencies require dependencies_source."""
-    with pytest.raises(ValidationError, match="dependencies_source must be set"):
-        CoordinationTruth(dependencies=[123])
-
-
-def test_empty_dependencies_no_source():
-    """Test that empty dependencies list doesn't require source."""
-    truth = CoordinationTruth(dependencies=[])
-    assert truth.dependencies == []
-    assert truth.dependencies_source is None
 
 
 def test_is_blocked_in_serialization():

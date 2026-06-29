@@ -385,10 +385,10 @@ class CheckService(CheckRemote):
 
                 resolver = CoordinationResolver(store=self.store)
                 truth = resolver.resolve_coordination(branch, task_issue)
-                if truth.dependencies:
+                if truth.blocked_by_issues:
                     unresolved = []
                     unresolved_details = []
-                    for dep in truth.dependencies:
+                    for dep in truth.blocked_by_issues:
                         resolution = DependencyResolutionService.is_dependency_resolved(
                             dep,
                             github_client=self.github_client,

@@ -118,7 +118,7 @@ def check_dependencies(
     blocked_state_service_cls: type[Any] = BlockedStateService,
     label_service_cls: type[Any] = LabelService,
 ) -> bool:
-    dependencies = truth.dependencies
+    dependencies = truth.blocked_by_issues
     if not dependencies:
         return True
 
