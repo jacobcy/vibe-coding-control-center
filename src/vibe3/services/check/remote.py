@@ -8,8 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 from loguru import logger
 
 from vibe3.clients import parse_linked_issues
-from vibe3.models import IssueLink, IssueState
-from vibe3.models.state_machine import get_highest_priority_state_label
+from vibe3.models import IssueLink, IssueState, get_highest_priority_state_label
 
 
 @dataclass

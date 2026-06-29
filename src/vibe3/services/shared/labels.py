@@ -14,10 +14,7 @@ from vibe3.clients import (
     normalize_assignees,
     normalize_labels,
 )
-from vibe3.models import OrchestraConfig
-from vibe3.models.state_machine import (
-    get_highest_priority_state_label,
-)
+from vibe3.models import OrchestraConfig, get_highest_priority_state_label
 
 if TYPE_CHECKING:
     from vibe3.models import DispatchExclusion, IssueInfo

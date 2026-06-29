@@ -18,9 +18,9 @@ from vibe3.models import (
     VIBE_TASK_LABEL,
     IssueState,
     StateTransition,
+    get_highest_priority_state_label,
     validate_transition,
 )
-from vibe3.models.state_machine import get_highest_priority_state_label
 
 
 class LabelService:
