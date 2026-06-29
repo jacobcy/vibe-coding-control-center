@@ -191,13 +191,21 @@ class FlowOrchestratorService:
                 self.task_service.link_issue(
                     branch, related_issue, "related", actor=actor
                 )
-            for dependency_issue in dependency_issue_numbers:
+            if not dependency_issue_numbers and blocked_reason is not None:
                 self.flow_service.block_flow(
                     branch,
                     reason=blocked_reason,
-                    blocked_by_issue=dependency_issue,
+                    blocked_by_issue=None,
                     actor=actor,
                 )
+            else:
+                for dependency_issue in dependency_issue_numbers:
+                    self.flow_service.block_flow(
+                        branch,
+                        reason=blocked_reason,
+                        blocked_by_issue=dependency_issue,
+                        actor=actor,
+                    )
 
             result = self.store.get_flow_state(branch) or flow_state.model_dump()
 
