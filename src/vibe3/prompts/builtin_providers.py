@@ -36,18 +36,17 @@ def resolve_skill_content(
     if skill_path is None:
         return None
 
-    # Resolve relative path against repo root for CWD-independent access
-    from vibe3.clients import find_repo_root
-
-    try:
-        repo_root = find_repo_root()
-        abs_path = repo_root / skill_path
-    except Exception:
-        # Fallback to cwd-relative if not in git repo
-        abs_path = Path(skill_path)
+    abs_path = resolve_runtime_asset(skill_path)
     try:
         return abs_path.read_text(encoding="utf-8")
-    except OSError:
+    except OSError as exc:
+        logger.bind(
+            domain="prompt_assembly",
+            action="resolve_skill_content",
+            skill=skill_name,
+            cwd=str(Path.cwd()),
+            resolved_path=str(abs_path),
+        ).warning("Optional skill content is unavailable: {}", exc)
         return None
 
 

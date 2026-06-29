@@ -153,6 +153,40 @@ def test_resolve_vibe_project_asset_from_subdirectory(
     assert resolved == vibe_file
 
 
+def test_resolve_vibe_project_asset_from_bare_repo_worktree(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Project assets anchor to a checkout nested below a bare repository."""
+    seed = tmp_path / "seed"
+    seed.mkdir()
+    _run_git(["init", "-b", "main"], cwd=seed)
+    _run_git(["config", "user.email", "test@test.com"], cwd=seed)
+    _run_git(["config", "user.name", "Test"], cwd=seed)
+    _run_git(
+        ["-c", "core.hooksPath=", "commit", "--allow-empty", "-m", "init"], cwd=seed
+    )
+
+    bare_repo = tmp_path / "bare_repo"
+    _run_git(["clone", "--bare", str(seed), str(bare_repo)], cwd=tmp_path)
+    worktree = bare_repo / ".worktrees" / "topic"
+    _run_git(
+        ["worktree", "add", "-b", "topic", str(worktree), "main"],
+        cwd=bare_repo,
+    )
+    vibe_file = worktree / ".vibe" / "policies" / "plan.md"
+    vibe_file.parent.mkdir(parents=True)
+    vibe_file.write_text("bare worktree policy", encoding="utf-8")
+    nested = worktree / "src" / "nested"
+    nested.mkdir(parents=True)
+    monkeypatch.chdir(nested)
+
+    from vibe3.clients.runtime_assets import _git_toplevel
+
+    _git_toplevel.cache_clear()
+
+    assert resolve_runtime_asset(".vibe/policies/plan.md") == vibe_file
+
+
 def test_resolve_vibe_project_asset_not_in_repo(monkeypatch, tmp_path: Path) -> None:
     """Verify .vibe/ paths return relative path when not in a git repo."""
     # Create a non-git directory structure outside any git repo

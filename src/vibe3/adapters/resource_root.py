@@ -42,14 +42,18 @@ def resolve_resource_root(
         ResourceRootNotFoundError: If no root with required_marker is found
     """
     candidates: list[Path] = []
+    resolution_errors: list[str] = []
 
     if git_common_dir:
-        from vibe3.clients import find_repo_root
+        from vibe3.utils.git_helpers import (
+            RepositoryLayoutError,
+            resolve_repo_root_from_common_dir,
+        )
 
         try:
-            candidates.append(find_repo_root())
-        except Exception:
-            candidates.append(Path(git_common_dir).parent)
+            candidates.append(resolve_repo_root_from_common_dir(git_common_dir))
+        except RepositoryLayoutError as exc:
+            resolution_errors.append(str(exc))
 
     candidates.extend(additional_roots)
     candidates.extend(_with_parents(Path.cwd()))
@@ -63,6 +67,11 @@ def resolve_resource_root(
         if _has_marker(resolved, required_marker):
             return resolved
 
-    raise ResourceRootNotFoundError(
-        f"Cannot resolve resource root containing {required_marker!r}"
+    details = (
+        f"cwd={Path.cwd()}; git_common_dir={git_common_dir or 'unavailable'}; "
+        f"required_marker={required_marker}; "
+        f"checked_candidates={[str(path) for path in seen]}"
     )
+    if resolution_errors:
+        details += f"; layout_errors={resolution_errors}"
+    raise ResourceRootNotFoundError(f"Cannot resolve resource root; {details}")

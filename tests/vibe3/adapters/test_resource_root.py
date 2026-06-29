@@ -42,8 +42,14 @@ def test_resolve_resource_root_raises_when_no_required_marker(
 
     monkeypatch.chdir(cwd)
 
-    with pytest.raises(ResourceRootNotFoundError):
+    with pytest.raises(ResourceRootNotFoundError) as exc_info:
         resolve_resource_root(
             git_common_dir=str(mocked_common_dir),
             required_marker="skills",
         )
+
+    message = str(exc_info.value)
+    assert f"cwd={cwd}" in message
+    assert f"git_common_dir={mocked_common_dir}" in message
+    assert "required_marker=skills" in message
+    assert "checked_candidates=" in message
