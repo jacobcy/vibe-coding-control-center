@@ -1,5 +1,7 @@
 """GitClient 单元测试."""
 
+import os
+import subprocess
 import time
 from collections.abc import Generator
 from pathlib import Path
@@ -270,6 +272,24 @@ class TestCheckMergeConflicts:
 class TestFindRepoRoot:
     """Tests for the shared repo-root resolution function."""
 
+    def test_client_method_uses_instance_cwd(self, tmp_path: Path) -> None:
+        """An injected client's cwd, not the process cwd, selects the repository."""
+        other_repo = tmp_path / "other"
+        other_repo.mkdir()
+        env = dict(os.environ)
+        for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_PREFIX", "GIT_COMMON_DIR"):
+            env.pop(key, None)
+        subprocess.run(
+            ["git", "init", "-b", "main"],
+            cwd=other_repo,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        assert GitClient(cwd=other_repo).find_repo_root() == other_repo
+
     def test_git_common_dir_success(self):
         """Primary path: git common dir resolves to main repo."""
         with patch(
@@ -294,9 +314,16 @@ class TestFindRepoRoot:
                 "read_text",
                 return_value="gitdir: /repos/main/.git/worktrees/wt-dev\n",
             ),
+            patch(
+                "vibe3.utils.git_helpers.resolve_repo_root_from_common_dir",
+                return_value=Path("/repos/main"),
+            ) as resolve_root,
         ):
             root = find_repo_root()
         assert root == Path("/repos/main")
+        resolve_root.assert_called_once_with(
+            Path("/repos/main/.git"), cwd=Path("/worktrees/wt-dev")
+        )
 
     def test_worktree_git_file_relative_gitdir(self):
         """Fallback: relative gitdir resolved against cwd."""
@@ -313,11 +340,18 @@ class TestFindRepoRoot:
                 "read_text",
                 return_value="gitdir: ../.git/worktrees/wt-dev\n",
             ),
+            patch(
+                "vibe3.utils.git_helpers.resolve_repo_root_from_common_dir",
+                return_value=Path("/worktrees"),
+            ) as resolve_root,
         ):
             root = find_repo_root()
         # ../.git/worktrees/wt-dev → /worktrees/.git/worktrees/wt-dev
         # parent.parent.parent → /worktrees
         assert root == Path("/worktrees")
+        resolve_root.assert_called_once_with(
+            Path("/worktrees/.git"), cwd=Path("/worktrees/wt-dev")
+        )
 
     def test_main_repo_returns_cwd(self):
         """When .git is a directory, cwd IS the main repo."""

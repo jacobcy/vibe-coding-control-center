@@ -232,7 +232,17 @@ class GitClient:
 
     def find_repo_root(self) -> Path:
         """Resolve the main repository root deterministically."""
-        return find_repo_root()
+        from vibe3.utils.git_helpers import resolve_repo_root_from_common_dir
+
+        try:
+            worktree_root = Path(self.get_worktree_root())
+        except GitError:
+            worktree_root = None
+        return resolve_repo_root_from_common_dir(
+            self.get_git_common_dir(),
+            cwd=self._cwd or Path.cwd(),
+            worktree_root=worktree_root,
+        )
 
     def get_remote_url(self, name: str = "origin") -> str | None:
         """Get the URL of a git remote.
