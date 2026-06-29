@@ -44,7 +44,12 @@ def resolve_resource_root(
     candidates: list[Path] = []
 
     if git_common_dir:
-        candidates.append(Path(git_common_dir).parent)
+        from vibe3.clients import find_repo_root
+
+        try:
+            candidates.append(find_repo_root())
+        except Exception:
+            candidates.append(Path(git_common_dir).parent)
 
     candidates.extend(additional_roots)
     candidates.extend(_with_parents(Path.cwd()))
