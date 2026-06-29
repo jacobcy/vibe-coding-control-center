@@ -472,3 +472,30 @@ class TestApplyUnifiedNoopGate:
         assert event_args[0][1] == "state_transitioned"
         assert "state/merge-ready" in event_args[1]["detail"]
         assert "state/handoff" in event_args[1]["detail"]
+
+
+def test_state_verification_picks_highest_priority_label(monkeypatch):
+    """Multi state label: highest priority (in-progress > handoff) must win."""
+    from vibe3.execution.state_verification import StateVerificationService
+
+    svc = StateVerificationService()
+
+    # Simulate GitHub returning both labels (order: handoff first, then in-progress)
+    labels = [
+        {"name": "state/handoff"},
+        {"name": "state/in-progress"},
+        {"name": "type/feature"},
+    ]
+
+    def fake_view_issue(issue_number, *args, **kwargs):
+        return {"labels": labels, "state": "OPEN"}
+
+    monkeypatch.setattr(
+        "vibe3.clients.github_client.GitHubClient.view_issue",
+        fake_view_issue,
+    )
+
+    label, is_closed = svc.get_issue_state_label(42)
+    # "in-progress" beats "handoff" in STATE_PRIORITY_ORDER
+    assert label == "state/in-progress"
+    assert is_closed is False

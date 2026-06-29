@@ -86,17 +86,32 @@ class StateVerificationService:
                 issue_payload, issue_number, branch, flow_state, tick_id
             )
 
+        # Extract all label names and resolve to highest-priority state label
+        label_names: list[str] = []
         for label in labels:
             if isinstance(label, dict):
                 label_name = label.get("name", "")
                 if not isinstance(label_name, str):
                     continue
+                label_names.append(label_name)
             else:
-                label_name = str(label)
-            if label_name.startswith("state/"):
-                return label_name, is_closed
+                label_names.append(str(label))
 
-        return None, is_closed
+        state_labels = [lb for lb in label_names if lb.startswith("state/")]
+        if not state_labels:
+            return None, is_closed
+        if len(state_labels) == 1:
+            return state_labels[0], is_closed
+
+        # Multiple state labels: select the highest-priority one in STATE_PRIORITY_ORDER
+        from vibe3.clients.label_utils import STATE_PRIORITY_ORDER
+
+        priority = {f"state/{s}": i for i, s in enumerate(STATE_PRIORITY_ORDER)}
+        best = min(
+            state_labels,
+            key=lambda lb: priority.get(lb, len(STATE_PRIORITY_ORDER)),
+        )
+        return best, is_closed
 
     def _handle_github_api_failure(
         self,
