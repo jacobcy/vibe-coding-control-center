@@ -200,7 +200,21 @@ def find_repo_root() -> Path:
     try:
         git_common = get_git_common_dir()
         if git_common:
-            return Path(git_common).parent
+            git_common_path = Path(git_common)
+            # Check if this is a bare repository. In a bare repository, core.bare = true is in config,
+            # and git_common itself is the repository directory.
+            config_path = git_common_path / "config"
+            is_bare = False
+            if config_path.is_file():
+                try:
+                    content = config_path.read_text()
+                    if "bare = true" in content:
+                        is_bare = True
+                except Exception:
+                    pass
+            if is_bare:
+                return git_common_path
+            return git_common_path.parent
     except Exception:
         pass
 
