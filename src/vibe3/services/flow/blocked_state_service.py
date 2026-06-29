@@ -66,6 +66,11 @@ class BlockedStateService:
         actor: str = "system",
     ) -> None:
         """Authoritatively block flow by writing to remote body truth, then reconcile."""
+        # Graceful degradation: no issue number -> write local cache only
+        if issue_number is None:
+            self._io.write_database_cache(branch, reason, tasks[0] if tasks else None, actor)
+            return
+
         try:
             current_body = self._io.github.get_issue_body(issue_number)
             if current_body is None:
@@ -117,13 +122,32 @@ class BlockedStateService:
         blocked_by_issue = open_tasks[0] if open_tasks else None
 
         # Update flow status pointer, reason, and main dependency
-        self.store.update_flow_state(
-            branch,
-            flow_status="blocked" if is_blocked else "active",
-            blocked_reason=truth.blocked_reason,
-            blocked_by_issue=blocked_by_issue,
-            latest_actor=actor,
-        )
+        update_kwargs: dict[str, object] = {
+            "flow_status": "blocked" if is_blocked else "active",
+            "blocked_reason": truth.blocked_reason,
+            "blocked_by_issue": blocked_by_issue,
+            "latest_actor": actor,
+        }
+        if not is_blocked:
+            # Reset transition counters on unblock (replaces old clear_database_cache)
+            update_kwargs["transition_count"] = 0
+            update_kwargs["aup_rejection_count"] = 0
+            update_kwargs["last_aup_rejection_at"] = None
+        self.store.update_flow_state(branch, **update_kwargs)
+
+        # Clear transition history on unblock to reset per-pair loop detection
+        if not is_blocked:
+            import sqlite3
+            try:
+                with sqlite3.connect(self.store.db_path) as conn:
+                    self.store.clear_transition_history(conn, branch)
+            except Exception as exc:
+                from loguru import logger
+                logger.bind(
+                    domain="blocked_state",
+                    action="rebuild_cache",
+                    branch=branch,
+                ).warning(f"Failed to clear transition history: {exc}")
 
         # Update flow_issue_links dependencies list
         current_deps = self.store.get_dependency_links(branch)

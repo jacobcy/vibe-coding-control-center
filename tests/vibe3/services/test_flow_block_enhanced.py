@@ -117,6 +117,7 @@ class TestBlockFlowEnhanced:
         mock_store,
         mock_label_service,
         mock_flow_timeline_service,
+        mock_github_client,
     ):
         """block_flow works without task_issue_number (graceful degradation)."""
         # Arrange - flow without issue number
@@ -140,11 +141,12 @@ class TestBlockFlowEnhanced:
         # Assert - No timeline comment added (no issue number)
         mock_flow_timeline_service.record_timeline_event.assert_not_called()
 
-        # Assert - Flow state still updated
-        mock_store.update_flow_state.assert_called_once()
+        # Assert - BlockedStateService.set_block was called (which internally
+        # calls reconcile_blocked -> rebuild_cache_from_truth -> store.update_flow_state)
+        mock_store.update_flow_state.assert_called()
         update_kwargs = mock_store.update_flow_state.call_args[1]
-        assert update_kwargs["blocked_reason"] == reason
-        assert update_kwargs["latest_actor"] == actor
+        assert update_kwargs.get("blocked_reason") == reason
+        assert update_kwargs.get("latest_actor") == actor
 
     @pytest.mark.skip(
         reason="Test isolation issue with FlowTimelineService mock - needs refactor"

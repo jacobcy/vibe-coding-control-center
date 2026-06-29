@@ -61,15 +61,15 @@ def test_resume_resets_single_step_limit_counter(tmp_path):
         label_service=label_service,
         store=db,
     )
-    result = service.unblock(
-        branch=branch,
-        target_state=IssueState.READY,
+    result = service.reconcile_blocked(
         issue_number=issue_number,
+        branch=branch,
+        clear_reason=True,
         actor="human:resume",
     )
 
-    assert result.db_cleared, "DB should be cleared"
-    assert result.label_cleared, "Label should be cleared"
+    assert result is not None, "Should return target state (unblocked)"
+    assert result == IssueState.READY, "Should return READY as target state"
 
     # Verify transition_count reset
     flow = db.get_flow_state(branch)
@@ -154,14 +154,14 @@ def test_resume_resets_hard_limit_counter(tmp_path):
         label_service=label_service,
         store=db,
     )
-    result = service.unblock(
-        branch=branch,
-        target_state=IssueState.READY,
+    result = service.reconcile_blocked(
         issue_number=issue_number,
+        branch=branch,
+        clear_reason=True,
         actor="human:resume",
     )
 
-    assert result.db_cleared
+    assert result is not None, "Should return target state (unblocked)"
 
     # Verify counter reset
     flow = db.get_flow_state(branch)

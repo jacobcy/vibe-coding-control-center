@@ -87,6 +87,8 @@ def test_check_worktree_health_blocked_real_flow_checks_path(
         "branch": "task/issue-456",
         "flow_status": "blocked",
     }
+    # set_block -> reconcile_blocked -> rebuild_cache_from_truth needs iterable deps
+    mock_store.get_dependency_links.return_value = []
     service = QualifyGateService(
         config=mock_config,
         github=mock_github,

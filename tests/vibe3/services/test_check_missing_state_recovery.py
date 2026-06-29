@@ -59,7 +59,7 @@ def test_verify_branch_recovers_missing_state_label_from_flow_refs(
         mock_label_service.confirm_issue_state.assert_called_once_with(
             501,
             IssueState.IN_PROGRESS,
-            actor="human:resume",
+            actor="recovery:resume",
             force=True,
         )
 

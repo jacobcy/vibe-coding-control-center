@@ -47,12 +47,11 @@ def check_worktree_health(
             store=store,
             github_client=github,
             label_service=label_service_cls(repo=config.repo),
-        ).block(
+        ).set_block(
             branch=branch,
             reason=reason,
             actor="orchestra:dispatcher",
             issue_number=issue.number,
-            event_type="flow_blocked",
         )
         _append_orchestra_event(
             "dispatcher", f"qualify_gate skip #{issue.number}: {reason}"
@@ -74,12 +73,11 @@ def check_worktree_health(
                 store=store,
                 github_client=github,
                 label_service=label_service_cls(repo=config.repo),
-            ).block(
+            ).set_block(
                 branch=branch,
                 reason=reason,
                 actor="orchestra:dispatcher",
                 issue_number=issue.number,
-                event_type="flow_blocked",
             )
             _append_orchestra_event(
                 "dispatcher", f"qualify_gate skip #{issue.number}: {reason}"
