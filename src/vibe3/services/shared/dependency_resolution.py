@@ -39,10 +39,9 @@ class DependencyResolutionService:
     ) -> DependencyResolution:
         """Check if a dependency issue is resolved.
 
-        Resolution logic (in order):
+        Resolution logic:
         1. If GitHub issue state is "CLOSED" → resolved
-        2. If issue has a merged PR → resolved
-        3. Otherwise → unresolved
+        2. Otherwise → unresolved
 
         Args:
             issue_number: GitHub issue number
@@ -91,25 +90,7 @@ class DependencyResolutionService:
                 github_state=github_state,
             )
 
-        # Step 3: Check for merged PR
-        try:
-            from vibe3.clients import get_merged_pr_for_issue
-
-            pr_data = get_merged_pr_for_issue(issue_number, repo)
-            if pr_data:
-                return DependencyResolution(
-                    resolved=True,
-                    issue_number=issue_number,
-                    github_state=github_state,
-                )
-        except Exception as e:
-            logger.bind(
-                domain="dependency_resolution",
-                issue_number=issue_number,
-                error=str(e),
-            ).warning(f"Failed to check merged PR for #{issue_number}")
-
-        # Step 4: Issue is unresolved
+        # Step 3: Issue is unresolved (CLOSED-only semantics per standard §1.5/§3/§6)
         return DependencyResolution(
             resolved=False,
             issue_number=issue_number,

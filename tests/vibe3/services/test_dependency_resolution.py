@@ -50,27 +50,23 @@ class TestDependencyResolutionService:
         assert resolution.issue_number == 123
         assert resolution.github_state == "OPEN"
 
-    def test_resolved_when_issue_open_with_merged_pr(self) -> None:
-        """Dependency is resolved when issue has a merged PR."""
+    def test_not_resolved_when_issue_open_with_merged_pr(self) -> None:
+        """OPEN issue not resolved even with merged PR (CLOSED-only)."""
         github_client = MagicMock()
         github_client.view_issue.return_value = {
             "state": "OPEN",
-            "labels": [],
         }
 
-        with patch(
-            "vibe3.clients.pr_status_checker.get_merged_pr_for_issue",
-            return_value={"number": 42},
-        ):
-            resolution = DependencyResolutionService.is_dependency_resolved(
-                123,
-                github_client=github_client,
-                repo=None,
-            )
+        # Merged PR no longer confers resolved status — only CLOSED does
+        result = DependencyResolutionService.is_dependency_resolved(
+            123,
+            github_client=github_client,
+            repo=None,
+        )
 
-        assert resolution.resolved is True
-        assert resolution.issue_number == 123
-        assert resolution.github_state == "OPEN"
+        assert result.resolved is False
+        assert result.issue_number == 123
+        assert result.github_state == "OPEN"
 
     def test_not_resolved_when_network_error(self) -> None:
         """Dependency is not resolved when GitHub API returns network_error."""
@@ -154,3 +150,23 @@ class TestDependencyResolution:
             issue_number=123,
         )
         assert resolution.github_state is None
+
+
+def test_open_issue_with_merged_pr_is_not_resolved():
+    """OPEN issue with merged PR must remain unresolved (CLOSED-only)."""
+    github_client = MagicMock()
+    github_client.view_issue.return_value = {
+        "state": "OPEN",
+    }
+
+    with patch(
+        "vibe3.clients.pr_status_checker.get_merged_pr_for_issue",
+        return_value={"number": 999, "state": "MERGED", "title": "merged PR"},
+    ):
+        result = DependencyResolutionService.is_dependency_resolved(
+            100, github_client=github_client
+        )
+
+    assert (
+        result.resolved is False
+    ), f"OPEN+merged PR must NOT resolve. Got: resolved={result.resolved}"
