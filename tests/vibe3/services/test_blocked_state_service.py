@@ -3,8 +3,6 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow.blocked_state_service import (
@@ -46,7 +44,6 @@ class StubLabelService:
 
     def get_state(self, issue_number: int) -> IssueState | None:
         return self.current_state
-
 
 
 def test_block_dependency_writes_to_all_three_sources(tmp_path: Path) -> None:
@@ -330,7 +327,6 @@ def test_set_block_on_double_block(tmp_path: Path) -> None:
     assert flow_state.get("blocked_reason") == "Second failure"
 
 
-
 def test_remove_issue_link(tmp_path: Path) -> None:
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
     store.add_issue_link("test-branch", 101, "dependency")
@@ -375,7 +371,9 @@ def test_reconcile_blocked_blocked_state(tmp_path: Path) -> None:
     github = StubGitHubClient(issue_body=issue_body_blocked)
     label_service = StubLabelService()
 
-    svc = BlockedStateService(store=store, github_client=github, label_service=label_service)
+    svc = BlockedStateService(
+        store=store, github_client=github, label_service=label_service
+    )
 
     # Reconcile should keep state blocked
     target = svc.reconcile_blocked(123, "test-branch")
@@ -399,7 +397,9 @@ def test_reconcile_blocked_resume_state(tmp_path: Path) -> None:
     label_service = StubLabelService()
     label_service.current_state = IssueState.BLOCKED
 
-    svc = BlockedStateService(store=store, github_client=github, label_service=label_service)
+    svc = BlockedStateService(
+        store=store, github_client=github, label_service=label_service
+    )
 
     # Reconcile with clear_reason=True should unblock and resume to READY
     target = svc.reconcile_blocked(123, "test-branch", clear_reason=True)
@@ -409,8 +409,9 @@ def test_reconcile_blocked_resume_state(tmp_path: Path) -> None:
 
 
 def test_reconcile_blocked_dependency_resolved(tmp_path: Path) -> None:
-    """Verify that when a dependency is resolved, reconcile_blocked unblocks the flow."""
+    """When a dependency is resolved, reconcile_blocked unblocks the flow."""
     from unittest.mock import patch
+
     from vibe3.services.shared.dependency_resolution import DependencyResolution
 
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
@@ -433,7 +434,9 @@ def test_reconcile_blocked_dependency_resolved(tmp_path: Path) -> None:
     label_service = StubLabelService()
     label_service.current_state = IssueState.BLOCKED
 
-    svc = BlockedStateService(store=store, github_client=github, label_service=label_service)
+    svc = BlockedStateService(
+        store=store, github_client=github, label_service=label_service
+    )
 
     # Mock DependencyResolutionService.is_dependency_resolved to return resolved=True
     with patch(
@@ -463,4 +466,33 @@ def test_reconcile_blocked_dependency_resolved(tmp_path: Path) -> None:
     assert len(links) == 0
 
 
+def test_reconcile_degraded_stays_blocked(tmp_path: Path) -> None:
+    """Degraded mode (GitHub read fails) must not be misjudged as "recovered".
 
+    When GitHub is unreachable, reconcile_blocked returns None (conservative
+    block) and must NOT rebuild the cache or flip flow_status to active.
+    """
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state(
+        "task/issue-100",
+        flow_slug="issue-100",
+        flow_status="blocked",
+        blocked_reason="Manual intervention",
+    )
+
+    github = MagicMock()
+    github.get_issue_body.side_effect = Exception("GitHub API unavailable")
+
+    svc = BlockedStateService(store=store, github_client=github)
+
+    target = svc.reconcile_blocked(
+        100, "task/issue-100", clear_reason=False, actor="orchestra:dispatcher"
+    )
+
+    # None = stay blocked, caller must not interpret as recovered
+    assert target is None
+
+    # flow_status must NOT have been flipped to active during degraded mode
+    flow_state = store.get_flow_state("task/issue-100")
+    assert flow_state is not None
+    assert flow_state.get("flow_status") == "blocked"

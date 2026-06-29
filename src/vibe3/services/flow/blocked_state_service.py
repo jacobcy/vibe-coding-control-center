@@ -64,14 +64,11 @@ class BlockedStateService:
         tasks: list[int] | None = None,
         actor: str = "system",
     ) -> None:
-        """Authoritatively block flow by writing body truth, then reconcile."""
-        # Graceful degradation: no issue number -> write local cache only
-        if issue_number is None:
-            self._io.write_database_cache(
-                branch, reason, tasks[0] if tasks else None, actor
-            )
-            return
+        """Authoritatively block flow by writing body truth, then reconcile.
 
+        Caller MUST resolve issue_number to a non-None int before calling;
+        cache-only writes (no issue context) should use ``write_cache`` instead.
+        """
         try:
             current_body = self._io.github.get_issue_body(issue_number)
             if current_body is None:
@@ -193,7 +190,9 @@ class BlockedStateService:
                 issue_number=issue_number,
                 error=str(exc),
             ).warning("GitHub read failed; falling back to DB cache")
-            # Return None: conservative-block, skip cache rebuild in degraded
+            # None = stay blocked / degraded. Callers must NOT treat None as
+            # "recovered"; it means we could not verify truth, so we
+            # conservatively keep blocking and skip cache rebuild.
             return None
 
         # 2. Clear Reason if requested (e.g. manual resume)
