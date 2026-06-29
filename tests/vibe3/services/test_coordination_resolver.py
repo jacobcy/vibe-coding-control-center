@@ -92,7 +92,7 @@ def test_resolve_coordination_no_issue_number():
 
 
 def test_resolve_coordination_fallback_to_local_no_flow_state_but_dependencies():
-    """Test validation passes and source is set when flow_state is None but dependency links exist."""
+    """flow_state is None but dependency links exist -> source set."""
     store = MagicMock(spec=SQLiteClient)
     store.get_flow_state.return_value = None
     store.get_dependency_links.return_value = [789]
@@ -111,4 +111,3 @@ def test_resolve_coordination_fallback_to_local_no_flow_state_but_dependencies()
 
         assert truth.blocked_by_issues == [789]
         assert truth.blocked_by_issue_source == DataSource.LOCAL_SQLITE
-

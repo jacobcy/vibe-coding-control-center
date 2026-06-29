@@ -214,6 +214,7 @@ def test_timeline_recorded_during_block_not_as_state_source(tmp_path: Path) -> N
     events = store.get_events("test-branch")
     if events:
         import sqlite3
+
         event_id = events[0]["id"]
         with sqlite3.connect(store.db_path) as conn:
             conn.execute("DELETE FROM flow_events WHERE id = ?", (event_id,))

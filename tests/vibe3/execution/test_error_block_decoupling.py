@@ -227,7 +227,9 @@ class TestDependencyNotSatisfiedTriggersBlock:
                 "vibe3.services.flow.blocked_state_io.GitHubClient",
                 return_value=_make_tracking_github(),
             ),
-            patch("vibe3.services.flow.blocked_state_io.LabelService") as mock_label_cls,
+            patch(
+                "vibe3.services.flow.blocked_state_io.LabelService"
+            ) as mock_label_cls,
         ):
             mock_label = MagicMock()
             mock_label.confirm_issue_state.return_value = "advanced"
@@ -282,7 +284,9 @@ class TestErrorBlockOrthogonality:
                 "vibe3.services.flow.blocked_state_io.GitHubClient",
                 return_value=_make_tracking_github(),
             ),
-            patch("vibe3.services.flow.blocked_state_io.LabelService") as mock_label_cls,
+            patch(
+                "vibe3.services.flow.blocked_state_io.LabelService"
+            ) as mock_label_cls,
         ):
             mock_label = MagicMock()
             mock_label.confirm_issue_state.return_value = "advanced"

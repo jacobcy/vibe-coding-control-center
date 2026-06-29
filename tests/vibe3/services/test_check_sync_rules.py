@@ -147,7 +147,14 @@ class TestCheckServiceSyncRules:
         github_client.view_issue.return_value = {
             "state": "OPEN",
             "title": "Test issue",
-            "body": "Description\n<!-- vibe3-flow-state-start -->\n\n**Vibe3 Flow State**\n\n- **State**: blocked\n- **Blocked reason**: Remote state/blocked label detected\n\n<!-- vibe3-flow-state-end -->",
+            "body": (
+                "Description\n"
+                "<!-- vibe3-flow-state-start -->\n\n"
+                "**Vibe3 Flow State**\n\n"
+                "- **State**: blocked\n"
+                "- **Blocked reason**: Remote state/blocked label detected\n\n"
+                "<!-- vibe3-flow-state-end -->"
+            ),
             "labels": [{"name": "state/blocked"}],
         }
         # reconcile_blocked reads issue body to determine authoritative truth
@@ -182,7 +189,9 @@ class TestCheckServiceSyncRules:
 
         # Patch write_label_state to avoid real GitHub label API calls
         # during reconcile_blocked's label sync step.
-        with patch.object(BlockedStateIO, "write_label_state", return_value="confirmed"):
+        with patch.object(
+            BlockedStateIO, "write_label_state", return_value="confirmed"
+        ):
             result = service.verify_current_flow()
 
         assert result is not None
