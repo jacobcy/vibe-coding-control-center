@@ -232,7 +232,7 @@ class GitClient:
 
     def find_repo_root(self) -> Path:
         """Resolve the main repository root deterministically."""
-        from vibe3.utils.git_helpers import resolve_repo_root_from_common_dir
+        from vibe3.utils import resolve_repo_root_from_common_dir
 
         try:
             worktree_root = Path(self.get_worktree_root())

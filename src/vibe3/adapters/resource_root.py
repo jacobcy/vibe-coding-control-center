@@ -45,7 +45,7 @@ def resolve_resource_root(
     resolution_errors: list[str] = []
 
     if git_common_dir:
-        from vibe3.utils.git_helpers import (
+        from vibe3.utils import (
             RepositoryLayoutError,
             resolve_repo_root_from_common_dir,
         )
