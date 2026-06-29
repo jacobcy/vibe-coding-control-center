@@ -2,7 +2,6 @@
 
 import time
 from datetime import datetime
-from os import PathLike
 from pathlib import Path
 from typing import cast
 
@@ -14,6 +13,7 @@ from vibe3.clients import (
     GitHubClientProtocol,
     RecentPRCache,
     SQLiteClient,
+    find_repo_root,
 )
 from vibe3.exceptions import GitError, PRNotFoundError, UserError
 from vibe3.models import (
@@ -75,15 +75,10 @@ class PRService:
 
     @property
     def recent_pr_cache(self) -> RecentPRCache:
-        """Persistent recent PR cache rooted at the repository common dir."""
+        """Persistent recent PR cache rooted at the repository root."""
         if self._recent_pr_cache_client is None:
             try:
-                git_common_dir = self.git_client.get_git_common_dir()
-                repo_path = (
-                    Path(git_common_dir).parent
-                    if isinstance(git_common_dir, (str, PathLike)) and git_common_dir
-                    else Path.cwd()
-                )
+                repo_path = find_repo_root()
             except Exception:
                 repo_path = Path.cwd()
             self._recent_pr_cache_client = RecentPRCache(repo_path)
