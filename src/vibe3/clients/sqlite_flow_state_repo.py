@@ -205,6 +205,24 @@ class SQLiteFlowStateRepo(_HasConnection):
         ).debug("Updated issue link role")
         return bool(updated)
 
+    def remove_issue_link(self, branch: str, issue_number: int, role: str) -> None:
+        """Remove a specific issue link relation."""
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM flow_issue_links "
+                "WHERE branch = ? AND issue_number = ? AND issue_role = ?",
+                (branch, issue_number, role),
+            )
+        logger.bind(
+            external="sqlite",
+            operation="remove_issue_link",
+            branch=branch,
+            issue=issue_number,
+            role=role,
+        ).debug("Removed issue link")
+
     def get_issue_links(self, branch: str) -> list[dict[str, Any]]:
         conn = self._get_connection()
         conn.row_factory = sqlite3.Row

@@ -389,3 +389,15 @@ def test_unblock_reports_label_failure(tmp_path: Path) -> None:
     )
     assert result.label_cleared is False
     assert label_service.current_state == IssueState.BLOCKED
+
+
+def test_remove_issue_link(tmp_path: Path) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.add_issue_link("test-branch", 101, "dependency")
+    links_before = store.get_dependency_links("test-branch")
+    assert 101 in links_before
+
+    store.remove_issue_link("test-branch", 101, "dependency")
+    links_after = store.get_dependency_links("test-branch")
+    assert 101 not in links_after
+
