@@ -106,7 +106,11 @@ class CoordinationResolver:
         if remote_success:
             blocked_by_issues = blocked_by_issues_remote
         else:
-            blocked_by_issues = self.store.get_dependency_links(branch)
+            blocked_by_issues = self.store.get_dependency_links(branch) if branch else []
+            if flow_state:
+                local_blocked_by = flow_state.get("blocked_by_issue")
+                if local_blocked_by is not None and local_blocked_by not in blocked_by_issues:
+                    blocked_by_issues = [local_blocked_by] + blocked_by_issues
 
         truth = CoordinationTruth(
             # Issue body projection state (remote-first)
