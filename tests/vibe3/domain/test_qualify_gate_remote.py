@@ -532,3 +532,99 @@ class TestE2EBlockedReconciliation:
                     clear_reason=False,
                     actor="orchestra:dispatcher",
                 )
+
+
+class TestConvergedDispatchGate:
+    """End-to-end tests for the converged run_qualify_gate -> reconcile path.
+
+    Guards against regression where the main dispatch gate bypasses
+    reconcile_blocked or wrongly dispatches when body truth says blocked
+    with an unresolved dependency.
+    """
+
+    def test_blocked_body_unclosed_dep_no_dispatch_no_link_clear(self, tmp_path):
+        """label=blocked + body=blocked + dep #456 unclosed -> no dispatch,
+        flow stays blocked, dependency binding preserved."""
+        from vibe3.clients.sqlite_client import SQLiteClient
+
+        class StubGitHub:
+            def __init__(self):
+                self._body = (
+                    "<!-- vibe3-flow-state-start -->\n\n"
+                    "**Vibe3 Flow State**\n\n"
+                    "- **State**: blocked\n"
+                    "- **Blocked by**: #456\n\n"
+                    "<!-- vibe3-flow-state-end -->"
+                )
+
+            def get_issue_body(self, issue_number):
+                return self._body
+
+            def update_issue_body(self, issue_number, body):
+                self._body = body
+                return True
+
+            def view_issue(self, issue_number, **kwargs):
+                # Dependency #456 is OPEN (unresolved)
+                return {"labels": [], "state": "OPEN"}
+
+            def list_prs_for_branch(self, branch):
+                return []
+
+        store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+        store.update_flow_state(
+            "task/issue-100",
+            flow_slug="issue-100",
+            flow_status="blocked",
+            blocked_by_issue=456,
+        )
+        store.add_issue_link("task/issue-100", 456, "dependency")
+
+        qualify_gate = QualifyGateService(
+            config=OrchestraConfig(repo="test/repo"),
+            github=StubGitHub(),
+            store=store,
+            flow_manager=Mock(),
+        )
+
+        issue = IssueInfo(
+            number=100,
+            title="Blocked Issue",
+            state=IssueState.BLOCKED,
+            labels=["state/blocked"],
+        )
+
+        mock_truth = CoordinationTruth(
+            projection_state="blocked",
+            projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
+            blocked_reason=None,
+            blocked_reason_source=None,
+            blocked_by_issues=[456],
+            blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
+            worktree_path=None,
+            actor=None,
+        )
+
+        with patch.object(
+            qualify_gate._coordination_resolver,
+            "resolve_coordination",
+            return_value=mock_truth,
+        ):
+            result = qualify_gate.run_qualify_gate(
+                issue=issue,
+                branch="task/issue-100",
+                flow_state={"flow_status": "blocked"},
+                labels=["state/blocked"],
+                trigger_state=IssueState.READY,
+            )
+
+        # No dispatch — body truth says blocked with unclosed dep
+        assert result is None
+
+        # Flow stays blocked (reconcile did not flip it)
+        flow_state = store.get_flow_state("task/issue-100")
+        assert flow_state is not None
+        assert flow_state.get("flow_status") == "blocked"
+
+        # Dependency binding preserved — reconcile did not clear it
+        assert 456 in store.get_dependency_links("task/issue-100")
