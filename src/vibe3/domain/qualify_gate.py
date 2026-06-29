@@ -9,10 +9,8 @@ from typing import TYPE_CHECKING, Any
 from vibe3.clients import GitHubClient
 from vibe3.config import get_convention
 from vibe3.domain.qualify_gate_checks import (
-    check_dependencies,
     check_worktree_health,
     get_issue_dependencies,
-    is_dependency_satisfied,
 )
 from vibe3.domain.qualify_gate_support import (
     align_blocked_state,
@@ -24,7 +22,7 @@ from vibe3.domain.qualify_gate_support import (
 )
 from vibe3.models import CoordinationTruth, IssueInfo, IssueState, OrchestraConfig
 from vibe3.services.flow import (
-    BlockedStateService,  # noqa: F401
+    BlockedStateService,
     FlowCleanupService,  # noqa: F401
     FlowService,  # noqa: F401
     FlowStatusService,  # noqa: F401
@@ -126,9 +124,6 @@ class QualifyGateService:
         if not self._check_worktree_health(issue, branch, truth):
             return None
 
-        if not self._check_dependencies(issue, branch, truth, labels):
-            return None
-
         return trigger_state if trigger_state.to_label() in labels else None
 
     def qualify_blocked_issue(self, issue: IssueInfo) -> IssueState | None:
@@ -143,52 +138,15 @@ class QualifyGateService:
         if not branch:
             return None
 
-        truth = self._coordination_resolver.resolve_coordination(branch, issue.number)
-        if truth.blocked_reason:
-            if truth.is_blocked:
-                self._align_blocked_state(
-                    issue.number,
-                    branch,
-                    truth,
-                    list(issue.labels),
-                    self._store.get_flow_state(branch),
-                )
-            return None
-
-        if truth.is_blocked and truth.blocked_by_issues:
-            all_satisfied = all(
-                self._is_dependency_satisfied(dep) for dep in truth.blocked_by_issues
-            )
-            if all_satisfied:
-                return self._resume_dep_resolved(
-                    branch, issue.number, truth.blocked_by_issues
-                )
-
-            from vibe3.observability import append_orchestra_event
-
-            open_deps = [
-                dep
-                for dep in truth.blocked_by_issues
-                if not self._is_dependency_satisfied(dep)
-            ]
-            append_orchestra_event(
-                "dispatcher",
-                "qualify_gate skip #"
-                f"{issue.number}: blocked by dependencies {open_deps} "
-                "(some still open)",
-            )
-            return None
-
-        flow_state = self._store.get_flow_state(branch)
-        result = self.run_qualify_gate(
-            issue,
-            branch,
-            flow_state,
-            list(issue.labels),
-            IssueState.BLOCKED,
-            truth=truth,
+        # Converge entirely onto reconcile_blocked
+        service = BlockedStateService(store=self._store, github_client=self._github)
+        target_state = service.reconcile_blocked(
+            issue_number=issue.number,
+            branch=branch,
+            clear_reason=False,
+            actor="orchestra:dispatcher",
         )
-        return None if result == IssueState.BLOCKED else result
+        return target_state
 
     def _terminalize_closed_issue(self, issue: IssueInfo, branch: str) -> None:
         terminalize_closed_issue(
@@ -358,33 +316,6 @@ class QualifyGateService:
             label_service_cls=_service_symbol("LabelService", _ORIG_LABEL_SERVICE),
         )
 
-    def _check_dependencies(
-        self,
-        issue: IssueInfo,
-        branch: str,
-        truth: CoordinationTruth,
-        _labels: list[str],
-    ) -> bool:
-        return check_dependencies(
-            issue=issue,
-            branch=branch,
-            truth=truth,
-            store=self._store,
-            github=self._github,
-            config=self.config,
-            is_dependency_satisfied_fn=self._is_dependency_satisfied,
-            blocked_state_service_cls=_service_symbol(
-                "BlockedStateService", _ORIG_BLOCKED_STATE_SERVICE
-            ),
-            label_service_cls=_service_symbol("LabelService", _ORIG_LABEL_SERVICE),
-        )
-
     def _get_issue_dependencies(self, issue_number: int) -> list[int]:
         return get_issue_dependencies(issue_number=issue_number, store=self._store)
 
-    def _is_dependency_satisfied(self, dep_issue_number: int) -> bool:
-        return is_dependency_satisfied(
-            github=self._github,
-            config=self.config,
-            dep_issue_number=dep_issue_number,
-        )

@@ -200,82 +200,6 @@ class TestRunQualifyGate:
                 assert result is None
                 mock_label_port.confirm_issue_state.assert_not_called()
 
-    @pytest.mark.slow
-    def test_dependency_block(
-        self, qualify_gate_service, sample_issue, mock_store, mock_github
-    ):
-        """Issue with unresolved dependency should be blocked."""
-        qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
-
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/issue-123-test",
-            "flow_status": "active",
-        }
-        mock_store.get_issue_links.return_value = [
-            {"issue_number": 123, "issue_role": "task"}
-        ]
-
-        mock_truth = Mock()
-        mock_truth.is_blocked = False
-        mock_truth.blocked_reason = None
-        mock_truth.blocked_by_issue = None
-        mock_truth.blocked_by_issues = [456]
-        mock_truth.worktree_path = None
-
-        mock_github.get_issue_body.return_value = "User content"
-
-        with patch.object(
-            qualify_gate_service._coordination_resolver,
-            "resolve_coordination",
-            return_value=mock_truth,
-        ):
-            with patch(
-                "vibe3.services.flow.blocked_state_io.GitHubClient",
-                return_value=mock_github,
-            ):
-                flow_state = {"status": "active"}
-
-                result = qualify_gate_service.run_qualify_gate(
-                    issue=sample_issue,
-                    branch="task/issue-123-test",
-                    flow_state=flow_state,
-                    labels=["state/in-progress"],
-                    trigger_state=IssueState.IN_PROGRESS,
-                )
-
-                assert result is None
-                # BlockedStateService.block() updates flow state with blocked info
-                mock_store.update_flow_state.assert_called()
-                mock_store.add_event.assert_called()
-
-    def test_dependency_satisfied(self, qualify_gate_service, sample_issue, mock_store):
-        """Issue with satisfied dependency should pass gate."""
-        qualify_gate_service._is_dependency_satisfied = Mock(return_value=True)
-
-        mock_truth = Mock()
-        mock_truth.is_blocked = False
-        mock_truth.blocked_reason = None
-        mock_truth.blocked_by_issue = None
-        mock_truth.blocked_by_issues = [456]
-        mock_truth.worktree_path = None
-
-        with patch.object(
-            qualify_gate_service._coordination_resolver,
-            "resolve_coordination",
-            return_value=mock_truth,
-        ):
-            flow_state = {}
-
-            result = qualify_gate_service.run_qualify_gate(
-                issue=sample_issue,
-                branch="task/issue-123-test",
-                flow_state=flow_state,
-                labels=["state/in-progress"],
-                trigger_state=IssueState.IN_PROGRESS,
-            )
-
-            assert result == IssueState.IN_PROGRESS
-
     def test_unblock_from_blocked_state(
         self, qualify_gate_service, sample_issue, mock_store
     ):
@@ -284,7 +208,6 @@ class TestRunQualifyGate:
         When body truth is NOT blocked but local cache says blocked,
         qualify-gate auto-resumes by clearing stale blocked state.
         """
-        qualify_gate_service._is_dependency_satisfied = Mock(return_value=True)
 
         flow_state = {
             "blocked_by_issue": 456,
@@ -338,7 +261,6 @@ class TestRunQualifyGate:
         self, qualify_gate_service, sample_issue, mock_store, mock_github
     ):
         """Stale local blocked cache should auto-resume even without blocked label."""
-        qualify_gate_service._is_dependency_satisfied = Mock(return_value=True)
 
         flow_state = {
             "blocked_by_issue": 456,
@@ -394,33 +316,64 @@ class TestRunQualifyGate:
                         assert result == IssueState.IN_PROGRESS
 
 
-class TestIsDependencySatisfied:
-    """Tests for _is_dependency_satisfied method."""
+class TestQualifyBlockedIssue:
+    """Tests for qualify_blocked_issue method."""
 
-    def test_issue_closed(self, qualify_gate_service, mock_github):
-        """Closed issue should satisfy dependency."""
-        mock_github.view_issue.return_value = {"state": "CLOSED"}
+    def test_qualify_blocked_issue_delegates_to_reconcile_blocked(
+        self, qualify_gate_service, mock_store, mock_flow_manager
+    ):
+        """qualify_blocked_issue should delegate to reconcile_blocked."""
+        from unittest.mock import patch
 
-        result = qualify_gate_service._is_dependency_satisfied(456)
+        from vibe3.models.orchestration import IssueInfo, IssueState
 
-        assert result is True
+        issue = IssueInfo(
+            number=456,
+            title="Blocked issue",
+            state=IssueState.BLOCKED,
+            labels=["state/blocked"],
+        )
+        mock_flow_manager.get_flow_for_issue.return_value = {
+            "branch": "task/issue-456"
+        }
 
-    @pytest.mark.slow
-    def test_issue_open(self, qualify_gate_service, mock_github):
-        """Open issue should not satisfy dependency."""
-        mock_github.view_issue.return_value = {"state": "OPEN"}
+        with patch(
+            "vibe3.domain.qualify_gate.BlockedStateService.reconcile_blocked",
+            return_value=IssueState.READY,
+        ) as mock_reconcile:
+            result = qualify_gate_service.qualify_blocked_issue(issue)
 
-        result = qualify_gate_service._is_dependency_satisfied(456)
+            assert result == IssueState.READY
+            mock_reconcile.assert_called_once_with(
+                issue_number=456,
+                branch="task/issue-456",
+                clear_reason=False,
+                actor="orchestra:dispatcher",
+            )
 
-        assert result is False
+    def test_qualify_blocked_issue_no_branch_returns_none(
+        self, qualify_gate_service, mock_flow_manager
+    ):
+        """qualify_blocked_issue without a branch should return None."""
+        from unittest.mock import patch
 
-    def test_invalid_payload(self, qualify_gate_service, mock_github):
-        """Invalid payload should not satisfy dependency."""
-        mock_github.view_issue.return_value = None
+        from vibe3.models.orchestration import IssueInfo, IssueState
 
-        result = qualify_gate_service._is_dependency_satisfied(456)
+        issue = IssueInfo(
+            number=457,
+            title="No branch issue",
+            state=IssueState.BLOCKED,
+            labels=["state/blocked"],
+        )
+        mock_flow_manager.get_flow_for_issue.return_value = None
 
-        assert result is False
+        with patch(
+            "vibe3.domain.qualify_gate.BlockedStateService.reconcile_blocked",
+        ) as mock_reconcile:
+            result = qualify_gate_service.qualify_blocked_issue(issue)
+
+            assert result is None
+            mock_reconcile.assert_not_called()
 
     def test_qualify_blocked_closed_issue_terminalizes_flow(
         self, qualify_gate_service, mock_store, mock_flow_manager

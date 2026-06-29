@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from vibe3.domain.qualify_gate_support import _append_orchestra_event
 from vibe3.services.flow import BlockedStateService
@@ -104,41 +104,6 @@ def is_dependency_satisfied(
         repo=config.repo,
     )
     return resolution.resolved
-
-
-def check_dependencies(
-    *,
-    issue: "IssueInfo",
-    branch: str,
-    truth: "CoordinationTruth",
-    store: "SQLiteClient",
-    github: "GitHubClient",
-    config: "OrchestraConfig",
-    is_dependency_satisfied_fn: Callable[[int], bool],
-    blocked_state_service_cls: type[Any] = BlockedStateService,
-    label_service_cls: type[Any] = LabelService,
-) -> bool:
-    dependencies = truth.blocked_by_issues
-    if not dependencies:
-        return True
-
-    unresolved = [d for d in dependencies if not is_dependency_satisfied_fn(d)]
-    if not unresolved:
-        return True
-
-    blocked_state_service_cls(
-        store=store,
-        github_client=github,
-        label_service=label_service_cls(repo=config.repo),
-    ).block(
-        branch=branch,
-        reason=None,
-        blocked_by_issue=truth.blocked_by_issue or unresolved[0],
-        actor="orchestra:dispatcher",
-        issue_number=issue.number,
-        event_type="flow_blocked",
-    )
-    return False
 
 
 def get_issue_dependencies(*, issue_number: int, store: "SQLiteClient") -> list[int]:
