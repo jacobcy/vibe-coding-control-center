@@ -160,19 +160,22 @@ def rule_stale_blocked_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
     from vibe3.services.check.service import CheckResult
 
     try:
-        result = svc.recovery_svc.recover(
-            branch=ctx.branch,
+        from vibe3.services.flow import BlockedStateService
+
+        service = BlockedStateService(
+            github_client=svc.github_client, store=svc.store
+        )
+        target = service.reconcile_blocked(
             issue_number=ctx.task_issue,
-            reason="Remote state/blocked label removed",
-            auto=True,
-            ensure_worktree=True,
-        )
-        logger.info(
-            "Auto-resumed stale blocked flow",
             branch=ctx.branch,
-            action=result.action.value,
-            detail=result.detail,
+            clear_reason=False,
+            actor="check:stale_blocked_sync",
         )
+        if target is not None:
+            logger.info(
+                f"Auto-resumed stale blocked flow to {target}",
+                branch=ctx.branch,
+            )
         return CheckResult(is_valid=True, branch=ctx.branch, issues=[])
     except Exception as e:
         logger.error(
@@ -197,21 +200,18 @@ def rule_blocked_label_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
         return None
 
     from vibe3.services.check.service import CheckResult
-    from vibe3.services.flow import BlockedStateService
 
     try:
-        BlockedStateService(
-            github_client=svc.github_client,
-            store=svc.store,
-        ).write_cache(
-            branch=ctx.branch,
-            reason="Remote state/blocked label detected",
-            blocked_by_issue=None,
-            actor="check:blocked_label_sync",
+        from vibe3.services.flow import BlockedStateService
+
+        service = BlockedStateService(
+            github_client=svc.github_client, store=svc.store
         )
-        logger.info(
-            "Synced blocked label to local flow status (cache-from-truth)",
+        service.reconcile_blocked(
+            issue_number=ctx.task_issue,
             branch=ctx.branch,
+            clear_reason=False,
+            actor="check:blocked_label_sync",
         )
         return CheckResult(is_valid=True, branch=ctx.branch, issues=[])
     except Exception as e:
