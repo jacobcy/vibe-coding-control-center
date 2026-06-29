@@ -142,7 +142,7 @@ class TestBlockFlowEnhanced:
         mock_flow_timeline_service.record_timeline_event.assert_not_called()
 
         # Assert - BlockedStateService.set_block was called (which internally
-        # calls reconcile_blocked -> rebuild_cache_from_truth -> store.update_flow_state)
+        # calls reconcile_blocked -> rebuild_cache -> update_flow_state)
         mock_store.update_flow_state.assert_called()
         update_kwargs = mock_store.update_flow_state.call_args[1]
         assert update_kwargs.get("blocked_reason") == reason
