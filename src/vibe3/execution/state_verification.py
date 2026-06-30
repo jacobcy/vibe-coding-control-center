@@ -104,12 +104,13 @@ class StateVerificationService:
             return state_labels[0], is_closed
 
         # Multiple state labels: select the highest-priority one in STATE_PRIORITY_ORDER
-        from vibe3.clients.label_utils import STATE_PRIORITY_ORDER
+        from vibe3.clients import STATE_PRIORITY_ORDER
 
-        priority = {f"state/{s}": i for i, s in enumerate(STATE_PRIORITY_ORDER)}
+        _order: tuple[str, ...] = STATE_PRIORITY_ORDER  # type: ignore[assignment]
+        priority = {f"state/{s}": i for i, s in enumerate(_order)}
         best = min(
             state_labels,
-            key=lambda lb: priority.get(lb, len(STATE_PRIORITY_ORDER)),
+            key=lambda lb: priority.get(lb, len(_order)),
         )
         return best, is_closed
 

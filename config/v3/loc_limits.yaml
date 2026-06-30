@@ -382,8 +382,8 @@ code_limits:
         limit: 500
         reason: "Heartbeat server 测试集，覆盖 tick loop、error tracking cleanup、actor registry cleanup、debug max ticks、service registration 等紧密耦合场景，新增 actor cleanup 测试后超标（#2553）"
       - path: "tests/vibe3/services/test_blocked_state_service.py"
-        limit: 510
-        reason: "BlockedStateService 集成测试集，覆盖 set_block/clear_block/reconcile_blocked 三个统一原语的三源一致性（DB/body/label），包含 remove_issue_link、parse_projection_merges_legacy_dependencies、reconcile_blocked blocked/resume 状态转换等紧密耦合场景；PR #3247 删除 set_block 真源旁路后新增 test_reconcile_degraded_stays_blocked 测试验证降级模式语义（+23 行）"
+        limit: 620
+        reason: "BlockedStateService 集成测试集，覆盖 set_block/clear_block/reconcile_blocked 三个统一原语的三源一致性（DB/body/label），包含 remove_issue_link、parse_projection_merges_legacy_dependencies、reconcile_blocked blocked/resume 状态转换等紧密耦合场景；PR #3247 新增 3 个测试（test_set_block_fails_closed_on_read_error、test_reconcile_blocked_restores_missing_remote_label、测试类 TrackingLabelService）验证 fail-closed 和 remote label restore 行为（+95 行）"
       - path: "tests/vibe3/services/test_check_service_verify_branch.py"
         limit: 520
         reason: "Check service verify_branch 测试集，覆盖分支状态验证、label 约束、blocked flow reconcile、stale ready rebuild 等紧密耦合场景，共享 CheckContext 和 MockGitHub/MockStore fixture 基础设施"
