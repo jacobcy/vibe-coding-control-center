@@ -363,15 +363,26 @@ class TaskResumeCandidates:
     def _check_blocked_by_dependency(
         self, issue_number: int, repo: str | None
     ) -> tuple[bool, str] | None:
-        """Check if all body-truth dependencies are satisfied."""
-        from vibe3.services.flow.blocked_state_service import BlockedStateService
+        """Check if all body-truth dependencies are satisfied.
+
+        §6.4 degraded mode: fail-closed when GitHub API is unavailable.
+        """
+        from vibe3.services.issue.body import parse_projection
         from vibe3.services.shared import DependencyResolutionService
 
-        # Read body projection truth from GitHub issue body
-        service = BlockedStateService(github_client=self._github_client)
-        body_state = service.resolve_truth(branch="", issue_number=issue_number)
+        try:
+            body = self._github_client.get_issue_body(issue_number)
+            if body is None:
+                raise RuntimeError(f"Issue #{issue_number} body is None")
+            proj = parse_projection(body)
+        except Exception:
+            return (
+                False,
+                "无法读取 issue body 验证依赖状态，"
+                "保守拒绝 resume (§6.4 degraded mode)",
+            )
 
-        for dep in body_state.blocked_by or []:
+        for dep in proj.blocked_by or []:
             resolution = DependencyResolutionService.is_dependency_resolved(
                 dep,
                 github_client=self._github_client,

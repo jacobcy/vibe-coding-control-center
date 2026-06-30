@@ -10,7 +10,6 @@ from vibe3.clients import GitHubClient
 from vibe3.config import get_convention
 from vibe3.domain.qualify_gate_checks import (
     check_worktree_health,
-    get_issue_dependencies,
 )
 from vibe3.domain.qualify_gate_support import (
     terminalize_closed_issue,
@@ -141,6 +140,11 @@ class QualifyGateService:
             clear_reason=False,
             actor="orchestra:dispatcher",
         )
+        if target_state is None:
+            return None
+        truth = self._coordination_resolver.resolve_coordination(branch, issue.number)
+        if not self._check_worktree_health(issue, branch, truth):
+            return None
         return target_state
 
     def _terminalize_closed_issue(self, issue: IssueInfo, branch: str) -> None:
@@ -215,6 +219,3 @@ class QualifyGateService:
             ),
             label_service_cls=_service_symbol("LabelService", None),
         )
-
-    def _get_issue_dependencies(self, issue_number: int) -> list[int]:
-        return get_issue_dependencies(issue_number=issue_number, store=self._store)

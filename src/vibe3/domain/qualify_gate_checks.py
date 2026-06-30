@@ -86,31 +86,3 @@ def check_worktree_health(
     except Exception:
         pass
     return True
-
-
-def is_dependency_satisfied(
-    *,
-    github: "GitHubClient",
-    config: "OrchestraConfig",
-    dep_issue_number: int,
-) -> bool:
-    from vibe3.services.shared import DependencyResolutionService
-
-    resolution = DependencyResolutionService.is_dependency_resolved(
-        dep_issue_number,
-        github_client=github,
-        repo=config.repo,
-    )
-    return resolution.resolved
-
-
-def get_issue_dependencies(*, issue_number: int, store: "SQLiteClient") -> list[int]:
-    flows = store.get_flows_by_issue(issue_number, role="task")
-    if not flows:
-        return []
-
-    branch = str(flows[0].get("branch") or "").strip()
-    if not branch:
-        return []
-
-    return store.get_dependency_links(branch)
