@@ -335,7 +335,7 @@ def start(
             _resolve_dispatcher_models_root(config, Path.cwd())
         )
         os.environ.pop("VIBE3_ASYNC_CLI_PROJECT_ROOT", None)
-        os.environ["VIBE3_ASYNC_LOG_DIR"] = str(_resolve_orchestra_log_dir(Path.cwd()))
+        os.environ["VIBE3_ASYNC_LOG_DIR"] = str(_resolve_orchestra_log_dir())
         # --no-async flag: propagate to all dispatched role agents
         # Only set when user explicitly requested --no-async (not in async wrapper)
         if no_async:
