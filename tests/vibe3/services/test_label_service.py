@@ -57,6 +57,33 @@ class FakeIssuePort:
         return True
 
 
+def test_get_state_returns_highest_priority_label_when_multiple_exist() -> None:
+    """Regression: stale lower-priority label must not be picked as 'current'.
+
+    GitHub label list order is not guaranteed to reflect application order,
+    so get_state() must resolve ties by STATE_PRIORITY_ORDER, not by
+    iteration order. Otherwise confirm_issue_state() can short-circuit on a
+    stale label and leave it stuck forever (see issue #3182: state/in-progress
+    persisted while state/handoff toggled around it).
+    """
+    # handoff listed first, but in-progress outranks it in STATE_PRIORITY_ORDER
+    port = FakeIssuePort({123: ["state/handoff", "state/in-progress"]})
+    service = LabelService(issue_port=port)
+
+    assert service.get_state(123) == IssueState.IN_PROGRESS
+
+
+def test_confirm_issue_state_cleans_up_stale_label_when_multiple_exist() -> None:
+    """confirm_issue_state must not short-circuit on a stale non-priority label."""
+    port = FakeIssuePort({123: ["state/handoff", "state/in-progress"]})
+    service = LabelService(issue_port=port)
+
+    result = service.confirm_issue_state(123, IssueState.HANDOFF, actor="agent:run")
+
+    assert result == "advanced"
+    assert port.labels[123] == ["state/handoff"]
+
+
 def test_confirm_issue_state_returns_confirmed_when_already_target() -> None:
     port = FakeIssuePort({123: ["state/in-progress"]})
     service = LabelService(issue_port=port)
