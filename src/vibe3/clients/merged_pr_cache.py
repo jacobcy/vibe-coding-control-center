@@ -20,7 +20,7 @@ from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.utils import get_vibe3_cache_path
 
 
-class ErrorRecorder(Protocol):
+class _ErrorRecorder(Protocol):
     """Callable used by higher layers to persist external API failures."""
 
     def __call__(
@@ -177,7 +177,7 @@ class MergedPRCache:
         exc: Exception,
         *,
         action: str,
-        error_recorder: ErrorRecorder | None,
+        error_recorder: _ErrorRecorder | None,
         _classify_error: Callable[[Exception], str] | None = None,
     ) -> None:
         """Record or log a GitHub fetch failure without depending on services."""
@@ -217,7 +217,7 @@ class MergedPRCache:
         github_client: Any,
         limit: int = 200,
         *,
-        error_recorder: ErrorRecorder | None = None,
+        error_recorder: _ErrorRecorder | None = None,
         _classify_error: Callable[[Exception], str] | None = None,
     ) -> int:
         """Sync cache with latest merged PRs from GitHub.
@@ -285,7 +285,7 @@ class MergedPRCache:
         self,
         github_client: Any,
         *,
-        error_recorder: ErrorRecorder | None = None,
+        error_recorder: _ErrorRecorder | None = None,
         _classify_error: Callable[[Exception], str] | None = None,
     ) -> int:
         """Rebuild cache from scratch with all merged PRs.

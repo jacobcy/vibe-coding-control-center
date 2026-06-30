@@ -62,17 +62,7 @@ def get_adapter(name: str) -> AdapterManifest | None:
     return _ADAPTERS.get(name)
 
 
-def list_adapters() -> list[str]:
-    """List all registered adapter names.
-
-    Returns:
-        List of adapter names
-    """
-    return list(_ADAPTERS.keys())
-
-
 __all__ = [
     "register_adapter",
     "get_adapter",
-    "list_adapters",
 ]

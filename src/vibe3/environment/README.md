@@ -35,24 +35,18 @@
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| __init__.py | 56 | 模块导出（延迟加载） |
+| __init__.py | 33 | 模块导出（延迟加载） |
 
 **总计**：9 文件，约 2235 行
 
 ## 公共 API
 
-从 `__init__.py` 的 `__all__` 导出的 9 个符号，按功能分组：
-
-### Session 管理
-
-- `SessionManager` — Session 创建与销毁主入口
-- `TmuxSessionContext` — Tmux session 上下文
-- `CodeagentSessionContext` — Codeagent session 上下文
-- `get_manager_session_name` — 获取 manager session 名称
+从 `__init__.py` 的 `__all__` 导出的 6 个符号，按功能分组：
 
 ### Session 注册表
 
 - `SessionRegistryService` — Session 注册表服务（持久化 session 与 worktree 映射）
+- `get_manager_session_name` — 获取 manager session 名称（便捷查询）
 
 ### Worktree 管理
 
