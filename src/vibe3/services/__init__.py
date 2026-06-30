@@ -143,7 +143,6 @@ if TYPE_CHECKING:
     from vibe3.services.task.status import (
         build_api_task_data,
         classify_task_issues_for_rendering,
-        fetch_task_status_data,
     )
 
 __all__ = [
@@ -211,7 +210,6 @@ __all__ = [
     "fail_planner_issue",
     "fail_reviewer_issue",
     "fetch_serve_status_data",
-    "fetch_task_status_data",
     "format_agent_actor",
     "format_issue_runtime_line",
     "format_issue_summary_line",
@@ -309,7 +307,6 @@ _SYMBOL_MODULES = {
     "fail_planner_issue": "vibe3.services.issue.failure",
     "fail_reviewer_issue": "vibe3.services.issue.failure",
     "fetch_serve_status_data": "vibe3.services.orchestra.serve_status",
-    "fetch_task_status_data": "vibe3.services.task.status",
     "format_agent_actor": "vibe3.services.shared.actors",
     "format_issue_runtime_line": "vibe3.services.orchestra.status",
     "format_issue_summary_line": "vibe3.services.orchestra.status",
