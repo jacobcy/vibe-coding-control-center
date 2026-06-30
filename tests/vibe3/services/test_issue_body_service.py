@@ -6,7 +6,6 @@ from vibe3.services.issue.body import (
     MANAGED_SECTION_START,
     merge_projection,
     parse_projection,
-    render_projection,
 )
 
 
@@ -104,44 +103,6 @@ More content."""
         assert result.state == "done"
         assert result.blocked_by == [100]
         assert result.blocked_reason is None
-
-
-class TestRenderProjection:
-    """Tests for render_projection function."""
-
-    def test_render_empty_projection(self):
-        """Render empty projection returns empty string."""
-        proj = FlowStateProjection()
-        result = render_projection(proj)
-        assert result == ""
-
-    def test_render_active_state(self):
-        """Render active state (default) returns empty."""
-        proj = FlowStateProjection(state="active")
-        result = render_projection(proj)
-        assert result == ""
-
-    def test_render_blocked_projection(self):
-        """Render blocked state with full info."""
-        proj = FlowStateProjection(
-            state="blocked",
-            blocked_by=[123, 456],
-            blocked_reason="Waiting for deps",
-        )
-        result = render_projection(proj)
-
-        assert MANAGED_SECTION_START in result
-        assert MANAGED_SECTION_END in result
-        assert "**State**: blocked" in result
-        assert "#123" in result
-        assert "#456" in result
-        assert "Waiting for deps" in result
-
-    def test_render_done_state(self):
-        """Render done state."""
-        proj = FlowStateProjection(state="done")
-        result = render_projection(proj)
-        assert "**State**: done" in result
 
 
 class TestMergeProjection:

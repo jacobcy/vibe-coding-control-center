@@ -66,8 +66,32 @@ def parse_projection(body: str) -> FlowStateProjection:
     )
 
 
+def merge_projection(body: str, proj: FlowStateProjection) -> str:
+    """Merge flow-state projection into issue body.
+
+    Preserves user content, replaces managed section.
+
+    Args:
+        body: Original issue body
+        proj: FlowStateProjection instance
+
+    Returns:
+        Merged body text
+    """
+    rendered = render_projection(proj)
+
+    # Remove existing managed section
+    cleaned = MANAGED_SECTION_PATTERN.sub("", body).strip()
+
+    # Append new section if non-empty
+    if not rendered:
+        return cleaned
+
+    return f"{cleaned}\n\n{rendered}"
+
+
 def render_projection(proj: FlowStateProjection) -> str:
-    """Render flow-state projection to managed section.
+    """Render flow-state projection to managed section (internal helper).
 
     Args:
         proj: FlowStateProjection instance
@@ -95,27 +119,3 @@ def render_projection(proj: FlowStateProjection) -> str:
 
     lines.extend(["", MANAGED_SECTION_END])
     return "\n".join(lines)
-
-
-def merge_projection(body: str, proj: FlowStateProjection) -> str:
-    """Merge flow-state projection into issue body.
-
-    Preserves user content, replaces managed section.
-
-    Args:
-        body: Original issue body
-        proj: FlowStateProjection instance
-
-    Returns:
-        Merged body text
-    """
-    rendered = render_projection(proj)
-
-    # Remove existing managed section
-    cleaned = MANAGED_SECTION_PATTERN.sub("", body).strip()
-
-    # Append new section if non-empty
-    if not rendered:
-        return cleaned
-
-    return f"{cleaned}\n\n{rendered}"

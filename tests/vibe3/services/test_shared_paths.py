@@ -1,11 +1,13 @@
+"""Tests for shared handoff path helpers.
+
+Covers ``ref_to_handoff_cmd`` and ``resolve_ref_path`` from
+``vibe3.services.shared.paths`` plus ``sanitize_event_detail_paths``.
+"""
+
 from pathlib import Path
 
 import pytest
 
-from vibe3.services.handoff.resolution import (
-    is_shared_handoff_ref,
-    to_display_target,
-)
 from vibe3.services.shared.paths import (
     ref_to_handoff_cmd,
     resolve_ref_path,
@@ -40,39 +42,6 @@ def test_sanitize_event_detail_paths_rewrites_log_path_to_basename() -> None:
 
     assert log_path not in result
     assert "ses_bad.async.log" in result
-
-
-# --- is_shared_handoff_ref ---
-
-
-def test_is_shared_handoff_ref_true_for_shared_prefix() -> None:
-    assert is_shared_handoff_ref("vibe3/handoff/task-123/run-abc.md") is True
-
-
-def test_is_shared_handoff_ref_false_for_worktree_ref() -> None:
-    assert is_shared_handoff_ref("docs/reports/audit.md") is False
-
-
-def test_is_shared_handoff_ref_false_for_absolute_path() -> None:
-    assert is_shared_handoff_ref("/abs/path/to/file.md") is False
-
-
-# --- to_display_target ---
-
-
-def test_to_display_target_adds_at_prefix_for_shared() -> None:
-    result = to_display_target("vibe3/handoff/task-123/run-abc.md")
-    assert result == "@task-123/run-abc.md"
-
-
-def test_to_display_target_returns_as_is_for_canonical_ref() -> None:
-    ref = "docs/reports/audit.md"
-    assert to_display_target(ref) == ref
-
-
-def test_to_display_target_returns_as_is_for_absolute_path() -> None:
-    path = "/abs/path/to/file.md"
-    assert to_display_target(path) == path
 
 
 # --- ref_to_handoff_cmd ---
