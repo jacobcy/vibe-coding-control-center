@@ -262,7 +262,7 @@ class TestAutoFix:
         assert result.success
         mock_verify.assert_called_once()
         call_kwargs = mock_verify.call_args.kwargs
-        assert call_kwargs["status"] == ["active", "stale"]
+        assert call_kwargs["status"] == ["active", "stale", "blocked"]
         assert "on_progress" in call_kwargs
 
     def test_auto_fix_cannot_fix_handoff(self, check_service, mock_git_client):
