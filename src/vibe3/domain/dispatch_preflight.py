@@ -8,8 +8,10 @@ from typing import Protocol
 
 from loguru import logger
 
+from vibe3.exceptions.error_codes import E_DISPATCH_FAILURE
 from vibe3.models import IssueInfo, IssueState
 from vibe3.observability import append_orchestra_event, get_degraded_manager
+from vibe3.services.orchestra import record_error
 
 
 class QualifyGateLike(Protocol):
@@ -86,6 +88,19 @@ class DispatchPreflightService:
             logger.bind(domain="orchestra", action="dispatch_preflight").warning(
                 f"Blocked qualify gate failed for #{issue.number}: {exc}"
             )
+            try:
+                record_error(
+                    error_code=E_DISPATCH_FAILURE,
+                    error_message=(
+                        f"dispatch_preflight blocked qualify gate failed for "
+                        f"#{issue.number}: {exc}"
+                    ),
+                    issue_number=issue.number,
+                )
+            except Exception as record_exc:
+                logger.bind(
+                    domain="orchestra", action="dispatch_preflight_record_error"
+                ).warning(f"Failed to record dispatch_preflight error: {record_exc}")
             return None
 
         degraded = get_degraded_manager()
@@ -131,4 +146,17 @@ class DispatchPreflightService:
             logger.bind(domain="orchestra", action="dispatch_preflight").warning(
                 f"Qualify gate failed for #{issue.number}: {exc}"
             )
+            try:
+                record_error(
+                    error_code=E_DISPATCH_FAILURE,
+                    error_message=(
+                        f"dispatch_preflight active qualify gate failed for "
+                        f"#{issue.number}: {exc}"
+                    ),
+                    issue_number=issue.number,
+                )
+            except Exception as record_exc:
+                logger.bind(
+                    domain="orchestra", action="dispatch_preflight_record_error"
+                ).warning(f"Failed to record dispatch_preflight error: {record_exc}")
             return None
