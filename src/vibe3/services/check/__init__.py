@@ -35,7 +35,7 @@ def __getattr__(name: str) -> Any:
     """Lazy import for Check services symbols to avoid circular dependencies.
 
     This allows external modules to use:
-        from vibe3.services.check import CheckService, CheckPRService
+        from vibe3.services.check import CheckService, CheckResult
 
     While avoiding circular imports at module load time.
     """
