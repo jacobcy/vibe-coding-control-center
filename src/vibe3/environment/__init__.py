@@ -2,6 +2,18 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from vibe3.environment.session_naming import get_manager_session_name
+    from vibe3.environment.session_registry import SessionRegistryService
+    from vibe3.environment.worktree import WorktreeManager
+    from vibe3.environment.worktree_context import WorktreeContext
+    from vibe3.environment.worktree_support import (
+        find_worktree_by_path,
+        find_worktree_for_branch,
+    )
+
 # Lazy imports
 _LAZY_IMPORTS = {
     "SessionRegistryService": "vibe3.environment.session_registry",
