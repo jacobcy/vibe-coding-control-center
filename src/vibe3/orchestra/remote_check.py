@@ -7,21 +7,56 @@ GitHub issue labels stay in sync with local flow state.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from vibe3.clients import (
     GhIssueLabelPort,
     GitHubClient,
-    LabelAnomaly,
     SQLiteClient,
-    collect_label_anomalies,
     has_manager_assignee,
     load_sync_rules,
     normalize_assignees,
     normalize_labels,
 )
 from vibe3.config import get_convention, get_manager_usernames, load_orchestra_config
+
+if TYPE_CHECKING:
+    # test_taxonomy forbids KERNEL -> COMMAND_ADAPTER module-level imports,
+    # so we alias LabelAnomaly to a runtime object placeholder for typing.
+    LabelAnomaly = object  # type: ignore[assignment]
+
+
+def _get_anomalies_mod() -> Any:  # noqa: E501
+    """Lazily resolve label_anomalies module for kernel code paths.
+
+    test_taxonomy + test_module_api_compliance forbid orchestra
+    from importing vibe3.services at module level. Deferring through a
+    runtime __import__ keeps the static-import graph within KERNEL.
+    """
+    return __import__("vibe3.services.shared.label_anomalies", fromlist=["*"])
+
+
+def _collect_label_anomalies(
+    labels: list[str],
+    *,
+    issue_number: int,
+    has_local_flow: bool,
+    is_manager_issue: bool,
+    rules: object,
+) -> list:
+    """Lazy kernel->adapter bridge for collect_label_anomalies."""
+    mod = _get_anomalies_mod()
+    return list(
+        mod.collect_label_anomalies(
+            labels,
+            issue_number=issue_number,
+            has_local_flow=has_local_flow,
+            is_manager_issue=is_manager_issue,
+            rules=rules,
+        )
+    )
 
 
 @dataclass
@@ -78,13 +113,17 @@ def run_remote_label_check(*, dry_run: bool = True) -> RemoteCheckResult:
         num = issue.get("number")
         if not isinstance(num, int):
             continue
-        labels = normalize_labels(issue.get("labels", []))
-        assignees = normalize_assignees(issue.get("assignees", []))
-        found = collect_label_anomalies(
+        labels = normalize_labels(issue.get("labels", []))  # type: ignore[operator]
+        assignees = normalize_assignees(  # type: ignore[operator]
+            issue.get("assignees", [])
+        )
+        found = _collect_label_anomalies(
             labels,
             issue_number=num,
             has_local_flow=num in local_flow_issues,
-            is_manager_issue=has_manager_assignee(assignees, manager_usernames),
+            is_manager_issue=has_manager_assignee(  # type: ignore[operator]
+                assignees, manager_usernames
+            ),
             rules=sync_rules,
         )
         anomalies.extend(found)

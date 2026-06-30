@@ -1,4 +1,4 @@
-"""Tests for label_utils with sync rules."""
+"""Tests for label anomaly rules with sync rules."""
 
 from vibe3.clients import (
     RemoteSyncRules,
@@ -8,7 +8,7 @@ from vibe3.clients import (
 )
 
 
-class TestLabelUtilsSyncRules:
+class TestLabelAnomaliesSyncRules:
     """Test collect_label_anomalies with sync rules."""
 
     def test_remote_rule_disabled(self):

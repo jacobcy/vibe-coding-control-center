@@ -14,16 +14,13 @@ Public API Contract:
 - log_dispatch_error, has_recent_specific_error: Error utilities
 - emit_issue_failed, get_role_block_function: Flow execution helpers
 - material_loader, policy_loader: File loading
-- LabelService: Label management
-- classify_dispatch_eligibility, get_highest_priority_state, get_state_labels,
-  has_roadmap_label,
-  has_manager_assignee, normalize_labels, ORCHESTRA_GOVERNED_LABEL,
-  clean_old_state_labels, has_orchestra_governed, should_skip_from_queue,
-  normalize_assignees: Label utilities
-- LocService, LOCStats: LOC analysis
-- GitPathProtocol, check_ref_exists, get_git_common_dir, get_worktree_root,
-  ref_to_handoff_cmd, sanitize_event_detail_paths, resolve_ref_path:
-  Path utilities
+- LabelAnomaly, SUPERVISOR_LABEL, LabelService: Label management
+- get_highest_priority_state, has_roadmap_label, normalize_labels,
+  ORCHESTRA_GOVERNED_LABEL, clean_old_state_labels, has_orchestra_governed,
+  should_skip_from_queue, normalize_assignees: Label utilities
+- check_ref_exists, ref_to_handoff_cmd, sanitize_event_detail_paths,
+  resolve_ref_path: Path utilities
+- clear_queue_dirty, is_queue_dirty, mark_queue_dirty: Queue dirty flag
 - SignatureService: Signature management
 - SpecRefService: Spec reference management
 - StatusQueryService, is_auto_task_branch, is_dev_collab_branch: Status query
@@ -61,6 +58,12 @@ if TYPE_CHECKING:
         log_dispatch_error,
     )
     from vibe3.services.shared.file_loader import material_loader, policy_loader
+    from vibe3.services.shared.label_anomalies import (
+        SUPERVISOR_LABEL,
+        LabelAnomaly,
+        collect_label_anomalies,
+        has_supervisor_label,
+    )
     from vibe3.services.shared.label_service import LabelService
     from vibe3.services.shared.labels import (
         ORCHESTRA_GOVERNED_LABEL,
@@ -115,11 +118,13 @@ __all__ = [
     "GitPathProtocol",
     "IssueStatusAggregator",
     "IssueStatusEntry",
+    "LabelAnomaly",
     "LabelService",
     "LOCStats",
     "LocService",
     "MissingTaskIssueError",
     "ORCHESTRA_GOVERNED_LABEL",
+    "SUPERVISOR_LABEL",
     "SignatureService",
     "SpecRefService",
     "StatusQueryService",
@@ -130,6 +135,7 @@ __all__ = [
     "classify_dispatch_eligibility",
     "clean_old_state_labels",
     "clear_queue_dirty",
+    "collect_label_anomalies",
     "emit_issue_failed",
     "ensure_task_issue_bound",
     "extract_role_from_actor",
@@ -144,6 +150,7 @@ __all__ = [
     "has_orchestra_governed",
     "has_recent_specific_error",
     "has_roadmap_label",
+    "has_supervisor_label",
     "is_auto_task_branch",
     "is_dev_collab_branch",
     "is_human_comment",
@@ -170,11 +177,13 @@ _SYMBOL_MODULES = {
     "GitPathProtocol": "vibe3.services.shared.paths",
     "IssueStatusAggregator": "vibe3.services.shared.status_pipeline",
     "IssueStatusEntry": "vibe3.services.shared.status_pipeline",
+    "LabelAnomaly": "vibe3.services.shared.label_anomalies",
     "LabelService": "vibe3.services.shared.label_service",
     "LOCStats": "vibe3.services.shared.loc",
     "LocService": "vibe3.services.shared.loc",
     "MissingTaskIssueError": "vibe3.services.shared.binding_guard",
     "ORCHESTRA_GOVERNED_LABEL": "vibe3.services.shared.labels",
+    "SUPERVISOR_LABEL": "vibe3.services.shared.label_anomalies",
     "SignatureService": "vibe3.services.shared.signatures",
     "SpecRefService": "vibe3.services.shared.spec_ref",
     "StatusQueryService": "vibe3.services.shared.status_query",
@@ -185,6 +194,7 @@ _SYMBOL_MODULES = {
     "classify_dispatch_eligibility": "vibe3.services.shared.labels",
     "clean_old_state_labels": "vibe3.services.shared.labels",
     "clear_queue_dirty": "vibe3.services.shared.queue_dirty",
+    "collect_label_anomalies": "vibe3.services.shared.label_anomalies",
     "emit_issue_failed": "vibe3.services.shared.binding_guard",
     "ensure_task_issue_bound": "vibe3.services.shared.binding_guard",
     "extract_role_from_actor": "vibe3.services.shared.actors",
@@ -199,6 +209,7 @@ _SYMBOL_MODULES = {
     "has_orchestra_governed": "vibe3.services.shared.labels",
     "has_recent_specific_error": "vibe3.services.shared.errors",
     "has_roadmap_label": "vibe3.services.shared.labels",
+    "has_supervisor_label": "vibe3.services.shared.label_anomalies",
     "is_auto_task_branch": "vibe3.services.shared.status_query",
     "is_dev_collab_branch": "vibe3.services.shared.status_query",
     "is_human_comment": "vibe3.services.shared.comment",
