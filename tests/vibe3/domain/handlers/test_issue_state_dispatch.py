@@ -370,7 +370,7 @@ class TestIssueStateDispatchHandler:
                 dispatch_context=mock_ctx,
             )
 
-            # Capacity full should NOT call build_request or block_issue
+            # Capacity full should NOT call build_request or block_manager_noop_issue
             # It should just return early (defer)
             mock_block_issue.assert_not_called()
 

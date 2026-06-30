@@ -104,24 +104,30 @@ HandoffService 维护 kind → DB 字段映射：
 
 ## 公共 API
 
-`__init__.py` 导出以下 8 个符号：
+`__init__.py` 导出以下 4 个符号（**这是完整集合**，其他均属内部实现）：
 
 ### 服务类
 
 - **HandoffService**: 主 handoff 服务（记录、查询、事件处理）
 - **HandoffStatusService**: Handoff 状态追踪服务
-- **HandoffStatusResult**: Handoff 状态结果类型
 - **HandoffStorage**: Handoff 存储操作（文件系统）
 
 ### 解析函数
 
 - **resolve_handoff_target**: 解析 handoff target 引用为绝对路径
-- **is_shared_handoff_ref**: 检查引用是否为共享 handoff artifact（`@` namespace）
-- **to_display_target**: 转换绝对路径为 display target（逆向解析）
 
-### 验证函数
+## 未导出（内部实现）
 
-- **validate_authoritative_ref**: 验证权威引用（plan/report/audit ref）
+以下的模块内部符号**不**通过 `handoff/__init__.py` 导出。它们或被其他 service 内部引用，或仅供单元测试使用；修改时不保证兼容性。
+
+- `status.py :: HandoffStatusResult` — HandoffStatusService 的返回类型
+  - 目前被 `tests/vibe3/commands/conftest.py` 与
+    `tests/vibe3/commands/test_handoff_basic_commands.py` 直接 import；属于测试耦合，计划在后续重构中改为通过服务接口访问。
+- `validation.py :: validate_authoritative_ref` — 仅被 `service.py` 使用
+- `validation.py :: is_log_like_path` — 仅被 `validate_authoritative_ref` 使用
+- `external_events.py :: ExternalEventRecorder` — 仅被 `service.py` 使用
+- `resolution.py :: _validate_branch_name / _validate_vibe_path / _verify_handoff_dir_boundary / _resolve_vibe_material / _resolve_shared_artifact / _resolve_artifact_alias / _resolve_worktree_artifact` — 内部解析步骤，部分被 `test_handoff_resolution.py` 与 `test_handoff_security.py` 通过下划线路径直接访问（测试耦合）
+- `storage.py :: _get_handoff_template` — 内部模板 helper
 
 ## 内部依赖
 

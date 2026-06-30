@@ -1,7 +1,6 @@
 """Handoff status aggregation service."""
 
 import threading
-from dataclasses import dataclass
 from typing import Any
 
 from vibe3.clients import BackendProtocol, GitClient, SQLiteClient
@@ -12,9 +11,12 @@ from vibe3.services.handoff.service import HandoffService
 from vibe3.services.pr.verdict_service import VerdictService
 
 
-@dataclass
 class HandoffStatusResult:
     """Aggregated handoff status from multiple sources.
+
+    Return type for ``HandoffStatusService.get_handoff_status``. Not part of
+    the public handoff package API — callers should treat this as a value
+    object produced by the service rather than importing it directly.
 
     Attributes:
         flow_slug: Flow identifier
@@ -26,13 +28,24 @@ class HandoffStatusResult:
         recent_updates: List of recent handoff file updates (append records)
     """
 
-    flow_slug: str
-    worktree_root: str | None
-    state: FlowState
-    events: list[FlowEvent]
-    latest_verdict: VerdictRecord | None
-    live_sessions: list[dict[str, Any]]
-    recent_updates: list[dict[str, str]]
+    def __init__(
+        self,
+        *,
+        flow_slug: str,
+        worktree_root: str | None,
+        state: FlowState,
+        events: list[FlowEvent],
+        latest_verdict: VerdictRecord | None,
+        live_sessions: list[dict[str, Any]],
+        recent_updates: list[dict[str, str]],
+    ) -> None:
+        self.flow_slug = flow_slug
+        self.worktree_root = worktree_root
+        self.state = state
+        self.events = events
+        self.latest_verdict = latest_verdict
+        self.live_sessions = live_sessions
+        self.recent_updates = recent_updates
 
 
 class HandoffStatusService:

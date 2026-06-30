@@ -72,9 +72,9 @@ check_lock (release)
 
 ### Rule Chain Pattern
 
-`rule_checks.py` 实现规则链模式，从 `_check_branch` 提取独立规则：
+`rule_checks.py` 实现规则链模式（内部仅供 `service.py` 使用，**不**导出为 check 包公共 API）：
 
-**核心规则**：
+**核心规则**（均为内部函数）
 - `rule_pr_terminal_state`：PR merged/closed → mark flow aborted
 - `rule_closed_issue_sync`：Closed task issue → mark flow aborted
 - `rule_orphaned_flow`：Orphaned flow（> 100 commits behind main）→ mark aborted
@@ -86,13 +86,10 @@ check_lock (release)
 - 返回 `CheckResult` 表示 handled（short-circuit）
 - 返回 `None` 表示 continue to next rule
 
-**CheckContext**：
-- 共享状态对象，传递给所有规则
-- 包含 branch、flow_data、issue_labels 等信息
 
-### Data-Driven Label Constraints
+### Data-Driven Label Constraints（内部实现细节）
 
-`label_constraints.py` 实现数据驱动的 label 约束系统：
+`label_constraints.py` 实现数据驱动的 label 约束系统（仅内部规则 CheckContext 使用）：
 
 **LabelConstraint 结构**：
 - `name`：约束标识符
@@ -112,7 +109,7 @@ check_lock (release)
 - `check_constraints()` 验证 issue labels
 - 支持 glob-style group names（`state/*`）
 
-### PR State Change Detection
+### PR State Change Detection（内部实现细节）
 
 `pr_service.py` 处理 PR 状态变更：
 
@@ -145,7 +142,7 @@ check_lock (release)
 - 跳过有 live session 的分支
 - `_get_branches_with_live_sessions()` 批量查询
 
-### Branch-Level Locking
+### Branch-Level Locking（内部实现细节）
 
 `lock.py` 实现分支级锁：
 
@@ -170,18 +167,30 @@ check_lock (release)
 
 ## 公共 API
 
-`__init__.py` 导出以下 5 个符号：
+`__init__.py` 导出以下 4 个符号（**这是完整集合**，其他符号均属内部的 service.pipe 实现细节，不对外承诺稳定）：
 
 ### 服务类
 
 - **CheckService**: 主检查服务（verify、auto-fix、rule chain）
 - **CheckCleanupService**: Terminal flow 清理和过期资源清理
-- **CheckPRService**: PR 状态变更处理
 
 ### 结果类型
 
 - **CheckResult**: 检查结果（is_valid、issues、warnings、branch）
 - **InitResult**: Remote index 初始化结果（total_flows、updated、skipped、unresolvable）
+
+## 未导出（内部实现）
+
+以下的模块内部符号**不**通过 `check/__init__.py` 导出，仅供 `service.py` 与 `cleanup.py` 内部使用。修改这些内部符号时不保证兼容外部。
+
+- `service.py` 子依赖:
+  - `pr_service.py :: CheckPRService` — PR 状态变更处理
+  - `remote.py :: CheckRemote / IssueStateFromPayload` — 远程同步基类
+  - `rule_checks.py :: rule_* / CheckContext` — 规则链与上下文（均内部使用）
+  - `label_constraints.py :: LabelConstraint / ConstraintViolation / _matches_group / _labels_in_group / check_constraints / constraint_names`
+  - `lock.py :: check_lock` — 分支级 lock context manager
+  - `state_label_recovery.py :: should_recover_missing_state_label`
+- `CheckResult` 模型定义在 `vibe3/models/check_result.py`，re-export 在此（故 `__all__` 中的符号路径为 `vibe3.models.check_result`）
 
 ## 内部依赖
 
@@ -239,15 +248,8 @@ check/
 3. Short-circuit 执行（handled 则停止）
 4. `CheckContext` 共享状态
 
-### Data-Driven Label Constraints
-
-**设计目标**：避免 hard-coded label 检查逻辑
-
-**实现方式**：
-1. `LabelConstraint` 数据结构定义约束
-2. `check_constraints()` 验证 labels
-3. 支持 glob-style group names（`state/*`）
-4. 约束以数据形式定义，易于扩展和测试
+### Data-Driven Label Constraints（见上 Pipeline 内部细节）
+5. 仅 service.py 内部调用，不暴露为 check 包公共 API
 
 ### Terminal Flow Cleanup 演进
 
@@ -259,12 +261,14 @@ check/
 3. 集成 expired resource cleanup（worktrees、branches）
 4. Live session 保护
 
-### PR State Change 检测设计
+### Pipeline 内部更多细节
+
+### PR State Change 检测设计（`CheckPRService` 内部细节）
 
 **设计目标**：检测 PR merged/closed 并触发 flow 状态转变
 
 **实现方式**：
-1. `CheckPRService` 处理 PR state changes
+1. `CheckPRService` 内部实例(service.py 创建)直接处理 PR state changes
 2. 幂等性保护（避免重复处理）
 3. Merged → mark done + auto-close issues
 4. Closed → abort + cleanup

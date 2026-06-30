@@ -29,32 +29,32 @@ Issue 失败处理、Flow 映射、标题缓存、dispatch eligibility 服务。
 
 ### Failure 函数族设计
 
-`failure.py` 提供统一的 issue 状态标记接口：
-
-**核心函数**：
-- **mark_issue**：统一 fail/block 接口（根据 action 参数选择）
-  - `action="fail"`：runtime failures（记录 timeline event，不写 GitHub comment）
-  - `action="block"`：business blocks（blocked_reason + label）
+`failure.py` 提供一组 role-specific 的 issue 状态标记函数，全部委托给
+内部 `_mark_issue` 助手（未导出，属于实现细节）。
 
 **角色映射**（`_ROLE_MAP`）：
 - `executor` → `run`
 - `reviewer` → `review`
 - `planner` → `plan`
 
-**Fail 函数族**：
-- `fail_executor_issue`：executor 运行失败
+**Fail 函数族**（runtime failures：记录 ``flow_failed`` timeline event 到 SQLite，**不**写 GitHub comment）：
+- `fail_executor_issue`：executor 运行失败（actor 必传）
 - `fail_manager_issue`：manager 运行失败
 - `fail_planner_issue`：planner 运行失败
 - `fail_reviewer_issue`：reviewer 运行失败
 
-**Block 函数族**：
+**Block 函数族**（business blocks：写 ``blocked_reason`` + 标签 + 评论）：
 - `block_executor_noop_issue`：executor 无进展
 - `block_manager_noop_issue`：manager 无进展
 - `block_planner_noop_issue`：planner 无进展
 - `block_reviewer_noop_issue`：reviewer 无进展
-- `block_issue`：通用 block 函数
 
-**依赖方向**：failure → flow（单向，不可反转）
+**已移除 / 未导出**（均声明为内部实现）：
+- 通用 `mark_issue`、`fail_issue`、`block_issue`：已被
+  `_mark_issue` + 4+4 个 role-specific 包装替代，不再导出。
+- `_mark_issue`：fail/block 统一助手，属于 failure.py 内部实现。
+
+**依赖方向**：failure → flow（单向，不可反转）。
 
 ### Branch Naming Convention
 
@@ -100,11 +100,12 @@ Issue 失败处理、Flow 映射、标题缓存、dispatch eligibility 服务。
 - Start: `<!-- vibe3-flow-state-start -->`
 - End: `<!-- vibe3-flow-state-end -->`
 
-**核心函数**：
+**核心函数（仅此两项导出）**：
 - `parse_projection(body)`：从 issue body 解析 `FlowStateProjection`
   - 解析 state、blocked_by、blocked_reason、dependencies
-- `render_projection(proj)`：渲染 managed section 文本
 - `merge_projection(body, proj)`：合并 projection 到 issue body（替换 managed section）
+
+**未导出**：`_render_projection(proj)` 是 `merge_projection` 的内部 helper，不列入公共 API。
 
 ### Dispatch Eligibility
 
@@ -126,7 +127,7 @@ Issue 失败处理、Flow 映射、标题缓存、dispatch eligibility 服务。
 
 ## 公共 API
 
-`__init__.py` 导出以下 21 个符号：
+`__init__.py` 导出以下 18 个符号（不含已退役的 `fail_issue` / `block_issue` / `mark_issue` / `render_projection`）：
 
 ### 服务类
 
@@ -139,24 +140,21 @@ Issue 失败处理、Flow 映射、标题缓存、dispatch eligibility 服务。
 ### Body 函数
 
 - **parse_projection**: 解析 issue body managed section
-- **render_projection**: 渲染 managed section 文本
 - **merge_projection**: 合并 projection 到 issue body
 
-### Failure 函数
+### Failure 函数（role-specific 包装）
 
 - **fail_executor_issue**: Executor 运行失败
 - **fail_manager_issue**: Manager 运行失败
 - **fail_planner_issue**: Planner 运行失败
 - **fail_reviewer_issue**: Reviewer 运行失败
-- **fail_issue**: 通用 fail 函数（legacy）
 
-### Block 函数
+### Block 函数（role-specific 包装）
 
 - **block_executor_noop_issue**: Executor 无进展
 - **block_manager_noop_issue**: Manager 无进展
 - **block_planner_noop_issue**: Planner 无进展
 - **block_reviewer_noop_issue**: Reviewer 无进展
-- **block_issue**: 通用 block 函数
 
 ### Flow 函数
 
@@ -166,10 +164,6 @@ Issue 失败处理、Flow 映射、标题缓存、dispatch eligibility 服务。
 ### Context 函数
 
 - **load_issue_info**: 加载 issue 上下文（从 GitHub 或缓存）
-
-### 其他
-
-- **mark_issue**: 统一 issue 状态标记接口（fail/block）
 
 ## 内部依赖
 
@@ -218,10 +212,11 @@ issue/
 **早期设计**：分散的 fail/block 函数，无统一接口
 
 **当前设计**：
-1. `mark_issue` 提供统一 fail/block 接口
-2. 根据 `action` 参数选择行为（fail vs block）
-3. Role 映射统一处理（executor → run）
-4. 单向依赖 failure → flow（避免循环）
+1. `_mark_issue` 是内部助手，集中 fail/block 两条路径的 branch 查询与分派逻辑。
+2. 4 个 `fail_*_issue` wrapper 对应 4 种 runtime fail，写入 ``flow_failed`` timeline。
+3. 4 个 `block_*_noop_issue` wrapper 对应 4 种 business block，写入 ``blocked_reason + label + comment``。
+4. 移除早期通用 `fail_issue` / `block_issue` / `mark_issue`，避免"半成品 wrapper"与 role-specific 系列并行存在造成困惑。
+5. 单向依赖 failure → flow（避免循环）。
 
 ### Branch Naming 集中化
 
@@ -251,8 +246,9 @@ issue/
 
 **实现方式**：
 1. Managed section 通过 HTML comment 标记
-2. `parse_projection` / `render_projection` / `merge_projection` 三函数
-3. `FlowStateProjection` 模型（state, blocked_by, blocked_reason, dependencies）
+2. 导出 `parse_projection` / `merge_projection` 一对函数
+3. 内部 `_render_projection` 是 `merge_projection` helper，不单独导出
+4. `FlowStateProjection` 模型（state, blocked_by, blocked_reason, dependencies）
 
 ## 设计原则
 
