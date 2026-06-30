@@ -184,7 +184,8 @@ class BlockedStateIO:
         target_state: IssueState,
         actor: str = "system",
         force: bool = False,
-    ) -> Literal["confirmed", "advanced", "blocked"]:
+        normalize: bool = False,
+    ) -> Literal["confirmed", "advanced", "blocked", "normalized"]:
         """Write state to issue labels.
 
         Args:
@@ -192,12 +193,20 @@ class BlockedStateIO:
             target_state: Target state to set
             actor: Actor performing the transition
             force: If True, bypass transition validation (for unblock/resume)
+            normalize: If True, replace every remote state label with the target
 
         Returns:
             "confirmed": Already in target state
             "advanced": Transition succeeded
             "blocked": Transition rejected by state machine
+            "normalized": Duplicate or stale state labels were replaced
         """
+        if normalize:
+            return self.label_service.replace_issue_state(
+                issue_number,
+                target_state,
+                actor=actor,
+            )
         return self.label_service.confirm_issue_state(
             issue_number,
             target_state,

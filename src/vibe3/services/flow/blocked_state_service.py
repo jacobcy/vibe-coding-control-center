@@ -244,14 +244,21 @@ class BlockedStateService:
                 except Exception:
                     target = IssueState.READY
 
-            # Clear remote body state section
+            # Normalize the remote signal before publishing the active truth.
+            # If label I/O fails, the body and cache must remain blocked.
+            self._io.write_label_state(
+                issue_number,
+                target,
+                actor=actor,
+                force=True,
+                normalize=True,
+            )
             new_proj = FlowStateProjection(
                 state="active",
                 blocked_by=[],
                 blocked_reason=None,
             )
             self._io.write_projection(issue_number, new_proj)
-            self._io.write_label_state(issue_number, target, actor=actor, force=True)
             truth = new_proj
 
         # 5. Rebuild Cache

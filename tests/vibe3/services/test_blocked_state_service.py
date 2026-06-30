@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.exceptions import SystemError
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow.blocked_state_service import (
     BlockedStateService,
@@ -46,6 +47,12 @@ class StubLabelService:
 
     def get_state(self, issue_number: int) -> IssueState | None:
         return self.current_state
+
+    def replace_issue_state(
+        self, issue_number: int, state: IssueState, *, actor: str
+    ) -> str:
+        self.current_state = state
+        return "normalized"
 
 
 def test_block_dependency_writes_to_all_three_sources(tmp_path: Path) -> None:
@@ -567,6 +574,28 @@ class TrackingLabelService(StubLabelService):
         return super().confirm_issue_state(issue_number, state, actor, force)
 
 
+class FailingNormalizeLabelService(StubLabelService):
+    """Fail every state write so ordering can be verified before implementation."""
+
+    def confirm_issue_state(
+        self,
+        issue_number: int,
+        state: IssueState,
+        actor: str,
+        force: bool = False,
+    ) -> str:
+        raise SystemError("normalize failed")
+
+    def replace_issue_state(
+        self,
+        issue_number: int,
+        state: IssueState,
+        *,
+        actor: str,
+    ) -> str:
+        raise SystemError("normalize failed")
+
+
 def test_reconcile_blocked_restores_missing_remote_label(tmp_path: Path) -> None:
     """Label must be written when body/cache are blocked but remote label missing."""
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
@@ -604,3 +633,29 @@ def test_reconcile_blocked_restores_missing_remote_label(tmp_path: Path) -> None
     assert (
         label_service.confirm_calls[-1][1] == IssueState.BLOCKED
     ), f"Last label call was {label_service.confirm_calls[-1][1]}, expected BLOCKED"
+
+
+def test_reconcile_resume_normalization_failure_keeps_body_and_cache_blocked(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    branch = "task/issue-123"
+    store.update_flow_state(branch, flow_slug="test", flow_status="blocked")
+    blocked_body = (
+        "<!-- vibe3-flow-state-start -->\n\n"
+        "**Vibe3 Flow State**\n\n"
+        "- **State**: blocked\n\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
+    github = StubGitHubClient(issue_body=blocked_body)
+    service = BlockedStateService(
+        store=store,
+        github_client=github,
+        label_service=FailingNormalizeLabelService(),
+    )
+
+    with pytest.raises(SystemError, match="normalize failed"):
+        service.reconcile_blocked(123, branch)
+
+    assert "- **State**: blocked" in (github.get_issue_body(123) or "")
+    assert store.get_flow_state(branch)["flow_status"] == "blocked"

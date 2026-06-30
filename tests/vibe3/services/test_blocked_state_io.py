@@ -1,5 +1,10 @@
 """Tests for blocked_state_io module."""
 
+from unittest.mock import MagicMock
+
+from vibe3.models import IssueState
+from vibe3.services.flow.blocked_state_io import BlockedStateIO
+
 
 def test_write_database_cache_stores_reason(tmp_path):
     """write_database_cache should store blocked_reason and flow_status."""
@@ -95,3 +100,24 @@ def test_clear_database_cache_handles_transition_history_exception(
     assert flow is not None
     assert flow.get("transition_count") == 0
     assert flow.get("flow_status") == "active"
+
+
+def test_write_label_state_normalize_uses_strict_replacement() -> None:
+    label_service = MagicMock()
+    label_service.replace_issue_state.return_value = "normalized"
+    io = BlockedStateIO(label_service=label_service)
+
+    result = io.write_label_state(
+        123,
+        IssueState.IN_PROGRESS,
+        actor="recovery:resume",
+        normalize=True,
+    )
+
+    assert result == "normalized"
+    label_service.replace_issue_state.assert_called_once_with(
+        123,
+        IssueState.IN_PROGRESS,
+        actor="recovery:resume",
+    )
+    label_service.confirm_issue_state.assert_not_called()
