@@ -121,6 +121,9 @@ EOF
   cp -R "$VIBE_ROOT/lib" "$source_root/lib"
   cp -R "$VIBE_ROOT/config" "$source_root/config"
   cp -R "$VIBE_ROOT/scripts" "$source_root/scripts"
+  cp -R "$VIBE_ROOT/src" "$source_root/src"
+  cp -R "$VIBE_ROOT/supervisor" "$source_root/supervisor"
+  cp -R "$VIBE_ROOT/skills" "$source_root/skills"
 
   cat > "$bin_dir/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -181,6 +184,9 @@ EOF
   cp -R "$VIBE_ROOT/lib" "$source_root/lib"
   cp -R "$VIBE_ROOT/config" "$source_root/config"
   cp -R "$VIBE_ROOT/scripts" "$source_root/scripts"
+  cp -R "$VIBE_ROOT/src" "$source_root/src"
+  cp -R "$VIBE_ROOT/supervisor" "$source_root/supervisor"
+  cp -R "$VIBE_ROOT/skills" "$source_root/skills"
   cat > "$rc_file" <<'EOF'
 export VIBE_ROOT_CUSTOM="/tmp/keep-me"
 # mention UV_PROJECT_ENVIRONMENT but keep this comment
@@ -236,6 +242,9 @@ EOF
   cp -R "$VIBE_ROOT/lib" "$source_root/lib"
   cp -R "$VIBE_ROOT/config" "$source_root/config"
   cp -R "$VIBE_ROOT/scripts" "$source_root/scripts"
+  cp -R "$VIBE_ROOT/src" "$source_root/src"
+  cp -R "$VIBE_ROOT/supervisor" "$source_root/supervisor"
+  cp -R "$VIBE_ROOT/skills" "$source_root/skills"
 
   cat > "$bin_dir/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -287,6 +296,9 @@ EOF
   cp -R "$VIBE_ROOT/lib" "$source_root/lib"
   cp -R "$VIBE_ROOT/config" "$source_root/config"
   cp -R "$VIBE_ROOT/scripts" "$source_root/scripts"
+  cp -R "$VIBE_ROOT/src" "$source_root/src"
+  cp -R "$VIBE_ROOT/supervisor" "$source_root/supervisor"
+  cp -R "$VIBE_ROOT/skills" "$source_root/skills"
 
   # Pre-create an invalid venv (empty directory, no pyvenv.cfg or bin/python)
   mkdir -p "$venv_dir"
@@ -330,4 +342,190 @@ EOF
   [ -f "$venv_dir/pyvenv.cfg" ]
   [ -f "$venv_dir/bin/python" ]
   [ -x "$venv_dir/bin/python" ]
+}
+
+@test "install adds ~/.vibe to direnv whitelist prefix" {
+  local fixture home_dir bin_dir source_root install_script direnv_conf_dir direnv_conf
+
+  fixture="$(mktemp -d)"
+  home_dir="$fixture/home"
+  bin_dir="$fixture/bin"
+  source_root="$fixture/source"
+  install_script="$source_root/scripts/install.sh"
+  direnv_conf_dir="$home_dir/.config/direnv"
+  direnv_conf="$direnv_conf_dir/direnv.toml"
+
+  mkdir -p "$home_dir" "$bin_dir" "$source_root"
+  cp -R "$VIBE_ROOT/bin" "$source_root/bin"
+  cp -R "$VIBE_ROOT/lib" "$source_root/lib"
+  cp -R "$VIBE_ROOT/config" "$source_root/config"
+  cp -R "$VIBE_ROOT/scripts" "$source_root/scripts"
+  cp -R "$VIBE_ROOT/src" "$source_root/src"
+  cp -R "$VIBE_ROOT/supervisor" "$source_root/supervisor"
+  cp -R "$VIBE_ROOT/skills" "$source_root/skills"
+
+  cat > "$bin_dir/gh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+
+  cat > "$bin_dir/direnv" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  hook|allow) exit 0 ;;
+  *) exit 0 ;;
+esac
+EOF
+
+  cat > "$bin_dir/uv" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "venv" ]]; then
+  mkdir -p "$2/bin"
+  touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
+  exit 0
+fi
+exit 0
+EOF
+
+  chmod +x "$bin_dir/gh" "$bin_dir/direnv" "$bin_dir/uv"
+  _write_common_noninteractive_stubs "$bin_dir"
+
+  # Ensure direnv config directory does not exist before test
+  [ ! -d "$direnv_conf_dir" ]
+
+  run env HOME="$home_dir" SHELL="/bin/zsh" PATH="$bin_dir:$PATH" zsh "$install_script"
+
+  [ "$status" -eq 0 ]
+  [ -f "$direnv_conf" ]
+  grep -q "prefix = " "$direnv_conf"
+  grep -Fq "$home_dir/.vibe" "$direnv_conf"
+}
+
+@test "install appends to existing whitelist.prefix" {
+  local fixture home_dir bin_dir source_root install_script direnv_conf_dir direnv_conf
+
+  fixture="$(mktemp -d)"
+  home_dir="$fixture/home"
+  bin_dir="$fixture/bin"
+  source_root="$fixture/source"
+  install_script="$source_root/scripts/install.sh"
+  direnv_conf_dir="$home_dir/.config/direnv"
+  direnv_conf="$direnv_conf_dir/direnv.toml"
+
+  mkdir -p "$home_dir" "$bin_dir" "$source_root" "$direnv_conf_dir"
+  cp -R "$VIBE_ROOT/bin" "$source_root/bin"
+  cp -R "$VIBE_ROOT/lib" "$source_root/lib"
+  cp -R "$VIBE_ROOT/config" "$source_root/config"
+  cp -R "$VIBE_ROOT/scripts" "$source_root/scripts"
+  cp -R "$VIBE_ROOT/src" "$source_root/src"
+  cp -R "$VIBE_ROOT/supervisor" "$source_root/supervisor"
+  cp -R "$VIBE_ROOT/skills" "$source_root/skills"
+
+  # Pre-create direnv.toml with existing prefix
+  cat > "$direnv_conf" <<'EOF'
+[whitelist]
+prefix = ["/tmp/old"]
+EOF
+
+  cat > "$bin_dir/gh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+
+  cat > "$bin_dir/direnv" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  hook|allow) exit 0 ;;
+  *) exit 0 ;;
+esac
+EOF
+
+  cat > "$bin_dir/uv" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "venv" ]]; then
+  mkdir -p "$2/bin"
+  touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
+  exit 0
+fi
+exit 0
+EOF
+
+  chmod +x "$bin_dir/gh" "$bin_dir/direnv" "$bin_dir/uv"
+  _write_common_noninteractive_stubs "$bin_dir"
+
+  run env HOME="$home_dir" SHELL="/bin/zsh" PATH="$bin_dir:$PATH" zsh "$install_script"
+
+  [ "$status" -eq 0 ]
+  [ -f "$direnv_conf" ]
+  grep -Fq "/tmp/old" "$direnv_conf"
+  grep -Fq "$home_dir/.vibe" "$direnv_conf"
+}
+
+@test "install whitelist prefix entry is idempotent" {
+  local fixture home_dir bin_dir source_root install_script direnv_conf_dir direnv_conf before_content
+
+  fixture="$(mktemp -d)"
+  home_dir="$fixture/home"
+  bin_dir="$fixture/bin"
+  source_root="$fixture/source"
+  install_script="$source_root/scripts/install.sh"
+  direnv_conf_dir="$home_dir/.config/direnv"
+  direnv_conf="$direnv_conf_dir/direnv.toml"
+
+  mkdir -p "$home_dir" "$bin_dir" "$source_root" "$direnv_conf_dir"
+  cp -R "$VIBE_ROOT/bin" "$source_root/bin"
+  cp -R "$VIBE_ROOT/lib" "$source_root/lib"
+  cp -R "$VIBE_ROOT/config" "$source_root/config"
+  cp -R "$VIBE_ROOT/scripts" "$source_root/scripts"
+  cp -R "$VIBE_ROOT/src" "$source_root/src"
+  cp -R "$VIBE_ROOT/supervisor" "$source_root/supervisor"
+  cp -R "$VIBE_ROOT/skills" "$source_root/skills"
+
+  # Pre-create direnv.toml with vibe entry already present
+  cat > "$direnv_conf" <<'EOF'
+[whitelist]
+prefix = ["${HOME}/.vibe"]
+EOF
+  # Replace ${HOME} with actual home path
+  sed -i.bak "s|\${HOME}|$home_dir|g" "$direnv_conf" && rm -f "$direnv_conf.bak"
+
+  cat > "$bin_dir/gh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+
+  cat > "$bin_dir/direnv" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  hook|allow) exit 0 ;;
+  *) exit 0 ;;
+esac
+EOF
+
+  cat > "$bin_dir/uv" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "venv" ]]; then
+  mkdir -p "$2/bin"
+  touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
+  exit 0
+fi
+exit 0
+EOF
+
+  chmod +x "$bin_dir/gh" "$bin_dir/direnv" "$bin_dir/uv"
+  _write_common_noninteractive_stubs "$bin_dir"
+
+  before_content="$(cat "$direnv_conf")"
+
+  run env HOME="$home_dir" SHELL="/bin/zsh" PATH="$bin_dir:$PATH" zsh "$install_script"
+
+  [ "$status" -eq 0 ]
+  [ -f "$direnv_conf" ]
+  [ "$(cat "$direnv_conf")" == "$before_content" ]
 }

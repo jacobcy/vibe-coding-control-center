@@ -124,6 +124,41 @@ _ensure_uv_cli() {
     return 1
 }
 
+_add_vibe_dir_to_direnv_whitelist() {
+    local DIRENV_CONF_DIR="$HOME/.config/direnv"
+    local DIRENV_CONF="$DIRENV_CONF_DIR/direnv.toml"
+    local WHITELIST_ENTRY="${HOME}/.vibe"
+
+    if ! command -v direnv >/dev/null 2>&1; then
+        log_info "direnv not installed, skip whitelist"
+        return 0
+    fi
+
+    mkdir -p "$DIRENV_CONF_DIR"
+
+    # Check if the entry already exists in the TOML file
+    if [[ -f "$DIRENV_CONF" ]]; then
+        if grep -qF "$WHITELIST_ENTRY" "$DIRENV_CONF"; then
+            log_info "direnv whitelist already contains $WHITELIST_ENTRY"
+            return 0
+        fi
+    fi
+
+    local tmp="$DIRENV_CONF.tmp.$$.whitelist"
+    {
+        if [[ -f "$DIRENV_CONF" ]]; then cat "$DIRENV_CONF"; fi
+        echo ""
+        echo "# auto-added by scripts/install.sh (vibe)"
+        echo "[whitelist]"
+        echo "prefix = [\"$WHITELIST_ENTRY\"]"
+    } > "$tmp" && mv "$tmp" "$DIRENV_CONF" || {
+        rm -f "$tmp"
+        log_warn "Failed to update direnv whitelist — please add manually: $WHITELIST_ENTRY"
+        return 0
+    }
+    log_success "Added $WHITELIST_ENTRY to direnv whitelist ($DIRENV_CONF)"
+}
+
 # --- Pre-flight checks ---
 log_step "Performing pre-flight checks..."
 # 检查写入权限
@@ -340,6 +375,8 @@ _setup_uv_environment() {
             cd "$SOURCE_ROOT" &&
                 direnv allow . >/dev/null 2>&1 || true
         )
+        # Whitelist ~/.vibe so all future vibe-managed worktrees auto-activate .envrc
+        _add_vibe_dir_to_direnv_whitelist || true
     fi
 
     # 安装项目依赖（NOT editable install）
