@@ -188,7 +188,9 @@ class TestPlannerDispatchHandler:
         # Should NOT call record_error for launch_failed
         mock_record_error.assert_not_called()
 
-    @patch("vibe3.services.shared.has_recent_specific_error")
+    @patch(
+        "vibe3.services.orchestra.error_tracking.service.ErrorTrackingService.has_recent_specific_error"
+    )
     @patch("vibe3.services.orchestra.record_error")
     @patch("vibe3.roles.build_plan_request")
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")

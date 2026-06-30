@@ -79,7 +79,6 @@ def record_dispatch_failure_if_unexpected(
         tick_id: Heartbeat tick ID for automatic dispatches (keyword-only)
         dispatch_source: Source of dispatch - "manual" or "automatic" (keyword-only)
     """
-    from vibe3.services.shared.errors import has_recent_specific_error
 
     # Preserve None for governance, coerce to 0 for other roles
     effective_issue_number = (
@@ -152,14 +151,14 @@ def record_dispatch_failure_if_unexpected(
     # If no, record E_DISPATCH_FAILURE for infrastructure visibility
     if reason_code == "launch_failed":
         from vibe3.clients import SQLiteClient
+        from vibe3.services.orchestra import ErrorTrackingService
 
         # Use single store instance for both check and potential recording
         _store = SQLiteClient()
-        if has_recent_specific_error(
+        if ErrorTrackingService.get_instance(store=_store).has_recent_specific_error(
             issue_number=effective_issue_number,
             branch=branch,
             within_seconds=60,
-            store=_store,
         ):
             # Bottom layer recorded specific error - skip duplicate
             return

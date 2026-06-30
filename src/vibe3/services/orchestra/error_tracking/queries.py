@@ -340,3 +340,55 @@ def get_all_errors_status(db_path: str) -> dict[str, Any]:
         "warning_count": warning_count,
         "unknown_severity_counts": unknown_severity_counts,
     }
+
+
+def has_recent_specific_error(
+    db_path: str,
+    issue_number: int | None,
+    branch: str | None,
+    within_seconds: int = 60,
+    excluded_codes: tuple[str, ...] = (
+        "E_DISPATCH_FAILURE",
+        "E_DISPATCH_CODE_ERROR",
+    ),
+) -> bool:
+    """Check if a specific (non-dispatch) error was recently recorded.
+
+    Used to avoid duplicate error recording when launch_failed occurs
+    after a lower layer has already recorded a specific error.
+
+    Args:
+        db_path: SQLite database path
+        issue_number: Issue number to check
+        branch: Branch name to check
+        within_seconds: Time window in seconds (default 60)
+        excluded_codes: Error codes to exclude from check
+
+    Returns:
+        True if a non-excluded error exists in the time window
+    """
+    # Build parameterized query to avoid f-string injection
+    placeholders = ", ".join("?" * len(excluded_codes))
+    query = f"""
+        SELECT COUNT(*) FROM error_log
+        WHERE error_code NOT IN ({placeholders})
+          AND issue_number = ?
+          AND branch = ?
+          AND datetime(created_at) >= datetime('now', ? || ' seconds')
+    """
+
+    try:
+        with sqlite3.connect(db_path) as conn:
+            # Build params: excluded_codes + issue_number + branch + seconds
+            seconds_param = f"-{within_seconds}"
+            params = list(excluded_codes) + [
+                issue_number or 0,
+                branch or "",
+                seconds_param,
+            ]
+            cursor = conn.execute(query, params)
+            count = cursor.fetchone()[0]
+            return bool(count > 0)
+    except Exception:
+        # If query fails, be conservative and return False
+        return False

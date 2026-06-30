@@ -52,8 +52,11 @@ SERVICES_SUBPACKAGES = ["flow", "pr", "issue", "task"]
 # Known violations in shared/ boundary.
 # Each entry: (relative_path, import_target) — registered as technical debt.
 # These represent architectural debt that should be resolved over time.
-# Phase 7b: All shared/ boundary violations resolved (2026-06-11).
-KNOWN_SHARED_VIOLATIONS: set[tuple[str, str]] = set()
+# Issue #3226: shared/errors.py delegates has_recent_specific_error to orchestra.
+# This thin-reexport pattern is accepted as minimal fix for embedded SQL violation.
+KNOWN_SHARED_VIOLATIONS: set[tuple[str, str]] = {
+    ("vibe3/services/shared/errors.py", "vibe3.services.orchestra"),
+}
 
 # Known bidirectional coupling between sub-packages.
 # Format: (sub_a, sub_b) — both directions exist at sub-package level.
