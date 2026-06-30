@@ -81,15 +81,23 @@ class TestErrorModulesDoNotImportBlockModules:
                     "block_flow" not in line
                 ), f"{file_path.name} references block_flow (BLOCK module)"
 
-    def test_error_modules_do_not_import_fail_issue(
+    def test_error_modules_do_not_import_mark_issue_block_issue(
         self, error_files: list[Path]
     ) -> None:
-        """ERROR modules should not import fail_issue."""
+        """ERROR modules should not import BLOCK-side issue state mutators.
+
+        After dead-code cleanup, ``fail_issue`` and ``block_issue`` were
+        removed from ``services/issue/failure.py``. This test guards against
+        their being re-introduced into ERROR modules (the point of
+        decoupling is that ERROR paths record to ``error_log`` only — they
+        must not reach into BLOCK-side issue state mutation).
+        """
         for file_path in error_files:
             content = get_file_content(file_path)
-            assert (
-                "fail_issue" not in content
-            ), f"{file_path.name} imports fail_issue (BLOCK module)"
+            for marker in ("mark_issue", "fail_issue", "block_issue"):
+                assert (
+                    marker not in content
+                ), f"{file_path.name} references {marker} (BLOCK module)"
 
     def test_error_modules_do_not_import_blocked_state(
         self, error_files: list[Path]

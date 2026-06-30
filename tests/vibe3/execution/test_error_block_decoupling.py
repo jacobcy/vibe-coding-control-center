@@ -5,6 +5,10 @@ These tests verify the architectural separation between:
 - BLOCK system: business logic → blocked_reason + block_flow
 
 Phase 3 verification tests.
+
+The ERROR pathway assertions below exercise ``fail_manager_issue`` (the
+role-specific wrapper around the internal ``_mark_issue`` helper) rather
+than the now-removed ``fail_issue`` generic wrapper.
 """
 
 import tempfile
@@ -17,7 +21,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.exceptions import GitHubAPIError
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 from vibe3.services.flow import FlowService, FlowTimelineService
-from vibe3.services.issue.failure import fail_issue
+from vibe3.services.issue.failure import fail_manager_issue
 
 
 @pytest.fixture
@@ -84,17 +88,16 @@ class TestDatabaseErrorDoesNotTriggerBlock:
         assert flow_state_after.get("blocked_reason") is None
 
     def test_fail_issue_no_blocked_reason(self, temp_db):
-        """fail_issue() should NOT write blocked_reason."""
+        """fail_manager_issue (ERROR path) should NOT write blocked_reason."""
         branch = "test-branch"
         issue_number = 123
 
         temp_db.update_flow_state(branch, flow_slug="test")
         temp_db.add_issue_link(branch, issue_number, role="task")
 
-        fail_issue(
+        fail_manager_issue(
             issue_number=issue_number,
             reason="Runtime error: database connection failed",
-            role="manager",
             actor="test",
             flow_timeline_service=FlowTimelineService(store=temp_db),
         )

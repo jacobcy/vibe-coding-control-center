@@ -78,7 +78,7 @@ def merge_projection(body: str, proj: FlowStateProjection) -> str:
     Returns:
         Merged body text
     """
-    rendered = render_projection(proj)
+    rendered = _render_projection(proj)
 
     # Remove existing managed section
     cleaned = MANAGED_SECTION_PATTERN.sub("", body).strip()
@@ -90,14 +90,10 @@ def merge_projection(body: str, proj: FlowStateProjection) -> str:
     return f"{cleaned}\n\n{rendered}"
 
 
-def render_projection(proj: FlowStateProjection) -> str:
-    """Render flow-state projection to managed section (internal helper).
+def _render_projection(proj: FlowStateProjection) -> str:
+    """Render flow-state projection to managed section.
 
-    Args:
-        proj: FlowStateProjection instance
-
-    Returns:
-        Formatted managed section text
+    Internal helper for merge_projection.
     """
     if proj.is_empty():
         return ""

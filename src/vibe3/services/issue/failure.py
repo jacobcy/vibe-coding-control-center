@@ -3,6 +3,11 @@
 This module handles failure/block transitions for issues when
 executor or manager runs fail or make no progress.
 
+The public surface is the set of role-specific wrappers (``fail_executor_issue``,
+``block_manager_noop_issue``, etc.). These all delegate to the internal
+``_mark_issue`` helper, which is intentionally NOT exported — it is an
+implementation detail of the wrapper set.
+
 Intra-subpackage dependency: failure → flow (one-directional; do not reverse).
 """
 
@@ -22,7 +27,10 @@ _ISSUE_FLOW_SERVICE_CACHE: IssueFlowService | None = None
 
 
 def _get_issue_flow_service() -> IssueFlowService:
-    """Return cached IssueFlowService instance."""
+    """Return cached IssueFlowService.
+
+    Internal helper for role-specific wrappers in this module.
+    """
     global _ISSUE_FLOW_SERVICE_CACHE
     if _ISSUE_FLOW_SERVICE_CACHE is None:
         _ISSUE_FLOW_SERVICE_CACHE = IssueFlowService()
@@ -43,7 +51,7 @@ _ROLE_MAP = {
 }
 
 
-def mark_issue(
+def _mark_issue(
     *,
     issue_number: int,
     reason: str,
@@ -55,7 +63,7 @@ def mark_issue(
     flow_timeline_service: FlowTimelineProtocol | None = None,
     flow_service: FlowQueryProtocol | None = None,
 ) -> None:
-    """Unified issue state marking interface.
+    """Unified issue state marking (internal helper consumed by role-specific wrappers).
 
     Args:
         action: "fail" for runtime failures (writes flow_failed timeline event
@@ -78,7 +86,7 @@ def mark_issue(
     except Exception as e:
         logger.bind(
             domain="flow",
-            action="mark_issue",
+            action="mark_issue_internal",
             issue_number=issue_number,
             error=str(e),
         ).warning(f"Failed to get branch for issue #{issue_number}")
@@ -115,67 +123,9 @@ def mark_issue(
         )
 
 
-def fail_issue(
-    *,
-    issue_number: int,
-    reason: str,
-    role: str,
-    actor: str | None = None,
-    flow_timeline_service: FlowTimelineProtocol | None = None,
-) -> None:
-    """Generic fail issue handler.
-
-    Writes a flow_failed timeline event only. The runtime error itself is
-    recorded to error_log upstream by the caller (e.g., codeagent_runner via
-    ErrorTrackingService.record_error); this handler does NOT write to
-    error_log to avoid duplicate entries.
-    Does NOT write blocked_reason or change flow_status.
-    Runtime errors are handled by ERROR system, not BLOCK system.
-    """
-    if flow_timeline_service is None:
-        raise ValueError(
-            "flow_timeline_service is required. "
-            "Pass a FlowTimelineService instance (from vibe3.services.flow)."
-        )
-    mark_issue(
-        issue_number=issue_number,
-        reason=reason,
-        role=role,
-        actor=actor,
-        action="fail",
-        flow_timeline_service=flow_timeline_service,
-    )
-
-
-def block_issue(
-    *,
-    issue_number: int,
-    reason: str,
-    role: str,
-    actor: str | None = None,
-    repo: str | None = None,
-    is_noop: bool = False,
-    flow_service: FlowQueryProtocol | None = None,
-) -> None:
-    """Generic block issue handler."""
-    if flow_service is None:
-        raise ValueError(
-            "flow_service is required. "
-            "Pass a FlowService instance (from vibe3.services.flow)."
-        )
-    mark_issue(
-        issue_number=issue_number,
-        reason=reason,
-        role=role,
-        actor=actor,
-        repo=repo,
-        is_noop=is_noop,
-        action="block",
-        flow_service=flow_service,
-    )
-
-
-# Role-specific convenience wrappers for fail_issue/block_issue
+# Role-specific convenience wrappers (fail / block).
+# Kept as thin public-facing aliases so call sites can pick a role-specific
+# name, which reads clearer at the call site (e.g. `fail_executor_issue(...)`).
 def fail_reviewer_issue(
     *,
     issue_number: int,
@@ -183,11 +133,12 @@ def fail_reviewer_issue(
     actor: str = "agent:review",
     flow_timeline_service: FlowTimelineProtocol | None = None,
 ) -> None:
-    fail_issue(
+    _mark_issue(
         issue_number=issue_number,
         reason=reason,
         role="review",
         actor=actor,
+        action="fail",
         flow_timeline_service=flow_timeline_service,
     )
 
@@ -199,11 +150,12 @@ def fail_planner_issue(
     actor: str = "agent:plan",
     flow_timeline_service: FlowTimelineProtocol | None = None,
 ) -> None:
-    fail_issue(
+    _mark_issue(
         issue_number=issue_number,
         reason=reason,
         role="plan",
         actor=actor,
+        action="fail",
         flow_timeline_service=flow_timeline_service,
     )
 
@@ -215,11 +167,12 @@ def fail_executor_issue(
     actor: str,
     flow_timeline_service: FlowTimelineProtocol | None = None,
 ) -> None:
-    fail_issue(
+    _mark_issue(
         issue_number=issue_number,
         reason=reason,
         role="run",
         actor=actor,
+        action="fail",
         flow_timeline_service=flow_timeline_service,
     )
 
@@ -231,11 +184,12 @@ def fail_manager_issue(
     actor: str = "agent:manager",
     flow_timeline_service: FlowTimelineProtocol | None = None,
 ) -> None:
-    fail_issue(
+    _mark_issue(
         issue_number=issue_number,
         reason=reason,
         role="manager",
         actor=actor,
+        action="fail",
         flow_timeline_service=flow_timeline_service,
     )
 
@@ -311,13 +265,19 @@ def block_planner_noop_issue(
     repo: str | None = None,
     flow_service: FlowQueryProtocol | None = None,
 ) -> None:
-    block_issue(
+    if flow_service is None:
+        raise ValueError(
+            "flow_service is required. "
+            "Pass a FlowService instance (from vibe3.services.flow)."
+        )
+    _mark_issue(
         issue_number=issue_number,
         reason=reason,
         role="plan",
         actor=actor,
         repo=repo,
         is_noop=True,
+        action="block",
         flow_service=flow_service,
     )
 
@@ -330,13 +290,19 @@ def block_executor_noop_issue(
     repo: str | None = None,
     flow_service: FlowQueryProtocol | None = None,
 ) -> None:
-    block_issue(
+    if flow_service is None:
+        raise ValueError(
+            "flow_service is required. "
+            "Pass a FlowService instance (from vibe3.services.flow)."
+        )
+    _mark_issue(
         issue_number=issue_number,
         reason=reason,
         role="run",
         actor=actor,
         repo=repo,
         is_noop=True,
+        action="block",
         flow_service=flow_service,
     )
 
@@ -349,12 +315,18 @@ def block_reviewer_noop_issue(
     repo: str | None = None,
     flow_service: FlowQueryProtocol | None = None,
 ) -> None:
-    block_issue(
+    if flow_service is None:
+        raise ValueError(
+            "flow_service is required. "
+            "Pass a FlowService instance (from vibe3.services.flow)."
+        )
+    _mark_issue(
         issue_number=issue_number,
         reason=reason,
         role="review",
         actor=actor,
         repo=repo,
         is_noop=True,
+        action="block",
         flow_service=flow_service,
     )

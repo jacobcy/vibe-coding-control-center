@@ -4,13 +4,19 @@ Public API Contract:
 - IssueCollectionService, IssueFlowService, IssueTitleCacheService: Core services
 - IssueDispatchPolicy, DispatchExclusion: Dispatch policy
 - load_issue_info: Context loading
-- Failure functions: fail_executor_issue, fail_manager_issue, fail_planner_issue,
-  fail_reviewer_issue, block_executor_noop_issue, block_manager_noop_issue,
-  block_planner_noop_issue, block_reviewer_noop_issue
+- Failure functions (role-specific thin wrappers over the internal helper
+  ``_mark_issue``): fail_executor_issue, fail_manager_issue,
+  fail_planner_issue, fail_reviewer_issue, block_executor_noop_issue,
+  block_manager_noop_issue, block_planner_noop_issue,
+  block_reviewer_noop_issue
 - Body functions: parse_projection, merge_projection
 - Branch resolution: resolve_issue_branch_input, iter_issue_branch_candidates
 
-All exports are part of the public API.
+Internal (not exported): ``_mark_issue`` (fail/block unification helper
+in ``services/issue/failure.py``), ``_render_projection`` (internal
+helper for ``merge_projection`` in ``services/issue/body.py``).
+Plan to rely on lazy import for all __all__ symbols; do not import
+internal helpers directly from this package.
 """
 
 from typing import TYPE_CHECKING, Any
