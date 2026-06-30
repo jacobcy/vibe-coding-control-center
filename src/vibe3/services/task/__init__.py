@@ -6,7 +6,7 @@ Public API Contract:
 - TaskResumeUsecase, TaskResumeOperations, TaskResumeCandidates: Resume operations
 - TaskStatusBucket: Status types
 - MissingTaskIssueError, ensure_task_issue_bound, has_task_issue: Binding guard
-- build_api_task_data, classify_task_status: Status utilities
+- build_api_task_data, perform_status_fetch, classify_task_status: Status utilities
 
 All exports are part of the public API.
 """
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from vibe3.services.task.status import (
         build_api_task_data,
         classify_task_issues_for_rendering,
+        perform_status_fetch,
     )
 
 __all__ = [
@@ -62,6 +63,7 @@ __all__ = [
     "build_bind_task_hint",
     # Functions - status
     "build_api_task_data",
+    "perform_status_fetch",
     "classify_task_issues_for_rendering",
     # Functions - classifier
     "classify_task_status",
@@ -90,6 +92,7 @@ _SYMBOL_MODULES = {
     "build_bind_task_hint": "vibe3.services.shared.binding_guard",
     # Functions - status
     "build_api_task_data": "vibe3.services.task.status",
+    "perform_status_fetch": "vibe3.services.task.status",
     "classify_task_issues_for_rendering": "vibe3.services.task.status",
     # Functions - classifier
     "classify_task_status": "vibe3.services.task.classifier",

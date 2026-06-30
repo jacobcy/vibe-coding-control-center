@@ -24,14 +24,14 @@ NON_ACTIVE_TASK_FLOW_STATUSES = frozenset({"done", "review", "failed", "aborted"
 
 # Module-private carrier for the three-step fetch sequence.
 # Not exported — callers should call build_api_task_data (HTTP) or
-# _perform_status_fetch (CLI dashboard), never reach into this tuple.
+# perform_status_fetch (CLI dashboard), never reach into this tuple.
 _StatusFetchResult = namedtuple(
     "_StatusFetchResult",
     ["config", "orch_snapshot", "snapshot_found", "flows", "orchestrated_issues"],
 )
 
 
-def _perform_status_fetch(all_flows: bool = False) -> _StatusFetchResult:
+def perform_status_fetch(all_flows: bool = False) -> _StatusFetchResult:
     """Run the three-step fetch sequence; return a private namedtuple.
 
     Kept separate from build_api_task_data so the CLI dashboard can
@@ -384,7 +384,7 @@ def build_api_task_data(all_flows: bool = False) -> dict[str, Any]:
     Returns:
         Dict with config_summary, server_status, classified_issues, flows.
     """
-    data = _perform_status_fetch(all_flows)
+    data = perform_status_fetch(all_flows)
     classified = classify_task_issues_for_rendering(
         data.orchestrated_issues, data.config
     )
