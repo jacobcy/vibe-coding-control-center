@@ -43,6 +43,8 @@ def has_recent_specific_error(
             within_seconds=within_seconds,
         )
     except Exception:
+        # Boundary defense: swallow get_instance()/SQLiteClient() failures and
+        # conservatively return False (same contract as before).
         return False
 
 

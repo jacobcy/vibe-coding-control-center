@@ -24,7 +24,7 @@
 
 ## 文件列表
 
-统计时间：2026-06-28
+统计时间：2026-07-01
 
 ### Label 体系
 
@@ -45,7 +45,7 @@
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| errors.py | 75 | 错误记录与查询工具 |
+| errors.py | 68 | 错误记录与查询工具（thin-reexport shell, 详见 `orchestra/error_tracking`） |
 
 ### Actor 与角色
 
@@ -200,4 +200,8 @@ def __getattr__(name: str) -> Any:
 
 - Label 体系：`labels.py`（常量与逻辑）+ `label_service.py`（API 服务）
 - 路径工具：`paths.py`（路径协议）+ `branch_resolver.py`（输入解析）
-- 错误工具：统一错误记录接口，支持错误追踪服务
+- 错误工具：
+  - `errors.py` 仅作为公共 re-export 壳（向后兼容），不持有任何 DB 查询；
+  - 实际 `error_log` 表的 SQL 已抽到 `services/orchestra/error_tracking/queries.py`，
+    并通过 `ErrorTrackingService.has_recent_specific_error()` 暴露。
+  - 新查询请直接在 `error_tracking.queries` 中扩展，`shared.errors` 不再承接 SQL。

@@ -13,7 +13,7 @@
 
 ## 文件列表
 
-统计时间：2026-06-28
+统计时间：2026-07-01
 
 ### 核心服务
 
@@ -41,8 +41,8 @@
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| error_tracking/service.py | 304 | ErrorTrackingService - 错误追踪主服务 |
-| error_tracking/queries.py | 338 | 错误查询与分析 |
+| error_tracking/service.py | 282 | ErrorTrackingService - 错误追踪主服务（含 `has_recent_specific_error` 实例方法） |
+| error_tracking/queries.py | 394 | 错误查询与分析（含 `has_recent_specific_error` 纯查询函数，此前嵌入 `services/shared/errors.py`） |
 | error_tracking/cleanup.py | 51 | 错误记录清理 |
 
 **总计**：12 文件，3418 行
@@ -180,10 +180,14 @@ OrchestraStatusService.get_snapshot()
 
 ```
 ErrorTrackingService (singleton)
-  ├── record_error() → Write to error_records table
-  ├── has_recent_specific_error() → Query recent errors
+  ├── record_error() → Write to error_log table
+  ├── has_recent_specific_error(issue, branch, within_seconds)
+  │     └── 委托 error_tracking/queries.has_recent_specific_error
   └── get_error_summary() → Aggregate error stats
 ```
+
+> 向后兼容：`vibe3.services.shared.errors.has_recent_specific_error` 仍作为 re-export 壳可用，
+> 内部实现已委托到 `ErrorTrackingService`（参见 issue #3226）。
 
 ### 资源清理流程
 

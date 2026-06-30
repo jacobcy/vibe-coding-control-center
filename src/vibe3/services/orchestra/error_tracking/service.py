@@ -263,15 +263,12 @@ class ErrorTrackingService:
         within_seconds: int = 60,
     ) -> bool:
         """Check if a specific (non-dispatch) error was recently recorded."""
-        try:
-            return _has_recent_specific_error(
-                self.db_path,
-                issue_number=issue_number,
-                branch=branch,
-                within_seconds=within_seconds,
-            )
-        except Exception:
-            return False
+        return _has_recent_specific_error(
+            self.db_path,
+            issue_number=issue_number,
+            branch=branch,
+            within_seconds=within_seconds,
+        )
 
     def get_critical_error_codes(self) -> list[str]:
         """Get error codes of CRITICAL severity errors."""
