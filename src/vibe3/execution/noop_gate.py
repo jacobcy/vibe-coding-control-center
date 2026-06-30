@@ -103,7 +103,7 @@ def apply_unified_noop_gate(
         flow_state=flow_state,
         tick_id=tick_id,
     )
-    from vibe3.services.shared.labels import get_highest_priority_state
+    from vibe3.services.shared import get_highest_priority_state
 
     added_state_labels = after_state_labels - effective_before_labels
     target_candidates = added_state_labels or after_state_labels

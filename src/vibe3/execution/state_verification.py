@@ -56,7 +56,7 @@ class StateVerificationService:
         if len(state_labels) == 1:
             return next(iter(state_labels)), is_closed
 
-        from vibe3.services.shared.labels import get_highest_priority_state
+        from vibe3.services.shared import get_highest_priority_state
 
         best = get_highest_priority_state(list(state_labels))
         return best or min(state_labels), is_closed
