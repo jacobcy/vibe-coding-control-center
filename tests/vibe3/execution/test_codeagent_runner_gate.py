@@ -84,6 +84,7 @@ class TestExecuteSyncGateIntegration:
         call_kwargs = mock_gate.call_args[1]
         assert call_kwargs["issue_number"] == 42
         assert call_kwargs["role"] == "planner"
+        assert "flow_service" in call_kwargs
 
     @pytest.mark.slow
     def test_gate_skipped_without_issue_number_or_branch(self) -> None:

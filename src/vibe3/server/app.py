@@ -166,6 +166,21 @@ def start(
 
     register_event_handlers()
 
+    # Validate we're in a git repository before creating any temp directories.
+    # Without this check, _resolve_orchestra_log_dir and other path resolution
+    # would fail with a cryptic error or create temp/ in the wrong directory.
+    try:
+        from vibe3.utils import find_repo_root
+
+        find_repo_root()
+    except SystemError:
+        typer.echo(
+            "Error: Not in a git repository.\n"
+            "Please run 'vibe3 serve start' from within the Vibe Center repository "
+            "(main repo or worktree)."
+        )
+        raise typer.Exit(1)
+
     # Orchestra events.log level follows global verbosity
     # Default: INFO (key runtime events for monitoring)
     # -v: already INFO (no change needed)
@@ -320,7 +335,7 @@ def start(
             _resolve_dispatcher_models_root(config, Path.cwd())
         )
         os.environ.pop("VIBE3_ASYNC_CLI_PROJECT_ROOT", None)
-        os.environ["VIBE3_ASYNC_LOG_DIR"] = str(_resolve_orchestra_log_dir(Path.cwd()))
+        os.environ["VIBE3_ASYNC_LOG_DIR"] = str(_resolve_orchestra_log_dir())
         # --no-async flag: propagate to all dispatched role agents
         # Only set when user explicitly requested --no-async (not in async wrapper)
         if no_async:

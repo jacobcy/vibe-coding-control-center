@@ -43,9 +43,15 @@ def _resolve_dispatcher_models_root(
     return resolve_orchestra_repo_root().resolve()
 
 
-def _resolve_orchestra_log_dir(launch_cwd: Path | None = None) -> Path:
-    """Resolve the shared orchestra log root anchored to the launch cwd."""
-    return (launch_cwd or Path.cwd()).resolve() / "temp" / "logs"
+def _resolve_orchestra_log_dir() -> Path:
+    """Resolve the shared orchestra log root anchored to the repo root.
+
+    Always uses find_repo_root() to anchor temp/logs in the repository root,
+    regardless of the current working directory at launch time.
+    """
+    from vibe3.utils import find_repo_root
+
+    return find_repo_root() / "temp" / "logs"
 
 
 def _build_server(config: "OrchestraConfig") -> tuple["HeartbeatServer", "FastAPI"]:
@@ -435,7 +441,7 @@ def _build_async_serve_command(
     """Build self-invocation command for async tmux startup."""
 
     models_root = _resolve_dispatcher_models_root(config, launch_cwd)
-    log_dir = _resolve_orchestra_log_dir(launch_cwd)
+    log_dir = _resolve_orchestra_log_dir()
 
     # Resolve the absolute path to vibe3 project root via module location.
     # This works correctly in both:

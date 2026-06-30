@@ -621,3 +621,33 @@ def test_stop_clears_global_pid_file(monkeypatch, tmp_path: Path) -> None:
         "Process 99999 not found" in result.stdout
         or "cleaning up" in result.stdout.lower()
     )
+
+
+def test_start_exits_when_not_in_git_repo(monkeypatch) -> None:
+    """serve start should exit with clear error when not in a git repository."""
+    monkeypatch.setattr(
+        serve_module,
+        "load_orchestra_config",
+        lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
+    )
+    monkeypatch.setattr(serve_module, "validate_pid_file", lambda _: (None, False))
+    monkeypatch.setattr(
+        serve_module, "find_available_port", lambda _port, _max: (8080, False)
+    )
+    monkeypatch.setattr(
+        serve_module,
+        "find_missing_backend_commands",
+        lambda env_path=None: {},
+    )
+
+    # Simulate not being in a git repository.
+    # find_repo_root() raises built-in SystemError on failure.
+    with patch(
+        "vibe3.utils.find_repo_root",
+        side_effect=SystemError("Not in a git repository"),
+    ):
+        runner = CliRunner()
+        result = runner.invoke(app, ["serve", "start"])
+
+    assert result.exit_code == 1
+    assert "Not in a git repository" in result.stdout
