@@ -4,7 +4,7 @@ Public API Contract:
 - TaskService: Main task service
 - TaskShowService, TaskShowResult, TaskRefSummary, etc.: Show operations
 - TaskResumeUsecase, TaskResumeOperations, TaskResumeCandidates: Resume operations
-- TaskStatusBucket, TaskStatusData: Status types
+- TaskStatusBucket: Status types
 - MissingTaskIssueError, ensure_task_issue_bound, has_task_issue: Binding guard
 - build_api_task_data, fetch_task_status_data, classify_task_status: Status utilities
 
@@ -35,7 +35,6 @@ if TYPE_CHECKING:
         TaskShowService,
     )
     from vibe3.services.task.status import (
-        TaskStatusData,
         build_api_task_data,
         classify_task_issues_for_rendering,
         fetch_task_status_data,
@@ -52,8 +51,6 @@ __all__ = [
     "TaskRefSummary",
     "TaskCommentSummary",
     "TaskPRSummary",
-    # Classes - status
-    "TaskStatusData",
     # Classes - resume
     "TaskResumeUsecase",
     "TaskResumeCandidates",
@@ -83,8 +80,6 @@ _SYMBOL_MODULES = {
     "TaskRefSummary": "vibe3.services.task.show",
     "TaskCommentSummary": "vibe3.services.task.show",
     "TaskPRSummary": "vibe3.services.task.show",
-    # Classes - status
-    "TaskStatusData": "vibe3.services.task.status",
     # Classes - resume
     "TaskResumeUsecase": "vibe3.services.task.resume",
     "TaskResumeCandidates": "vibe3.services.task.resume",
