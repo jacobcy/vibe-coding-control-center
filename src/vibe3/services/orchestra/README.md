@@ -19,23 +19,23 @@
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| orchestrator.py | 566 | FlowOrchestratorService - 主编排服务 |
-| status.py | 389 | OrchestraStatusService, OrchestraSnapshot - 状态聚合（委托给 IssueStatusAggregator） |
-| serve_status.py | 524 | ServeStatusService - 服务状态展示 |
+| orchestrator.py | 554 | FlowOrchestratorService - 主编排服务 |
+| status.py | 380 | OrchestraStatusService, OrchestraSnapshot - 状态聚合（委托给 IssueStatusAggregator） |
+| serve_status.py | 532 | ServeStatusService - 服务状态展示 |
 | cleanup.py | 625 | 过期资源清理（branches, worktrees, handoff files）|
 
 ### 错误处理
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| error_recording.py | 191 | record_error, record_dispatch_failure_if_unexpected - 错误记录包装器 |
+| error_recording.py | 190 | record_error, record_dispatch_failure_if_unexpected - 错误记录包装器 |
 | error_projection.py | 57 | build_error_projection_hook - ADR-0004 事件投影实现 |
 
 ### 协调与辅助
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| coordination.py | 194 | CoordinationResolver - 协调状态解析 |
+| coordination.py | 188 | CoordinationResolver - 协调状态解析 |
 
 ### 错误追踪子模块
 
@@ -45,7 +45,7 @@
 | error_tracking/queries.py | 394 | 错误查询与分析（含 `has_recent_specific_error` 纯查询函数，此前嵌入 `services/shared/errors.py`） |
 | error_tracking/cleanup.py | 51 | 错误记录清理 |
 
-**总计**：12 文件，3239 行
+**总计**：10 文件，3292 行
 
 ## 公共 API
 

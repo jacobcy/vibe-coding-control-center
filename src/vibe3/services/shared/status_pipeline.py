@@ -126,7 +126,7 @@ class IssueStatusAggregator:
                 branch.removeprefix("refs/heads/"): path for path, branch in worktrees
             }
         except Exception as exc:
-            logger.bind(domain="orchestra").warning(f"Failed to list worktrees: {exc}")
+            logger.bind(domain="shared").warning(f"Failed to list worktrees: {exc}")
             return {}
 
     def aggregate(
@@ -146,7 +146,7 @@ class IssueStatusAggregator:
         Returns:
             Tuple of IssueStatusEntry, sorted by state priority and queue rules
         """
-        log = logger.bind(domain="orchestra", action="status_pipeline_aggregate")
+        log = logger.bind(domain="shared", action="status_pipeline_aggregate")
         log.debug(f"Aggregating {len(issues)} issues")
 
         queued = queued or set()

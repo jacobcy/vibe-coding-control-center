@@ -15,9 +15,10 @@ from vibe3.commands.inspect import app as inspect_app
 from vibe3.models.coverage import CoverageReport, LayerCoverage
 from vibe3.models.flow import FlowState, FlowStatusResponse
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.handoff.status import HandoffStatusResult
 
 
+# HandoffStatusResult: imported on demand by fixtures below (lazy to bypass
+# the deprecated barrel re-export at vibe3.services.handoff).
 @pytest.fixture(autouse=True)
 def mock_git_client_base() -> Generator[None, None, None]:
     """Globally patch GitClient methods that require a real git repo."""
@@ -211,8 +212,10 @@ def mock_handoff_service() -> MagicMock:
 
 
 @pytest.fixture
-def mock_status_result() -> HandoffStatusResult:
+def mock_status_result():
     """Create a default HandoffStatusResult for testing."""
+    from vibe3.services.handoff.status import HandoffStatusResult
+
     return HandoffStatusResult(
         flow_slug="test-flow",
         worktree_root="/path/to/worktree",
