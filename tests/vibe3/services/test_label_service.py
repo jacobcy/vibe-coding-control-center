@@ -1,5 +1,8 @@
 """Tests for LabelService."""
 
+import pytest
+
+from vibe3.exceptions import SystemError
 from vibe3.models.orchestration import IssueState
 from vibe3.models.state_machine import VIBE_TASK_LABEL
 from vibe3.services.shared.label_service import LabelService
@@ -15,6 +18,7 @@ class FakeIssuePort:
         self.fail_get = False
         self.fail_ensure = False
         self.repo_labels: set[str] = set()
+        self.operations: list[tuple[str, str]] = []
 
     def get_issue_labels(self, issue_number: int) -> list[str] | None:
         if self.fail_get:
@@ -22,6 +26,7 @@ class FakeIssuePort:
         return list(self.labels.get(issue_number, []))
 
     def add_issue_label(self, issue_number: int, label: str) -> bool:
+        self.operations.append(("add", label))
         if self.fail_add:
             return False
         labels = self.labels.setdefault(issue_number, [])
@@ -30,6 +35,7 @@ class FakeIssuePort:
         return True
 
     def remove_issue_label(self, issue_number: int, label: str) -> bool:
+        self.operations.append(("remove", label))
         if self.fail_remove:
             return False
         labels = self.labels.setdefault(issue_number, [])
@@ -139,3 +145,49 @@ def test_confirm_vibe_task_add_confirmed_advanced_and_blocked() -> None:
     assert result1 == "advanced"
     assert result2 == "confirmed"
     assert result3 == "blocked"
+
+
+def test_replace_issue_state_normalizes_duplicate_labels() -> None:
+    port = FakeIssuePort({123: ["state/in-progress", "state/handoff", "type/feature"]})
+    service = LabelService(issue_port=port)
+
+    result = service.replace_issue_state(
+        123,
+        IssueState.IN_PROGRESS,
+        actor="recovery:resume",
+    )
+
+    assert result == "normalized"
+    assert port.labels[123] == ["state/in-progress", "type/feature"]
+    assert port.operations.index(("add", "state/in-progress")) < port.operations.index(
+        ("remove", "state/handoff")
+    )
+
+
+def test_replace_issue_state_confirms_single_target_without_writes() -> None:
+    port = FakeIssuePort({123: ["state/in-progress", "type/feature"]})
+    service = LabelService(issue_port=port)
+
+    result = service.replace_issue_state(
+        123,
+        IssueState.IN_PROGRESS,
+        actor="recovery:resume",
+    )
+
+    assert result == "confirmed"
+    assert port.operations == []
+
+
+def test_replace_issue_state_fails_closed_when_labels_unreadable() -> None:
+    port = FakeIssuePort({123: ["state/blocked"]})
+    port.fail_get = True
+    service = LabelService(issue_port=port)
+
+    with pytest.raises(SystemError, match="read state labels"):
+        service.replace_issue_state(
+            123,
+            IssueState.IN_PROGRESS,
+            actor="recovery:resume",
+        )
+
+    assert port.operations == []

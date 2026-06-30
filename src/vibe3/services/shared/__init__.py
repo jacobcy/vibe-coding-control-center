@@ -15,7 +15,8 @@ Public API Contract:
 - emit_issue_failed, get_role_block_function: Flow execution helpers
 - material_loader, policy_loader: File loading
 - LabelService: Label management
-- classify_dispatch_eligibility, get_state_labels, has_roadmap_label,
+- classify_dispatch_eligibility, get_highest_priority_state, get_state_labels,
+  has_roadmap_label,
   has_manager_assignee, normalize_labels, ORCHESTRA_GOVERNED_LABEL,
   clean_old_state_labels, has_orchestra_governed, should_skip_from_queue,
   normalize_assignees: Label utilities
@@ -65,6 +66,7 @@ if TYPE_CHECKING:
         ORCHESTRA_GOVERNED_LABEL,
         classify_dispatch_eligibility,
         clean_old_state_labels,
+        get_highest_priority_state,
         get_state_labels,
         has_manager_assignee,
         has_orchestra_governed,
@@ -128,6 +130,7 @@ __all__ = [
     "format_agent_actor",
     "format_dry_run_header",
     "get_git_common_dir",
+    "get_highest_priority_state",
     "get_role_block_function",
     "get_state_labels",
     "get_worktree_root",
@@ -180,6 +183,7 @@ _SYMBOL_MODULES = {
     "format_agent_actor": "vibe3.services.shared.actors",
     "format_dry_run_header": "vibe3.services.shared.actors",
     "get_git_common_dir": "vibe3.services.shared.paths",
+    "get_highest_priority_state": "vibe3.services.shared.labels",
     "get_role_block_function": "vibe3.services.shared.binding_guard",
     "get_state_labels": "vibe3.services.shared.labels",
     "get_worktree_root": "vibe3.services.shared.paths",

@@ -24,9 +24,10 @@ class StubGitHubClient:
         self._issue_body = body
         return True
 
-    def view_issue(self, issue_number: int) -> dict:
+    def view_issue(self, issue_number: int, *args, **kwargs) -> dict:
         return {
             "labels": [{"name": label} for label in self._labels],
+            "state": "OPEN",  # Default to OPEN to simulate unresolved dependency
         }
 
 
@@ -43,6 +44,15 @@ class StubLabelService:
         self.current_state = state
         return "advanced"
 
+    def get_state(self, issue_number: int) -> IssueState | None:
+        return self.current_state
+
+    def replace_issue_state(
+        self, issue_number: int, state: IssueState, *, actor: str
+    ) -> str:
+        self.current_state = state
+        return "normalized"
+
 
 def test_block_dependency_writes_to_all_three_sources(tmp_path: Path) -> None:
     """Verify dependency block writes to database, issue body, and labels."""
@@ -58,12 +68,12 @@ def test_block_dependency_writes_to_all_three_sources(tmp_path: Path) -> None:
         label_service=label_service,
     )
 
-    service.block(
+    service.set_block(
+        issue_number=123,
         branch="test-branch",
         reason=None,
-        blocked_by_issue=456,
+        tasks=[456],
         actor="executor/agent",
-        issue_number=123,
     )
 
     # Verify database
@@ -81,25 +91,37 @@ def test_block_dependency_writes_to_all_three_sources(tmp_path: Path) -> None:
     assert label_service.current_state == IssueState.BLOCKED
 
 
-def test_block_rejects_reason_and_dependency_together(tmp_path: Path) -> None:
-    """Reason and dependency metadata should remain mutually exclusive."""
+def test_block_accepts_reason_and_dependency_together(tmp_path: Path) -> None:
+    """Reason and dependency metadata can be set together."""
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
     store.update_flow_state("test-branch", flow_slug="test")
+    github = StubGitHubClient()
+    label_service = StubLabelService()
 
-    service = BlockedStateService(store=store, github_client=StubGitHubClient())
+    service = BlockedStateService(
+        store=store,
+        github_client=github,
+        label_service=label_service,
+    )
 
-    with pytest.raises(ValueError, match="mutually exclusive"):
-        service.block(
-            branch="test-branch",
-            reason="Manual block",
-            blocked_by_issue=456,
-            actor="executor/agent",
-            issue_number=123,
-        )
+    service.set_block(
+        issue_number=123,
+        branch="test-branch",
+        reason="Manual block",
+        tasks=[456],
+        actor="executor/agent",
+    )
+
+    # Verify database
+    flow_state = store.get_flow_state("test-branch")
+    assert flow_state is not None
+    assert flow_state.get("flow_status") == "blocked"
+    assert flow_state.get("blocked_reason") == "Manual block"
+    assert flow_state.get("blocked_by_issue") == 456
 
 
 def test_unblock_clears_all_three_sources(tmp_path: Path) -> None:
-    """Verify unblock() clears database, issue body, and labels."""
+    """Verify clear_block() clears database, issue body, and labels."""
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
     store.update_flow_state(
         "test-branch",
@@ -121,6 +143,7 @@ def test_unblock_clears_all_three_sources(tmp_path: Path) -> None:
         labels=["state/blocked"],
     )
     label_service = StubLabelService()
+    label_service.current_state = IssueState.BLOCKED
 
     service = BlockedStateService(
         store=store,
@@ -128,11 +151,11 @@ def test_unblock_clears_all_three_sources(tmp_path: Path) -> None:
         label_service=label_service,
     )
 
-    service.unblock(
-        branch="test-branch",
-        target_state=IssueState.READY,
-        actor="human:resume",
+    service.clear_block(
         issue_number=123,
+        branch="test-branch",
+        clear_reason=True,
+        actor="human:resume",
     )
 
     # Verify database cleared
@@ -152,8 +175,8 @@ def test_unblock_clears_all_three_sources(tmp_path: Path) -> None:
     assert label_service.current_state == IssueState.READY
 
 
-def test_sync_cache_from_truth_aligns_database(tmp_path: Path) -> None:
-    """Verify sync_cache_from_truth() aligns database to issue body truth."""
+def test_reconcile_blocked_aligns_database(tmp_path: Path) -> None:
+    """Verify reconcile_blocked() aligns database to issue body truth."""
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
     store.update_flow_state(
         "test-branch",
@@ -171,17 +194,15 @@ def test_sync_cache_from_truth_aligns_database(tmp_path: Path) -> None:
     github = StubGitHubClient(
         issue_body=issue_body_remote,
     )
+    label_service = StubLabelService()
 
     service = BlockedStateService(
         store=store,
         github_client=github,
+        label_service=label_service,
     )
 
-    state = service.sync_cache_from_truth("test-branch", 123)
-
-    # Verify state from truth
-    assert state.is_blocked
-    assert state.blocked_reason == "Remote truth"
+    service.reconcile_blocked(123, "test-branch")
 
     # Verify database synced to truth
     flow_state = store.get_flow_state("test-branch")
@@ -210,10 +231,12 @@ def test_validate_consistency_detects_mismatch(tmp_path: Path) -> None:
         issue_body=issue_body_active,
         labels=[],
     )
+    label_service = StubLabelService()
 
     service = BlockedStateService(
         store=store,
         github_client=github,
+        label_service=label_service,
     )
 
     report = service.validate_consistency("test-branch", 123)
@@ -282,29 +305,8 @@ def test_resolve_truth_fallback_to_database_on_github_failure(tmp_path: Path) ->
     assert state.blocked_reason == "DB cache truth"
 
 
-def test_block_handles_missing_issue_number(tmp_path: Path) -> None:
-    """Verify block() works without issue_number (skips body/label writes)."""
-    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
-    store.update_flow_state("test-branch", flow_slug="test")
-
-    service = BlockedStateService(store=store)
-
-    service.block(
-        branch="test-branch",
-        reason="No issue linked",
-        actor="system",
-        issue_number=None,
-    )
-
-    # Database still written
-    flow_state = store.get_flow_state("test-branch")
-    assert flow_state is not None
-    assert flow_state.get("flow_status") == "blocked"
-    assert flow_state.get("blocked_reason") == "No issue linked"
-
-
-def test_block_respects_state_machine_on_double_block(tmp_path: Path) -> None:
-    """Verify block() handles already-blocked label gracefully without force=True."""
+def test_set_block_on_double_block(tmp_path: Path) -> None:
+    """Verify set_block() handles already-blocked label gracefully."""
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
     store.update_flow_state("test-branch", flow_slug="test")
 
@@ -319,12 +321,12 @@ def test_block_respects_state_machine_on_double_block(tmp_path: Path) -> None:
         label_service=label_service,
     )
 
-    # Should not raise even though BLOCKED → BLOCKED is not in ALLOWED_TRANSITIONS
-    service.block(
+    # Should not raise even though BLOCKED -> BLOCKED is called
+    service.set_block(
+        issue_number=123,
         branch="test-branch",
         reason="Second failure",
         actor="system",
-        issue_number=123,
     )
 
     # DB and body still written; label stays BLOCKED
@@ -333,59 +335,278 @@ def test_block_respects_state_machine_on_double_block(tmp_path: Path) -> None:
     assert flow_state.get("blocked_reason") == "Second failure"
 
 
-def test_unblock_returns_result_with_label_status(tmp_path: Path) -> None:
-    """unblock() should return UnblockResult with label_cleared status."""
+def test_remove_issue_link(tmp_path: Path) -> None:
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
-    store.update_flow_state(
-        "test-branch",
-        flow_slug="test",
-        flow_status="blocked",
-        blocked_reason="Previous error",
-    )
+    store.add_issue_link("test-branch", 101, "dependency")
+    links_before = store.get_dependency_links("test-branch")
+    assert 101 in links_before
 
-    github = StubGitHubClient()
+    store.remove_issue_link("test-branch", 101, "dependency")
+    links_after = store.get_dependency_links("test-branch")
+    assert 101 not in links_after
+
+
+def test_parse_projection_merges_legacy_dependencies() -> None:
+    from vibe3.services.issue.body import parse_projection
+
+    legacy_body = (
+        "<!-- vibe3-flow-state-start -->\n\n"
+        "**Vibe3 Flow State**\n\n"
+        "- **State**: blocked\n"
+        "- **Blocked by**: #456\n"
+        "- **Dependencies**: #789, #101\n\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
+    proj = parse_projection(legacy_body)
+    # Check that legacy dependencies are merged into blocked_by
+    assert sorted(proj.blocked_by) == [101, 456, 789]
+    # Check that dependencies attribute is retired
+    assert not hasattr(proj, "dependencies")
+
+
+class TransientFailGitHub(StubGitHubClient):
+    """Simulates transient GitHub failure: first call raises, second succeeds."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._call_count = 0
+
+    def get_issue_body(self, issue_number: int) -> str | None:
+        self._call_count += 1
+        if self._call_count == 1:
+            raise RuntimeError("transient network error")
+        return super().get_issue_body(issue_number)
+
+
+def test_set_block_fails_closed_on_read_error(tmp_path: Path) -> None:
+    """set_block MUST raise on body read failure — must not write empty projection."""
+    from vibe3.services.flow.blocked_state_io import BlockedStateIO
+
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("task/issue-100", flow_slug="test")
+
+    existing_body = (
+        "## Flow State\nstate: blocked\n"
+        "blocked_reason: existing reason\nblocked_by: #456"
+    )
+    github = TransientFailGitHub(issue_body=existing_body)
     label_service = StubLabelService()
-    label_service.current_state = IssueState.BLOCKED
+    io = BlockedStateIO(
+        github_client=github,
+        label_service=label_service,
+        store=store,
+    )
+    svc = BlockedStateService(store=store)
+    svc._io = io
+
+    with pytest.raises(Exception, match="transient network error|body"):
+        svc.set_block(
+            issue_number=100,
+            branch="task/issue-100",
+            reason="new reason",
+        )
+
+    # Existing body must NOT be overwritten with empty projection
+    body_after = github.get_issue_body(100)
+    assert "existing reason" in (
+        body_after or ""
+    ), f"Existing body was overwritten. Got: {body_after!r}"
+
+
+def test_reconcile_blocked_blocked_state(tmp_path: Path) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("test-branch", flow_slug="test")
+
+    # Body has a blocked reason
+    issue_body_blocked = (
+        "<!-- vibe3-flow-state-start -->\n\n"
+        "**Vibe3 Flow State**\n\n"
+        "- **State**: blocked\n"
+        "- **Blocked reason**: Blocked by human\n\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
+    github = StubGitHubClient(issue_body=issue_body_blocked)
+    label_service = StubLabelService()
 
     svc = BlockedStateService(
         store=store, github_client=github, label_service=label_service
     )
-    result = svc.unblock(
-        branch="test-branch",
-        target_state=IssueState.READY,
-        issue_number=123,
-        detail="test",
-    )
-    assert hasattr(result, "label_cleared")
-    assert result.label_cleared is True
 
-
-def test_unblock_reports_label_failure(tmp_path: Path) -> None:
-    """unblock() should report when label write fails."""
-    from unittest.mock import MagicMock
-
-    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
-    store.update_flow_state(
-        "test-branch",
-        flow_slug="test",
-        flow_status="blocked",
-        blocked_reason="Previous error",
-    )
-
-    github = StubGitHubClient()
-    label_service = StubLabelService()
-    label_service.current_state = IssueState.BLOCKED
-
-    svc = BlockedStateService(
-        store=store, github_client=github, label_service=label_service
-    )
-    # Make label write fail
-    svc._io.write_label_state = MagicMock(side_effect=Exception("API error"))
-
-    result = svc.unblock(
-        branch="test-branch",
-        target_state=IssueState.READY,
-        issue_number=123,
-    )
-    assert result.label_cleared is False
+    # Reconcile should keep state blocked
+    target = svc.reconcile_blocked(123, "test-branch")
+    assert target is None
     assert label_service.current_state == IssueState.BLOCKED
+    assert store.get_flow_state("test-branch").get("flow_status") == "blocked"
+
+
+def test_reconcile_blocked_resume_state(tmp_path: Path) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("test-branch", flow_slug="test")
+
+    issue_body_blocked = (
+        "<!-- vibe3-flow-state-start -->\n\n"
+        "**Vibe3 Flow State**\n\n"
+        "- **State**: blocked\n"
+        "- **Blocked reason**: Blocked by human\n\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
+    github = StubGitHubClient(issue_body=issue_body_blocked)
+    label_service = StubLabelService()
+    label_service.current_state = IssueState.BLOCKED
+
+    svc = BlockedStateService(
+        store=store, github_client=github, label_service=label_service
+    )
+
+    # Reconcile with clear_reason=True should unblock and resume to READY
+    target = svc.reconcile_blocked(123, "test-branch", clear_reason=True)
+    assert target == IssueState.READY
+    assert label_service.current_state == IssueState.READY
+    assert store.get_flow_state("test-branch").get("flow_status") == "active"
+
+
+def test_reconcile_blocked_dependency_resolved(tmp_path: Path) -> None:
+    """When a dependency is resolved, reconcile_blocked unblocks the flow."""
+    from unittest.mock import patch
+
+    from vibe3.services.shared.dependency_resolution import DependencyResolution
+
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state(
+        "test-branch",
+        flow_slug="test",
+        flow_status="blocked",
+        blocked_by_issue=456,
+    )
+    store.add_issue_link("test-branch", 456, "dependency")
+
+    issue_body_blocked = (
+        "<!-- vibe3-flow-state-start -->\n\n"
+        "**Vibe3 Flow State**\n\n"
+        "- **State**: blocked\n"
+        "- **Blocked by**: #456\n\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
+    github = StubGitHubClient(issue_body=issue_body_blocked)
+    label_service = StubLabelService()
+    label_service.current_state = IssueState.BLOCKED
+
+    svc = BlockedStateService(
+        store=store, github_client=github, label_service=label_service
+    )
+
+    # Mock DependencyResolutionService.is_dependency_resolved to return resolved=True
+    with patch(
+        "vibe3.services.shared.dependency_resolution.DependencyResolutionService.is_dependency_resolved"
+    ) as mock_resolved:
+        mock_resolved.return_value = DependencyResolution(
+            resolved=True,
+            issue_number=456,
+            github_state="CLOSED",
+        )
+
+        target = svc.reconcile_blocked(123, "test-branch")
+
+    # Verify reconciliation unblocked the flow and updated target
+    assert target == IssueState.READY
+    assert label_service.current_state == IssueState.READY
+
+    # Verify database flow_state cache is updated
+    flow_state = store.get_flow_state("test-branch")
+    assert flow_state is not None
+    assert flow_state.get("flow_status") == "active"
+    assert flow_state.get("blocked_by_issue") is None
+
+    # Verify database flow_issue_links cache is cleared
+    links = store.get_dependency_links("test-branch")
+    assert 456 not in links
+    assert len(links) == 0
+
+
+def test_reconcile_degraded_stays_blocked(tmp_path: Path) -> None:
+    """Degraded mode (GitHub read fails) must not be misjudged as "recovered".
+
+    When GitHub is unreachable, reconcile_blocked returns None (conservative
+    block) and must NOT rebuild the cache or flip flow_status to active.
+    """
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state(
+        "task/issue-100",
+        flow_slug="issue-100",
+        flow_status="blocked",
+        blocked_reason="Manual intervention",
+    )
+
+    github = MagicMock()
+    github.get_issue_body.side_effect = Exception("GitHub API unavailable")
+
+    svc = BlockedStateService(store=store, github_client=github)
+
+    target = svc.reconcile_blocked(
+        100, "task/issue-100", clear_reason=False, actor="orchestra:dispatcher"
+    )
+
+    # None = stay blocked, caller must not interpret as recovered
+    assert target is None
+
+    # flow_status must NOT have been flipped to active during degraded mode
+    flow_state = store.get_flow_state("task/issue-100")
+    assert flow_state is not None
+    assert flow_state.get("flow_status") == "blocked"
+
+
+class TrackingLabelService(StubLabelService):
+    """Track all confirm_issue_state calls."""
+
+    def __init__(self):
+        super().__init__()
+        self.confirm_calls: list[tuple[int, IssueState, str, bool]] = []
+
+    def confirm_issue_state(
+        self,
+        issue_number: int,
+        state: IssueState,
+        actor: str = "system",
+        force: bool = False,
+    ) -> str:
+        self.confirm_calls.append((issue_number, state, actor, force))
+        return super().confirm_issue_state(issue_number, state, actor, force)
+
+
+def test_reconcile_blocked_restores_missing_remote_label(tmp_path: Path) -> None:
+    """Label must be written when body/cache are blocked but remote label missing."""
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("task/issue-100", flow_slug="test")
+    # Pre-populate cache to look "already blocked"
+    store.update_flow_state(
+        "task/issue-100",
+        flow_status="blocked",
+        blocked_reason="some reason",
+    )
+
+    # Body is also blocked (no open dependencies, but blocked_reason is set)
+    issue_body_blocked = (
+        "<!-- vibe3-flow-state-start -->\n\n"
+        "**Vibe3 Flow State**\n\n"
+        "- **State**: blocked\n"
+        "- **Blocked reason**: some reason\n\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
+    github = StubGitHubClient(issue_body=issue_body_blocked)
+    label_service = TrackingLabelService()
+
+    svc = BlockedStateService(
+        store=store,
+        github_client=github,
+        label_service=label_service,
+    )
+
+    svc.reconcile_blocked(100, "task/issue-100", clear_reason=False)
+
+    assert len(label_service.confirm_calls) > 0, (
+        "Expected confirm_issue_state to be called with IssueState.BLOCKED "
+        "when remote label is missing, but no calls happened"
+    )
+    assert (
+        label_service.confirm_calls[-1][1] == IssueState.BLOCKED
+    ), f"Last label call was {label_service.confirm_calls[-1][1]}, expected BLOCKED"

@@ -9,7 +9,6 @@ def test_default_projection():
     assert proj.state == "active"
     assert proj.blocked_by == []
     assert proj.blocked_reason is None
-    assert proj.dependencies == []
     assert proj.is_empty()
 
 
@@ -23,10 +22,3 @@ def test_blocked_projection():
     assert not proj.is_empty()
     assert proj.state == "blocked"
     assert proj.blocked_by == [123, 456]
-
-
-def test_dependencies_projection():
-    """Test dependencies are tracked."""
-    proj = FlowStateProjection(dependencies=[789])
-    assert not proj.is_empty()
-    assert proj.dependencies == [789]

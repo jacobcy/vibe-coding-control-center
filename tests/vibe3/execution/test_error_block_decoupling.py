@@ -9,7 +9,7 @@ Phase 3 verification tests.
 
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -27,6 +27,24 @@ def temp_db():
         db_path = Path(tmpdir) / "test.db"
         store = SQLiteClient(str(db_path))
         yield store
+
+
+def _make_tracking_github() -> MagicMock:
+    """Create a GitHub mock with tracking issue body for use with block_flow."""
+    _body: str = "User content"
+    mock_gh = MagicMock()
+
+    def _get(issue_number: int) -> str | None:
+        return _body
+
+    def _update(issue_number: int, body: str) -> bool:
+        nonlocal _body
+        _body = body
+        return True
+
+    mock_gh.get_issue_body.side_effect = _get
+    mock_gh.update_issue_body.side_effect = _update
+    return mock_gh
 
 
 class TestDatabaseErrorDoesNotTriggerBlock:
@@ -204,11 +222,28 @@ class TestDependencyNotSatisfiedTriggersBlock:
 
         temp_db.update_flow_state(branch, flow_slug="test")
 
-        FlowService(store=temp_db).block_flow(
-            branch=branch,
-            reason="Blocked by unresolved dependencies",
-            actor="test",
-        )
+        with (
+            patch(
+                "vibe3.services.flow.blocked_state_io.GitHubClient",
+                return_value=_make_tracking_github(),
+            ),
+            patch(
+                "vibe3.services.flow.blocked_state_io.LabelService"
+            ) as mock_label_cls,
+            patch(
+                "vibe3.services.issue.flow.IssueFlowService.resolve_task_issue_number",
+                return_value=123,
+            ),
+        ):
+            mock_label = MagicMock()
+            mock_label.confirm_issue_state.return_value = "advanced"
+            mock_label_cls.return_value = mock_label
+
+            FlowService(store=temp_db).block_flow(
+                branch=branch,
+                reason="Blocked by unresolved dependencies",
+                actor="test",
+            )
 
         flow_state_after = temp_db.get_flow_state(branch)
         assert flow_state_after is not None
@@ -248,11 +283,28 @@ class TestErrorBlockOrthogonality:
 
         temp_db.update_flow_state(branch, flow_slug="test")
 
-        FlowService(store=temp_db).block_flow(
-            branch=branch,
-            reason="Business logic block",
-            actor="test",
-        )
+        with (
+            patch(
+                "vibe3.services.flow.blocked_state_io.GitHubClient",
+                return_value=_make_tracking_github(),
+            ),
+            patch(
+                "vibe3.services.flow.blocked_state_io.LabelService"
+            ) as mock_label_cls,
+            patch(
+                "vibe3.services.issue.flow.IssueFlowService.resolve_task_issue_number",
+                return_value=123,
+            ),
+        ):
+            mock_label = MagicMock()
+            mock_label.confirm_issue_state.return_value = "advanced"
+            mock_label_cls.return_value = mock_label
+
+            FlowService(store=temp_db).block_flow(
+                branch=branch,
+                reason="Business logic block",
+                actor="test",
+            )
 
         flow_state_after = temp_db.get_flow_state(branch)
         assert flow_state_after is not None

@@ -78,8 +78,8 @@ class TestAutoResumePreservesWorktree:
                 label_state="ready",
             )
 
-            # Verify BlockedStateService.unblock was called (unified method)
-            mock_service.unblock.assert_called_once()
+            # Verify BlockedStateService.reconcile_blocked was called (unified method)
+            mock_service.reconcile_blocked.assert_called_once()
 
 
 class TestAutoResumeRestoresInferredState:

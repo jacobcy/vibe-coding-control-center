@@ -442,13 +442,14 @@ def test_dependency_check_reports_unresolved_warnings(tmp_path: Path) -> None:
 
     # Mock GitHub client
     mock_github = MagicMock(spec=GitHubClient)
-    # Task issue is open
+    # Task issue is open; body has state/active so reconcile rules short-circuit
     mock_github.view_issue.side_effect = lambda issue_num: {
         "state": "OPEN",
         "title": "Test Issue",
         "body": "",
         "labels": [],
     }
+    mock_github.get_issue_body.return_value = ""  # active projection, no blocked state
     mock_github.list_all_prs.return_value = []
     mock_github.list_prs_for_branch.return_value = []
 
@@ -469,8 +470,8 @@ def test_dependency_check_reports_unresolved_warnings(tmp_path: Path) -> None:
         mock_resolver = MagicMock()
         mock_resolver_cls.return_value = mock_resolver
         mock_resolver.resolve_coordination.return_value = CoordinationTruth(
-            dependencies=[200],
-            dependencies_source=DataSource.LOCAL_SQLITE,
+            blocked_by_issues=[200],
+            blocked_by_issue_source=DataSource.LOCAL_SQLITE,
         )
 
         # Need to update view_issue side_effect to handle dependency issue

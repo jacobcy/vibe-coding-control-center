@@ -54,12 +54,3 @@ class ConsistencyReport:
     def authoritative_state(self) -> BlockedState:
         """Returns the truth-source state (issue body)."""
         return self.body_state
-
-
-@dataclass(frozen=True)
-class UnblockResult:
-    """Outcome of an unblock operation."""
-
-    body_cleared: bool = True
-    db_cleared: bool = True
-    label_cleared: bool = True

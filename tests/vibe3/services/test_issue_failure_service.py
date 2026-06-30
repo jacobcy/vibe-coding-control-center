@@ -74,16 +74,29 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
                 mock_timeline_class.return_value = mock_timeline
 
                 with patch(
-                    "vibe3.services.shared.label_service.LabelService"
+                    "vibe3.services.flow.blocked_state_io.LabelService"
                 ) as mock_label_service_class:
                     mock_label_service = MagicMock()
                     mock_label_service_class.return_value = mock_label_service
+                    mock_label_service.confirm_issue_state.return_value = "advanced"
 
                     with patch(
                         "vibe3.services.flow.blocked_state_io.GitHubClient"
                     ) as mock_github_class:
+                        # Use tracking body so reconcile_blocked can read updated state
+                        _body: str = "User content"
                         mock_github = MagicMock()
-                        mock_github.get_issue_body.return_value = "User content"
+
+                        def _get_body(issue_number: int) -> str | None:
+                            return _body
+
+                        def _update_body(issue_number: int, body: str) -> bool:
+                            nonlocal _body
+                            _body = body
+                            return True
+
+                        mock_github.get_issue_body.side_effect = _get_body
+                        mock_github.update_issue_body.side_effect = _update_body
                         mock_github_class.return_value = mock_github
 
                         block_manager_noop_issue(
@@ -121,12 +134,31 @@ def test_block_flow_uses_new_fields():
                 "vibe3.services.flow.blocked_state_io.GitHubClient"
             ) as mock_github_class,
             patch(
+                "vibe3.services.flow.blocked_state_io.LabelService"
+            ) as mock_label_class,
+            patch(
                 "vibe3.services.flow.event_projection.SQLiteClient", return_value=store
             ),
         ):
             mock_github = MagicMock()
-            mock_github.get_issue_body.return_value = "User content"
+            # Use tracking body so reconcile_blocked can read updated state
+            _body_dep: str = "User content"
+
+            def _get_body_dep(issue_number: int) -> str | None:
+                return _body_dep
+
+            def _update_body_dep(issue_number: int, body: str) -> bool:
+                nonlocal _body_dep
+                _body_dep = body
+                return True
+
+            mock_github.get_issue_body.side_effect = _get_body_dep
+            mock_github.update_issue_body.side_effect = _update_body_dep
             mock_github_class.return_value = mock_github
+
+            mock_label = MagicMock()
+            mock_label.confirm_issue_state.return_value = "advanced"
+            mock_label_class.return_value = mock_label
 
             # Register projection hook to test timeline event creation
             from vibe3.models import EventPublisher
@@ -173,6 +205,7 @@ def test_block_flow_writes_body_label_and_cache():
             "vibe3.services.flow.blocked_state_io.LabelService"
         ) as mock_label_cls:
             mock_label = MagicMock()
+            mock_label.confirm_issue_state.return_value = "advanced"
             mock_label_cls.return_value = mock_label
 
             with patch(
@@ -185,7 +218,19 @@ def test_block_flow_writes_body_label_and_cache():
                     "vibe3.services.flow.blocked_state_io.GitHubClient"
                 ) as mock_github_class:
                     mock_github = MagicMock()
-                    mock_github.get_issue_body.return_value = "User content"
+                    # Use tracking body so reconcile_blocked can read updated state
+                    _body_health: str = "User content"
+
+                    def _get_body_health(issue_number: int) -> str | None:
+                        return _body_health
+
+                    def _update_body_health(issue_number: int, body: str) -> bool:
+                        nonlocal _body_health
+                        _body_health = body
+                        return True
+
+                    mock_github.get_issue_body.side_effect = _get_body_health
+                    mock_github.update_issue_body.side_effect = _update_body_health
                     mock_github_class.return_value = mock_github
 
                     flow_service.block_flow(

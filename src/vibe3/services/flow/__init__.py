@@ -4,6 +4,7 @@ Public API Contract:
 - FlowService: Main flow orchestration service
 - FlowCategory, FlowState, classify_flow, get_flow_state: Flow classification
 - BlockedStateService, BlockedState, BlockedStateIO: Blocked state management
+- ConsistencyReport: Consistency validation
 - FlowCleanupService, FlowRecoveryService: Cleanup and recovery
 - FlowProjection, FlowProjectionService: Flow projections
 - FlowRebuildUsecase, FlowStatusService, FlowStatusResolver: Core utilities
@@ -23,7 +24,6 @@ if TYPE_CHECKING:
     from vibe3.services.flow.blocked_state_types import (
         BlockedState,
         ConsistencyReport,
-        UnblockResult,
     )
     from vibe3.services.flow.branch_resolution import (
         resolve_branch_and_issue,
@@ -56,7 +56,6 @@ __all__ = [
     "BlockedStateIO",
     "BlockedStateService",
     "ConsistencyReport",
-    "UnblockResult",
     "FlowCategory",
     "FlowState",
     "classify_flow",
@@ -85,7 +84,6 @@ _SYMBOL_MODULES = {
     "BlockedStateIO": "vibe3.services.flow.blocked_state_io",
     "BlockedStateService": "vibe3.services.flow.blocked_state_service",
     "ConsistencyReport": "vibe3.services.flow.blocked_state_types",
-    "UnblockResult": "vibe3.services.flow.blocked_state_types",
     "FlowCategory": "vibe3.services.flow.classifier",
     "FlowState": "vibe3.services.flow.classifier",
     "classify_flow": "vibe3.services.flow.classifier",

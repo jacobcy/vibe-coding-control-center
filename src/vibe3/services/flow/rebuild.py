@@ -148,30 +148,21 @@ class FlowRebuildUsecase:
         Post-rebuild: consistency is guaranteed (we just rebuilt), so we
         skip the classify step and go straight to clearing blocked state.
         """
-        from vibe3.models import FlowState, IssueState
+        from loguru import logger
+
         from vibe3.services.flow.blocked_state_service import BlockedStateService
-        from vibe3.services.flow.resume_resolver import infer_resume_label
 
-        # Determine target state from rebuilt flow
-        fs_dict = self.store.get_flow_state(branch)
-        if fs_dict:
-            target_state = infer_resume_label(FlowState.model_validate(fs_dict))
-        else:
-            target_state = IssueState.READY
-
-        result = BlockedStateService(
+        target = BlockedStateService(
             github_client=self.github_client,
             store=self.store,
-        ).unblock(
-            branch=branch,
-            target_state=target_state,
+        ).reconcile_blocked(
             issue_number=issue_number,
-            detail=f"Rebuilt and resumed: {reason}",
+            branch=branch,
+            clear_reason=True,
+            actor="vibe3:flow_rebuild",
         )
 
-        if not result.label_cleared:
-            from loguru import logger
-
+        if target is None:
             logger.bind(
                 domain="recovery",
                 branch=branch,

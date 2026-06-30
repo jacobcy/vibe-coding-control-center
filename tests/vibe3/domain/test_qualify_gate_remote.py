@@ -70,15 +70,13 @@ class TestRemoteBlockedReason:
     def test_qualify_gate_uses_remote_blocked_reason(
         self, qualify_gate_service, sample_issue, mock_store
     ):
-        """Verify remote blocked_reason is used when available."""
+        """Verify reconcile_blocked called with remote blocked_reason."""
         # Mock CoordinationResolver to return remote blocked_reason
         mock_truth = CoordinationTruth(
             blocked_reason="Remote block from issue body",
             blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
-            blocked_by_issue=None,
+            blocked_by_issues=[],
             blocked_by_issue_source=None,
-            dependencies=[],
-            dependencies_source=None,
             worktree_path="/tmp/worktree",
             actor="executor",
         )
@@ -88,10 +86,12 @@ class TestRemoteBlockedReason:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_service = Mock()
+            mock_bss = Mock()
+            mock_bss.reconcile_blocked.return_value = None
+
             with patch(
-                "vibe3.services.LabelService",
-                return_value=mock_label_service,
+                "vibe3.domain.qualify_gate.BlockedStateService",
+                return_value=mock_bss,
             ):
                 flow_state = {"status": "active"}
 
@@ -104,15 +104,11 @@ class TestRemoteBlockedReason:
                 )
 
                 assert result is None
-                mock_store.update_flow_state.assert_called_once_with(
+                mock_bss.reconcile_blocked.assert_called_once_with(
+                    123,
                     "task/issue-123-test",
-                    flow_status="blocked",
-                    blocked_reason="Remote block from issue body",
-                    blocked_by_issue=None,
-                    latest_actor="system:qualify_gate",
-                )
-                mock_label_service.confirm_issue_state.assert_called_once_with(
-                    123, IssueState.BLOCKED, actor="orchestra:qualify_gate", force=True
+                    clear_reason=False,
+                    actor="orchestra:dispatcher",
                 )
 
                 # Verify CoordinationResolver was called
@@ -123,15 +119,13 @@ class TestRemoteBlockedReason:
     def test_qualify_gate_fallback_to_local_blocked_reason(
         self, qualify_gate_service, sample_issue, mock_store
     ):
-        """Verify fallback to local blocked_reason when remote unavailable."""
+        """Verify reconcile_blocked called with local blocked_reason."""
         # Mock CoordinationResolver to return local blocked_reason (degraded mode)
         mock_truth = CoordinationTruth(
             blocked_reason="Local block from SQLite",
             blocked_reason_source=DataSource.LOCAL_SQLITE,
-            blocked_by_issue=None,
+            blocked_by_issues=[],
             blocked_by_issue_source=None,
-            dependencies=[],
-            dependencies_source=None,
             worktree_path="/tmp/worktree",
             actor="executor",
         )
@@ -141,10 +135,12 @@ class TestRemoteBlockedReason:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_service = Mock()
+            mock_bss = Mock()
+            mock_bss.reconcile_blocked.return_value = None
+
             with patch(
-                "vibe3.services.LabelService",
-                return_value=mock_label_service,
+                "vibe3.domain.qualify_gate.BlockedStateService",
+                return_value=mock_bss,
             ):
                 flow_state = {"status": "active"}
 
@@ -157,16 +153,7 @@ class TestRemoteBlockedReason:
                 )
 
                 assert result is None
-                mock_store.update_flow_state.assert_called_once_with(
-                    "task/issue-123-test",
-                    flow_status="blocked",
-                    blocked_reason="Local block from SQLite",
-                    blocked_by_issue=None,
-                    latest_actor="system:qualify_gate",
-                )
-                mock_label_service.confirm_issue_state.assert_called_once_with(
-                    123, IssueState.BLOCKED, actor="orchestra:qualify_gate", force=True
-                )
+                mock_bss.reconcile_blocked.assert_called_once()
 
 
 class TestRemoteDependencies:
@@ -180,10 +167,8 @@ class TestRemoteDependencies:
         mock_truth = CoordinationTruth(
             blocked_reason=None,
             blocked_reason_source=None,
-            blocked_by_issue=None,
-            blocked_by_issue_source=None,
-            dependencies=[456, 789],  # Remote dependencies
-            dependencies_source=DataSource.ISSUE_BODY_FALLBACK,
+            blocked_by_issues=[456, 789],  # Remote dependencies
+            blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
             worktree_path=None,
             actor="executor",
         )
@@ -193,21 +178,13 @@ class TestRemoteDependencies:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            # Mock dependency satisfaction check (both unresolved)
-            qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
+            # Mock store returns None -> blocked code path returns None
+            mock_bss = Mock()
+            mock_bss.reconcile_blocked.return_value = None
 
-            # Mock store methods for FlowService.block_flow()
-            mock_store.get_flow_state.return_value = {
-                "branch": "task/issue-123-test",
-                "flow_status": "active",
-            }
-            mock_store.get_issue_links.return_value = []
-            mock_github.get_issue_body.return_value = "User content"
-
-            mock_label_service = Mock()
             with patch(
-                "vibe3.services.LabelService",
-                return_value=mock_label_service,
+                "vibe3.domain.qualify_gate.BlockedStateService",
+                return_value=mock_bss,
             ):
                 flow_state = {"status": "active"}
 
@@ -219,10 +196,8 @@ class TestRemoteDependencies:
                     trigger_state=IssueState.IN_PROGRESS,
                 )
 
-                # Verify blocked by remote dependencies
                 assert result is None
-                mock_store.update_flow_state.assert_called()
-                # BlockedStateService handles label updates internally
+                mock_bss.reconcile_blocked.assert_called_once()
 
                 # Verify CoordinationResolver was called
                 qualify_gate_service._coordination_resolver.resolve_coordination.assert_called_once_with(
@@ -237,10 +212,8 @@ class TestRemoteDependencies:
         mock_truth = CoordinationTruth(
             blocked_reason=None,
             blocked_reason_source=None,
-            blocked_by_issue=None,
-            blocked_by_issue_source=None,
-            dependencies=[456],  # Local dependencies
-            dependencies_source=DataSource.LOCAL_SQLITE,
+            blocked_by_issues=[456],  # Local dependencies
+            blocked_by_issue_source=DataSource.LOCAL_SQLITE,
             worktree_path=None,
             actor="executor",
         )
@@ -250,21 +223,12 @@ class TestRemoteDependencies:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            # Mock dependency satisfaction check (unresolved)
-            qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
+            mock_bss = Mock()
+            mock_bss.reconcile_blocked.return_value = None
 
-            # Mock store methods for FlowService.block_flow()
-            mock_store.get_flow_state.return_value = {
-                "branch": "task/issue-123-test",
-                "flow_status": "active",
-            }
-            mock_store.get_issue_links.return_value = []
-            mock_github.get_issue_body.return_value = "User content"
-
-            mock_label_service = Mock()
             with patch(
-                "vibe3.services.LabelService",
-                return_value=mock_label_service,
+                "vibe3.domain.qualify_gate.BlockedStateService",
+                return_value=mock_bss,
             ):
                 flow_state = {"status": "active"}
 
@@ -276,26 +240,22 @@ class TestRemoteDependencies:
                     trigger_state=IssueState.IN_PROGRESS,
                 )
 
-                # Verify still blocked by local dependencies
                 assert result is None
-                mock_store.update_flow_state.assert_called()
-                # BlockedStateService handles label updates internally
+                mock_bss.reconcile_blocked.assert_called_once()
 
     def test_qualify_gate_remote_blocked_by_issue(
         self, qualify_gate_service, sample_issue, mock_store
     ):
-        """Body truth blocked_by_issue means is_blocked → align and skip.
+        """Body truth blocked_by_issue triggers reconcile_blocked.
 
-        When remote body truth has blocked_by_issues=[456], the qualify gate
-        treats the issue as blocked, aligns local cache + label, and skips.
+        When remote body truth has blocked_by_issues=[456], blocked_signal
+        triggers reconcile_blocked.
         """
         mock_truth = CoordinationTruth(
             blocked_reason=None,
             blocked_reason_source=None,
             blocked_by_issues=[456],
             blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
-            dependencies=[],
-            dependencies_source=None,
             worktree_path=None,
             actor="executor",
         )
@@ -305,10 +265,12 @@ class TestRemoteDependencies:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_service = Mock()
+            mock_bss = Mock()
+            mock_bss.reconcile_blocked.return_value = None
+
             with patch(
-                "vibe3.services.LabelService",
-                return_value=mock_label_service,
+                "vibe3.domain.qualify_gate.BlockedStateService",
+                return_value=mock_bss,
             ):
                 flow_state = {"status": "active"}
 
@@ -321,15 +283,11 @@ class TestRemoteDependencies:
                 )
 
                 assert result is None
-                mock_store.update_flow_state.assert_called_once_with(
+                mock_bss.reconcile_blocked.assert_called_once_with(
+                    123,
                     "task/issue-123-test",
-                    flow_status="blocked",
-                    blocked_reason=None,
-                    blocked_by_issue=456,
-                    latest_actor="system:qualify_gate",
-                )
-                mock_label_service.confirm_issue_state.assert_called_once_with(
-                    123, IssueState.BLOCKED, actor="orchestra:qualify_gate", force=True
+                    clear_reason=False,
+                    actor="orchestra:dispatcher",
                 )
 
 
@@ -341,10 +299,8 @@ class TestProvenanceTracking:
         mock_truth = CoordinationTruth(
             blocked_reason="Remote block",
             blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
-            blocked_by_issue=None,
+            blocked_by_issues=[],
             blocked_by_issue_source=None,
-            dependencies=[],
-            dependencies_source=None,
             worktree_path="/tmp/worktree",
             actor="executor",
         )
@@ -376,10 +332,8 @@ class TestProvenanceTracking:
         mock_truth = CoordinationTruth(
             blocked_reason=None,
             blocked_reason_source=None,
-            blocked_by_issue=None,
-            blocked_by_issue_source=None,
-            dependencies=[456],
-            dependencies_source=DataSource.LOCAL_SQLITE,
+            blocked_by_issues=[456],
+            blocked_by_issue_source=DataSource.LOCAL_SQLITE,
             worktree_path="/tmp/worktree",
             actor="executor",
         )
@@ -389,19 +343,12 @@ class TestProvenanceTracking:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
-
-            # Mock store methods for FlowService.block_flow()
-            qualify_gate_service._store.get_flow_state.return_value = {
-                "branch": "task/issue-123-test",
-                "flow_status": "active",
-            }
-            qualify_gate_service._store.get_issue_links.return_value = []
-            qualify_gate_service._github.get_issue_body.return_value = "User content"
+            mock_bss = Mock()
+            mock_bss.reconcile_blocked.return_value = None
 
             with patch(
-                "vibe3.services.LabelService",
-                return_value=Mock(),
+                "vibe3.domain.qualify_gate.BlockedStateService",
+                return_value=mock_bss,
             ):
                 flow_state = {"status": "active"}
 
@@ -417,7 +364,7 @@ class TestProvenanceTracking:
                 truth = (
                     qualify_gate_service._coordination_resolver.resolve_coordination.return_value
                 )
-                assert truth.dependencies_source == DataSource.LOCAL_SQLITE
+                assert truth.blocked_by_issue_source == DataSource.LOCAL_SQLITE
 
 
 class TestE2EBlockedReconciliation:
@@ -447,10 +394,8 @@ class TestE2EBlockedReconciliation:
             projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
             blocked_reason="API design pending",
             blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
-            blocked_by_issue=None,
+            blocked_by_issues=[],
             blocked_by_issue_source=None,
-            dependencies=[],
-            dependencies_source=None,
             worktree_path=None,
             actor=None,
         )
@@ -460,10 +405,12 @@ class TestE2EBlockedReconciliation:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_service = Mock()
+            mock_bss = Mock()
+            mock_bss.reconcile_blocked.return_value = None
+
             with patch(
-                "vibe3.services.LabelService",
-                return_value=mock_label_service,
+                "vibe3.domain.qualify_gate.BlockedStateService",
+                return_value=mock_bss,
             ):
                 result = qualify_gate.run_qualify_gate(
                     issue=sample_issue,
@@ -474,19 +421,15 @@ class TestE2EBlockedReconciliation:
                 )
 
                 assert result is None
-                mock_store.update_flow_state.assert_called_once_with(
+                mock_bss.reconcile_blocked.assert_called_once_with(
+                    123,
                     "task/issue-994",
-                    flow_status="blocked",
-                    blocked_reason="API design pending",
-                    blocked_by_issue=None,
-                    latest_actor="system:qualify_gate",
-                )
-                mock_label_service.confirm_issue_state.assert_called_once_with(
-                    123, IssueState.BLOCKED, actor="orchestra:qualify_gate", force=True
+                    clear_reason=False,
+                    actor="orchestra:dispatcher",
                 )
 
     def test_blocked_label_body_active_with_cache(self, mock_store, sample_issue):
-        """state/blocked + body active + local blocked cache → auto-resume."""
+        """Blocked label + active body -> reconcile returns target."""
         config = OrchestraConfig(repo="test/repo")
         github = Mock()
         github.get_issue_body.return_value = "User content"
@@ -500,56 +443,49 @@ class TestE2EBlockedReconciliation:
             projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
             blocked_reason=None,
             blocked_reason_source=None,
-            blocked_by_issue=None,
+            blocked_by_issues=[],
             blocked_by_issue_source=None,
-            dependencies=[],
-            dependencies_source=None,
             worktree_path=None,
             actor="executor",
         )
 
         flow_state = {"blocked_reason": "Health check failed"}
 
-        # After auto-resume clears local cache, get_flow_state returns None
-        # so qualify-gate returns the auto-resume target label directly
-        mock_store.get_flow_state = Mock(return_value=None)
+        # After reconcile unblocks, get_flow_state returns active flow
+        mock_store.get_flow_state = Mock(return_value={"flow_status": "active"})
 
         with patch.object(
             qualify_gate._coordination_resolver,
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            from vibe3.models.flow import FlowState
+            mock_bss = Mock()
+            mock_bss.reconcile_blocked.return_value = IssueState.IN_PROGRESS
 
-            with patch.object(FlowState, "model_validate") as mock_validate:
-                mock_fs = Mock()
-                mock_fs.status = "active"
-                mock_validate.return_value = mock_fs
+            with patch(
+                "vibe3.domain.qualify_gate.BlockedStateService",
+                return_value=mock_bss,
+            ):
+                result = qualify_gate.run_qualify_gate(
+                    issue=sample_issue,
+                    branch="task/issue-123",
+                    flow_state=flow_state,
+                    labels=["state/blocked"],
+                    trigger_state=IssueState.BLOCKED,
+                )
 
-                with patch(
-                    "vibe3.domain.qualify_gate.infer_resume_label",
-                    return_value=IssueState.IN_PROGRESS,
-                ):
-                    with patch(
-                        "vibe3.domain.qualify_gate.TaskResumeOperations"
-                    ) as mock_operations_cls:
-                        mock_operations = Mock()
-                        mock_operations_cls.return_value = mock_operations
-
-                        result = qualify_gate.run_qualify_gate(
-                            issue=sample_issue,
-                            branch="task/issue-123",
-                            flow_state=flow_state,
-                            labels=["state/blocked"],
-                            trigger_state=IssueState.BLOCKED,
-                        )
-
-                        assert result == IssueState.IN_PROGRESS
+                assert result == IssueState.IN_PROGRESS
+                mock_bss.reconcile_blocked.assert_called_once_with(
+                    123,
+                    "task/issue-123",
+                    clear_reason=False,
+                    actor="orchestra:dispatcher",
+                )
 
     def test_issue_994_style_drift_alignment(self, mock_store, sample_issue):
         """#994: local flow missing, remote body blocked, label ready.
 
-        Expected: blocked truth wins, not dispatched, state is repaired.
+        Expected: blocked truth wins, not dispatched, reconcile_blocked called.
         """
         config = OrchestraConfig(repo="test/repo")
         github = Mock()
@@ -565,8 +501,6 @@ class TestE2EBlockedReconciliation:
             blocked_reason_source=None,
             blocked_by_issues=[456],
             blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
-            dependencies=[456],
-            dependencies_source=DataSource.ISSUE_BODY_FALLBACK,
             worktree_path=None,
             actor=None,
         )
@@ -576,10 +510,12 @@ class TestE2EBlockedReconciliation:
             "resolve_coordination",
             return_value=mock_truth,
         ):
-            mock_label_service = Mock()
+            mock_bss = Mock()
+            mock_bss.reconcile_blocked.return_value = None
+
             with patch(
-                "vibe3.services.LabelService",
-                return_value=mock_label_service,
+                "vibe3.domain.qualify_gate.BlockedStateService",
+                return_value=mock_bss,
             ):
                 result = qualify_gate.run_qualify_gate(
                     issue=sample_issue,
@@ -590,13 +526,105 @@ class TestE2EBlockedReconciliation:
                 )
 
                 assert result is None
-                mock_store.update_flow_state.assert_called_once_with(
+                mock_bss.reconcile_blocked.assert_called_once_with(
+                    123,
                     "task/issue-994",
-                    flow_status="blocked",
-                    blocked_reason=None,
-                    blocked_by_issue=456,
-                    latest_actor="system:qualify_gate",
+                    clear_reason=False,
+                    actor="orchestra:dispatcher",
                 )
-                mock_label_service.confirm_issue_state.assert_called_once_with(
-                    123, IssueState.BLOCKED, actor="orchestra:qualify_gate", force=True
+
+
+class TestConvergedDispatchGate:
+    """End-to-end tests for the converged run_qualify_gate -> reconcile path.
+
+    Guards against regression where the main dispatch gate bypasses
+    reconcile_blocked or wrongly dispatches when body truth says blocked
+    with an unresolved dependency.
+    """
+
+    def test_blocked_body_unclosed_dep_no_dispatch_no_link_clear(self, tmp_path):
+        """label=blocked + body=blocked + dep #456 unclosed -> no dispatch,
+        flow stays blocked, dependency binding preserved."""
+        from vibe3.clients.sqlite_client import SQLiteClient
+
+        class StubGitHub:
+            def __init__(self):
+                self._body = (
+                    "<!-- vibe3-flow-state-start -->\n\n"
+                    "**Vibe3 Flow State**\n\n"
+                    "- **State**: blocked\n"
+                    "- **Blocked by**: #456\n\n"
+                    "<!-- vibe3-flow-state-end -->"
                 )
+
+            def get_issue_body(self, issue_number):
+                return self._body
+
+            def update_issue_body(self, issue_number, body):
+                self._body = body
+                return True
+
+            def view_issue(self, issue_number, **kwargs):
+                # Dependency #456 is OPEN (unresolved)
+                return {"labels": [], "state": "OPEN"}
+
+            def list_prs_for_branch(self, branch):
+                return []
+
+        store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+        store.update_flow_state(
+            "task/issue-100",
+            flow_slug="issue-100",
+            flow_status="blocked",
+            blocked_by_issue=456,
+        )
+        store.add_issue_link("task/issue-100", 456, "dependency")
+
+        qualify_gate = QualifyGateService(
+            config=OrchestraConfig(repo="test/repo"),
+            github=StubGitHub(),
+            store=store,
+            flow_manager=Mock(),
+        )
+
+        issue = IssueInfo(
+            number=100,
+            title="Blocked Issue",
+            state=IssueState.BLOCKED,
+            labels=["state/blocked"],
+        )
+
+        mock_truth = CoordinationTruth(
+            projection_state="blocked",
+            projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
+            blocked_reason=None,
+            blocked_reason_source=None,
+            blocked_by_issues=[456],
+            blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
+            worktree_path=None,
+            actor=None,
+        )
+
+        with patch.object(
+            qualify_gate._coordination_resolver,
+            "resolve_coordination",
+            return_value=mock_truth,
+        ):
+            result = qualify_gate.run_qualify_gate(
+                issue=issue,
+                branch="task/issue-100",
+                flow_state={"flow_status": "blocked"},
+                labels=["state/blocked"],
+                trigger_state=IssueState.READY,
+            )
+
+        # No dispatch — body truth says blocked with unclosed dep
+        assert result is None
+
+        # Flow stays blocked (reconcile did not flip it)
+        flow_state = store.get_flow_state("task/issue-100")
+        assert flow_state is not None
+        assert flow_state.get("flow_status") == "blocked"
+
+        # Dependency binding preserved — reconcile did not clear it
+        assert 456 in store.get_dependency_links("task/issue-100")

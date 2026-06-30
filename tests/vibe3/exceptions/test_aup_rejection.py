@@ -163,9 +163,10 @@ class TestAUPRejectionRetryCounter:
         from vibe3.services.flow import BlockedStateService
 
         reason = f"AUP rejection threshold reached ({count}/3 attempts)"
-        BlockedStateService(store=temp_store).block_state_only(
+        BlockedStateService(store=temp_store).write_cache(
             branch=branch,
             reason=reason,
+            blocked_by_issue=None,
             actor="test-actor",
         )
 

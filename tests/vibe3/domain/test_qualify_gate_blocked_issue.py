@@ -5,8 +5,6 @@ from unittest.mock import Mock, patch
 import pytest
 
 from vibe3.domain.qualify_gate import QualifyGateService
-from vibe3.models.coordination_truth import CoordinationTruth
-from vibe3.models.data_source import DataSource
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 
@@ -88,82 +86,48 @@ def test_qualify_blocked_issue_no_branch(
 
 
 def test_qualify_blocked_issue_success(
-    qualify_gate_service, sample_issue, mock_flow_manager, mock_store
-):
-    """Blocked issue should be qualified successfully."""
-    mock_flow_manager.get_flow_for_issue.return_value = {
-        "branch": "task/issue-123-test"
-    }
-    mock_store.get_flow_state.return_value = {}
-    qualify_gate_service.run_qualify_gate = Mock(return_value=IssueState.IN_PROGRESS)
-
-    result = qualify_gate_service.qualify_blocked_issue(sample_issue)
-
-    assert result == IssueState.IN_PROGRESS
-    qualify_gate_service.run_qualify_gate.assert_called_once()
-
-
-@pytest.mark.slow
-def test_qualify_blocked_issue_reuses_truth(
     qualify_gate_service, sample_issue, mock_flow_manager
 ):
-    """qualify_blocked_issue checks deps and returns None if still blocked."""
+    """Blocked issue should be qualified successfully via reconcile_blocked."""
+    from unittest.mock import patch
+
     mock_flow_manager.get_flow_for_issue.return_value = {
         "branch": "task/issue-123-test"
     }
-    mock_truth = CoordinationTruth(
-        blocked_reason="Blocked by #456",
-        blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
-        blocked_by_issues=[456],
-        blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
-        dependencies=[],
-        dependencies_source=None,
-        worktree_path="/tmp/worktree",
-        actor="executor",
-    )
-    with patch.object(
-        qualify_gate_service._coordination_resolver,
-        "resolve_coordination",
-        return_value=mock_truth,
-    ) as mock_resolve:
-        qualify_gate_service._is_dependency_satisfied = Mock(return_value=False)
-
+    with patch(
+        "vibe3.domain.qualify_gate.BlockedStateService.reconcile_blocked",
+        return_value=IssueState.READY,
+    ) as mock_reconcile:
         result = qualify_gate_service.qualify_blocked_issue(sample_issue)
 
-    mock_resolve.assert_called_once_with("task/issue-123-test", 123)
-    # Should return None because dependency is still open
-    assert result is None
+    assert result == IssueState.READY
+    mock_reconcile.assert_called_once_with(
+        issue_number=123,
+        branch="task/issue-123-test",
+        clear_reason=False,
+        actor="orchestra:dispatcher",
+    )
 
 
-@pytest.mark.slow
-def test_qualify_blocked_issue_stays_blocked_when_manual_reason_present(
-    qualify_gate_service, sample_issue, mock_flow_manager, mock_store
+def test_qualify_blocked_issue_stays_blocked_when_blocked(
+    qualify_gate_service, sample_issue, mock_flow_manager
 ):
-    """Manual blocked_reason should prevent auto-resume even if deps are closed."""
-    mock_flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-123"}
-    mock_store.get_flow_state.return_value = {
-        "branch": "task/issue-123",
-        "flow_slug": "issue-123",
-        "flow_status": "blocked",
-        "blocked_by_issue": 456,
-    }
-    mock_truth = CoordinationTruth(
-        blocked_reason="Blocked by #456",
-        blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
-        blocked_by_issues=[456],
-        blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
-        dependencies=[],
-        dependencies_source=None,
-        worktree_path=None,
-        actor="executor",
-    )
-    with patch.object(
-        qualify_gate_service._coordination_resolver,
-        "resolve_coordination",
-        return_value=mock_truth,
-    ):
-        qualify_gate_service._is_dependency_satisfied = Mock(return_value=True)
+    """qualify_blocked_issue returns None when reconcile_blocked returns None."""
+    from unittest.mock import patch
 
+    mock_flow_manager.get_flow_for_issue.return_value = {
+        "branch": "task/issue-123-test"
+    }
+    with patch(
+        "vibe3.domain.qualify_gate.BlockedStateService.reconcile_blocked",
+        return_value=None,
+    ) as mock_reconcile:
         result = qualify_gate_service.qualify_blocked_issue(sample_issue)
 
     assert result is None
+    mock_reconcile.assert_called_once_with(
+        issue_number=123,
+        branch="task/issue-123-test",
+        clear_reason=False,
+        actor="orchestra:dispatcher",
+    )

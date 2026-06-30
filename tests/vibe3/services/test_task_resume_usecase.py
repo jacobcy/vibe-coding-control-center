@@ -98,9 +98,19 @@ def test_verify_rejects_when_blocked_by_dependency_still_open() -> None:
     """Test that resume is rejected when blocked_by_issue is still OPEN."""
     usecase = _make_usecase()
     usecase.label_service.get_state.return_value = MagicMock(value="blocked")
-    usecase.candidates._flow_service.get_flow_for_issue.return_value = {
-        "blocked_by_issue": 999
-    }
+
+    # Mock GitHub client to return issue body with blocked_by info
+    usecase.candidates._github_client.get_issue_body.return_value = (
+        "Some content\n\n"
+        "<!-- vibe3-flow-state-start -->\n"
+        "\n"
+        "**Vibe3 Flow State**\n"
+        "\n"
+        "- **State**: blocked\n"
+        "- **Blocked by**: #999\n"
+        "\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
 
     # Mock GitHub client to return OPEN state
     usecase.candidates._github_client.view_issue.return_value = {
@@ -120,9 +130,18 @@ def test_verify_allows_when_blocked_by_dependency_closed() -> None:
     """Test that resume is allowed when blocked_by_issue is CLOSED."""
     usecase = _make_usecase()
     usecase.label_service.get_state.return_value = MagicMock(value="blocked")
-    usecase.candidates._flow_service.get_flow_for_issue.return_value = {
-        "blocked_by_issue": 999
-    }
+    # Mock GitHub client to return issue body with blocked_by info
+    usecase.candidates._github_client.get_issue_body.return_value = (
+        "Some content\n\n"
+        "<!-- vibe3-flow-state-start -->\n"
+        "\n"
+        "**Vibe3 Flow State**\n"
+        "\n"
+        "- **State**: blocked\n"
+        "- **Blocked by**: #999\n"
+        "\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
 
     # Mock GitHub client to return CLOSED state
     usecase.candidates._github_client.view_issue.return_value = {
@@ -138,24 +157,22 @@ def test_verify_allows_when_blocked_by_dependency_closed() -> None:
 
 
 def test_verify_skips_check_when_blocked_by_issue_empty() -> None:
-    """Test that dependency check is skipped when blocked_by_issue is None or 0."""
+    """Test that dependency check is skipped when blocked_by is empty."""
     usecase = _make_usecase()
     usecase.label_service.get_state.return_value = MagicMock(value="blocked")
 
-    # Test with None
-    usecase.candidates._flow_service.get_flow_for_issue.return_value = {
-        "blocked_by_issue": None
-    }
-    can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
-        123, "blocked", None
+    # Mock GitHub client to return issue body WITHOUT blocked_by
+    usecase.candidates._github_client.get_issue_body.return_value = (
+        "Some content\n\n"
+        "<!-- vibe3-flow-state-start -->\n"
+        "\n"
+        "**Vibe3 Flow State**\n"
+        "\n"
+        "- **State**: blocked\n"
+        "\n"
+        "<!-- vibe3-flow-state-end -->"
     )
-    assert can_resume is True
-    assert reason is None
 
-    # Test with 0
-    usecase.candidates._flow_service.get_flow_for_issue.return_value = {
-        "blocked_by_issue": 0
-    }
     can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
         123, "blocked", None
     )
@@ -167,9 +184,19 @@ def test_verify_refuses_when_gh_command_fails() -> None:
     """Test that resume is refused (fail-safe) when GitHub API fails."""
     usecase = _make_usecase()
     usecase.label_service.get_state.return_value = MagicMock(value="blocked")
-    usecase.candidates._flow_service.get_flow_for_issue.return_value = {
-        "blocked_by_issue": 999
-    }
+
+    # Mock GitHub client to return issue body with blocked_by info
+    usecase.candidates._github_client.get_issue_body.return_value = (
+        "Some content\n\n"
+        "<!-- vibe3-flow-state-start -->\n"
+        "\n"
+        "**Vibe3 Flow State**\n"
+        "\n"
+        "- **State**: blocked\n"
+        "- **Blocked by**: #999\n"
+        "\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
 
     # Mock GitHub client to fail (return None for not found)
     usecase.candidates._github_client.view_issue.return_value = None

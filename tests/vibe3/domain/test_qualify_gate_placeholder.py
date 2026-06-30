@@ -87,6 +87,8 @@ def test_check_worktree_health_blocked_real_flow_checks_path(
         "branch": "task/issue-456",
         "flow_status": "blocked",
     }
+    # set_block -> reconcile_blocked -> rebuild_cache_from_truth needs iterable deps
+    mock_store.get_dependency_links.return_value = []
     service = QualifyGateService(
         config=mock_config,
         github=mock_github,
@@ -95,8 +97,14 @@ def test_check_worktree_health_blocked_real_flow_checks_path(
     )
     truth = CoordinationTruth(worktree_path="/tmp/worktree/task-issue-456")
 
-    with patch("vibe3.domain.qualify_gate.Path") as mock_path:
+    with (
+        patch("vibe3.domain.qualify_gate.Path") as mock_path,
+        patch("vibe3.services.LabelService") as mock_label_service_cls,
+    ):
         mock_path.return_value.exists.return_value = False
+        mock_label_service_cls.return_value.replace_issue_state.return_value = (
+            "normalized"
+        )
 
         result = service._check_worktree_health(
             issue=sample_issue,
@@ -106,3 +114,8 @@ def test_check_worktree_health_blocked_real_flow_checks_path(
 
     assert result is False
     mock_path.assert_called_once_with("/tmp/worktree/task-issue-456")
+    mock_label_service_cls.return_value.replace_issue_state.assert_called_once_with(
+        123,
+        IssueState.READY,
+        actor="orchestra:dispatcher",
+    )

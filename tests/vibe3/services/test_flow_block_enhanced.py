@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.exceptions import SystemError
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow.service import FlowService
 
@@ -117,8 +118,9 @@ class TestBlockFlowEnhanced:
         mock_store,
         mock_label_service,
         mock_flow_timeline_service,
+        mock_github_client,
     ):
-        """block_flow works without task_issue_number (graceful degradation)."""
+        """block_flow without task issue must raise SystemError (incomplete flow)."""
         # Arrange - flow without issue number
         branch = "feature/some-branch"
         reason = "Waiting for dependency"
@@ -131,20 +133,9 @@ class TestBlockFlowEnhanced:
             # No task_issue_number
         }
 
-        # Act
-        service.block_flow(branch=branch, reason=reason, actor=actor)
-
-        # Assert - No issue state transition (no issue number)
-        mock_label_service.confirm_issue_state.assert_not_called()
-
-        # Assert - No timeline comment added (no issue number)
-        mock_flow_timeline_service.record_timeline_event.assert_not_called()
-
-        # Assert - Flow state still updated
-        mock_store.update_flow_state.assert_called_once()
-        update_kwargs = mock_store.update_flow_state.call_args[1]
-        assert update_kwargs["blocked_reason"] == reason
-        assert update_kwargs["latest_actor"] == actor
+        # Act & Assert - Must raise SystemError
+        with pytest.raises(SystemError, match="no task issue"):
+            service.block_flow(branch=branch, reason=reason, actor=actor)
 
     @pytest.mark.skip(
         reason="Test isolation issue with FlowTimelineService mock - needs refactor"

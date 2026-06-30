@@ -20,8 +20,8 @@ class TestReviewerNoOpGate:
 
         with (
             patch(
-                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label",
-                return_value=("state/review", False),
+                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_labels",
+                return_value=(frozenset({"state/review"}), False),
             ),
             patch(
                 "vibe3.services.issue.failure.block_reviewer_noop_issue"
@@ -63,8 +63,8 @@ class TestReviewerNoOpGate:
 
         with (
             patch(
-                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label",
-                return_value=("state/handoff", False),
+                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_labels",
+                return_value=(frozenset({"state/handoff"}), False),
             ),
             patch(
                 "vibe3.services.issue.failure.block_reviewer_noop_issue"

@@ -43,7 +43,33 @@ class StateVerificationService:
         flow_state: dict | None = None,
         tick_id: int = 0,
     ) -> tuple[str | None, bool]:
-        """Get current state label and closed status from GitHub issue.
+        """Get the highest-priority state label as a compatibility view."""
+        state_labels, is_closed = self.get_issue_state_labels(
+            issue_number=issue_number,
+            repo=repo,
+            branch=branch,
+            flow_state=flow_state,
+            tick_id=tick_id,
+        )
+        if not state_labels:
+            return None, is_closed
+        if len(state_labels) == 1:
+            return next(iter(state_labels)), is_closed
+
+        from vibe3.services.shared import get_highest_priority_state
+
+        best = get_highest_priority_state(list(state_labels))
+        return best or min(state_labels), is_closed
+
+    def get_issue_state_labels(
+        self,
+        issue_number: int,
+        repo: str | None = None,
+        branch: str | None = None,
+        flow_state: dict | None = None,
+        tick_id: int = 0,
+    ) -> tuple[frozenset[str], bool]:
+        """Get every current state label and closed status from GitHub issue.
 
         Args:
             issue_number: Issue number to query
@@ -54,8 +80,8 @@ class StateVerificationService:
                 are recorded to error_log
 
         Returns:
-            Tuple of (state_label, is_closed) where:
-            - state_label: State label string (e.g., "state/in-progress") or None
+            Tuple of (state_labels, is_closed) where:
+            - state_labels: All state label strings on the issue
             - is_closed: True if issue state is "CLOSED", False otherwise
 
         Raises:
@@ -86,17 +112,19 @@ class StateVerificationService:
                 issue_payload, issue_number, branch, flow_state, tick_id
             )
 
+        # Extract all label names and resolve to highest-priority state label
+        label_names: list[str] = []
         for label in labels:
             if isinstance(label, dict):
                 label_name = label.get("name", "")
                 if not isinstance(label_name, str):
                     continue
+                label_names.append(label_name)
             else:
-                label_name = str(label)
-            if label_name.startswith("state/"):
-                return label_name, is_closed
+                label_names.append(str(label))
 
-        return None, is_closed
+        state_labels = frozenset(lb for lb in label_names if lb.startswith("state/"))
+        return state_labels, is_closed
 
     def _handle_github_api_failure(
         self,

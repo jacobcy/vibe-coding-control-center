@@ -121,7 +121,7 @@ class FlowRecoveryService:
         """
         # Special case: no branch (issue with no flow) -> just clear label
         if not branch:
-            self._do_resume(branch, issue_number, reason)
+            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
             return RecoveryResult(
                 action=RecoveryAction.RESUME_ONLY,
                 success=True,
@@ -144,7 +144,7 @@ class FlowRecoveryService:
                 ensure_worktree=ensure_worktree,
                 include_remote=include_remote,
             )
-            self._do_resume(branch, issue_number, reason)
+            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
             return RecoveryResult(
                 action=RecoveryAction.REBUILD,
                 success=True,
@@ -157,7 +157,7 @@ class FlowRecoveryService:
 
         # --- Classify ---
         if consistency.code == FlowConsistencyCode.OK:
-            self._do_resume(branch, issue_number, reason)
+            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
             return RecoveryResult(
                 action=RecoveryAction.RESUME_ONLY,
                 success=True,
@@ -170,7 +170,7 @@ class FlowRecoveryService:
                 logger.bind(
                     domain="recovery", branch=branch, fix=consistency.fix_action
                 ).info("Applied cheap consistency fix")
-            self._do_resume(branch, issue_number, reason)
+            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
             return RecoveryResult(
                 action=RecoveryAction.FIX_AND_RESUME,
                 success=True,
@@ -193,7 +193,7 @@ class FlowRecoveryService:
                 ensure_worktree=ensure_worktree,
                 include_remote=include_remote,
             )
-            self._do_resume(branch, issue_number, reason)
+            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
             return RecoveryResult(
                 action=RecoveryAction.REBUILD,
                 success=True,
@@ -204,52 +204,45 @@ class FlowRecoveryService:
             )
 
         # Should not reach here
-        self._do_resume(branch, issue_number, reason)
+        self._do_resume(branch, issue_number, reason, clear_reason=not auto)
         return RecoveryResult(
             action=RecoveryAction.RESUME_ONLY,
             success=True,
             detail="Fallback: cleared blocked markers",
         )
 
-    def _do_resume(self, branch: str, issue_number: int, reason: str) -> None:
-        """Clear blocked markers from all three sources (DB, body, label).
-
-        Raises:
-            RuntimeError: If label write fails (RC2: prevents silent failure)
-        """
-        from vibe3.models import FlowState, IssueState
+    def _do_resume(
+        self,
+        branch: str,
+        issue_number: int,
+        reason: str,
+        clear_reason: bool = False,
+    ) -> None:
+        """Clear blocked markers via reconcile_blocked."""
         from vibe3.services.flow.blocked_state_service import BlockedStateService
-        from vibe3.services.flow.resume_resolver import infer_resume_label
-
-        # Determine target state from flow progress
-        fs_dict = self.store.get_flow_state(branch)
-        if fs_dict and isinstance(fs_dict, dict):
-            try:
-                target_state = infer_resume_label(FlowState.model_validate(fs_dict))
-            except Exception:
-                # Fallback to READY if validation fails
-                target_state = IssueState.READY
-        else:
-            target_state = IssueState.READY
 
         service = BlockedStateService(
             github_client=self.github_client,
-            label_service=None,  # uses default
             store=self.store,
         )
-        result = service.unblock(
-            branch=branch,
-            target_state=target_state,
+        target_state = service.reconcile_blocked(
             issue_number=issue_number,
-            detail=f"Recovery resume: {reason}",
+            branch=branch,
+            clear_reason=clear_reason,
+            actor="recovery:resume",
         )
-
-        # RC2 fix: Fail-fast if label not cleared to prevent blocked loop
-        if not result.label_cleared:
-            raise RuntimeError(
-                f"Failed to clear state/blocked label on issue #{issue_number}. "
-                f"Manual fix: gh issue edit {issue_number} "
-                "--remove-label state/blocked"
+        if target_state is None and clear_reason:
+            # None means either open dependencies remain or GitHub is unreachable
+            # (degraded mode).  Either way we must NOT raise — keeping the flow
+            # blocked is the correct conservative outcome (§6.2 / §6.4).
+            logger.bind(
+                domain="recovery",
+                action="_do_resume",
+                issue_number=issue_number,
+                branch=branch,
+            ).warning(
+                "reconcile_blocked returned None after clear_reason; "
+                "flow remains blocked (open deps or GitHub degraded)"
             )
 
     def _do_rebuild(

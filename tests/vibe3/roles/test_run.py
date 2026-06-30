@@ -158,8 +158,8 @@ class TestExecutorNoOpGate:
 
         with (
             patch(
-                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label",
-                return_value=("state/in-progress", False),
+                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_labels",
+                return_value=(frozenset({"state/in-progress"}), False),
             ),
             patch(
                 "vibe3.services.issue.failure.block_executor_noop_issue"
@@ -188,8 +188,8 @@ class TestExecutorNoOpGate:
 
         with (
             patch(
-                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label",
-                return_value=("state/handoff", False),
+                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_labels",
+                return_value=(frozenset({"state/handoff"}), False),
             ),
             patch(
                 "vibe3.services.issue.failure.block_executor_noop_issue"

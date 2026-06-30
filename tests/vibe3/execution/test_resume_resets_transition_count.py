@@ -61,15 +61,15 @@ def test_resume_resets_single_step_limit_counter(tmp_path):
         label_service=label_service,
         store=db,
     )
-    result = service.unblock(
-        branch=branch,
-        target_state=IssueState.READY,
+    result = service.reconcile_blocked(
         issue_number=issue_number,
+        branch=branch,
+        clear_reason=True,
         actor="human:resume",
     )
 
-    assert result.db_cleared, "DB should be cleared"
-    assert result.label_cleared, "Label should be cleared"
+    assert result is not None, "Should return target state (unblocked)"
+    assert result == IssueState.READY, "Should return READY as target state"
 
     # Verify transition_count reset
     flow = db.get_flow_state(branch)
@@ -91,9 +91,9 @@ def test_resume_resets_single_step_limit_counter(tmp_path):
         return_value=mock_block_fn,
     ):
         with patch(
-            "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label"
+            "vibe3.execution.state_verification.StateVerificationService.get_issue_state_labels"
         ) as mock_state:
-            mock_state.return_value = ("state/handoff", False)
+            mock_state.return_value = (frozenset({"state/handoff"}), False)
 
             apply_unified_noop_gate(
                 store=db,
@@ -154,14 +154,14 @@ def test_resume_resets_hard_limit_counter(tmp_path):
         label_service=label_service,
         store=db,
     )
-    result = service.unblock(
-        branch=branch,
-        target_state=IssueState.READY,
+    result = service.reconcile_blocked(
         issue_number=issue_number,
+        branch=branch,
+        clear_reason=True,
         actor="human:resume",
     )
 
-    assert result.db_cleared
+    assert result is not None, "Should return target state (unblocked)"
 
     # Verify counter reset
     flow = db.get_flow_state(branch)
@@ -183,9 +183,9 @@ def test_resume_resets_hard_limit_counter(tmp_path):
         return_value=mock_block_fn,
     ):
         with patch(
-            "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label"
+            "vibe3.execution.state_verification.StateVerificationService.get_issue_state_labels"
         ) as mock_state:
-            mock_state.return_value = ("state/handoff", False)
+            mock_state.return_value = (frozenset({"state/handoff"}), False)
 
             apply_unified_noop_gate(
                 store=db,

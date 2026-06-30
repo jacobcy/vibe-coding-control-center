@@ -128,6 +128,40 @@ class LabelService:
             return "blocked"
         return "advanced"
 
+    def replace_issue_state(
+        self,
+        issue_number: int,
+        target: IssueState,
+        *,
+        actor: str,
+    ) -> Literal["confirmed", "normalized"]:
+        """Normalize remote state labels to exactly one target state."""
+        from vibe3.services.shared.labels import get_state_labels
+
+        labels = self.issue_port.get_issue_labels(issue_number)
+        if labels is None:
+            raise SystemError(f"Failed to read state labels on issue #{issue_number}")
+
+        current_states = get_state_labels(labels)
+        target_label = target.to_label()
+        if current_states == [target_label]:
+            return "confirmed"
+
+        self._ensure_state_label_exists(target)
+        self._add_label(issue_number, target_label)
+        for label in current_states:
+            if label != target_label:
+                self._remove_label(issue_number, label)
+
+        logger.bind(
+            external="github",
+            operation="replace_state",
+            issue_number=issue_number,
+            target_state=target.value,
+            actor=actor,
+        ).info("Issue state labels normalized")
+        return "normalized"
+
     def set_state(self, issue_number: int, state: IssueState) -> None:
         """Directly set state (internal method, atomically replace state/* labels).
 

@@ -85,9 +85,8 @@ Some content.
 More content."""
         result = parse_projection(body)
         assert result.state == "blocked"
-        assert result.blocked_by == [123, 456]
+        assert result.blocked_by == [123, 456, 789]
         assert result.blocked_reason == "Waiting for dependencies"
-        assert result.dependencies == [789]
 
     def test_parse_partial_projection(self):
         """Parse projection with only some fields."""
@@ -103,9 +102,8 @@ More content."""
 {MANAGED_SECTION_END}"""
         result = parse_projection(body)
         assert result.state == "done"
-        assert result.blocked_by == []
+        assert result.blocked_by == [100]
         assert result.blocked_reason is None
-        assert result.dependencies == [100]
 
 
 class TestRenderProjection:
@@ -129,7 +127,6 @@ class TestRenderProjection:
             state="blocked",
             blocked_by=[123, 456],
             blocked_reason="Waiting for deps",
-            dependencies=[789],
         )
         result = render_projection(proj)
 
@@ -139,7 +136,6 @@ class TestRenderProjection:
         assert "#123" in result
         assert "#456" in result
         assert "Waiting for deps" in result
-        assert "#789" in result
 
     def test_render_done_state(self):
         """Render done state."""
@@ -184,7 +180,7 @@ class TestMergeProjection:
 
 User content."""
 
-        proj = FlowStateProjection(state="done", dependencies=[100])
+        proj = FlowStateProjection(state="done", blocked_by=[100])
         result = merge_projection(body, proj)
 
         # Should have new state

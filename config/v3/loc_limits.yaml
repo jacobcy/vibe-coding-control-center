@@ -30,8 +30,8 @@ code_limits:
         limit: 680
         reason: "校验聚合 + 规则编排；sync rules 实现已提取至 rule_checks.py，_check_branch 精简为编排器；#2912 新增 enforce_label_constraints_remote 方法（+116 行）实现远程 issue 标签约束扫描"
       - path: "src/vibe3/services/check/rule_checks.py"
-        limit: 550
-        reason: "Check 规则实现文件，含 13 条规则函数；#2912 新增 rule_label_constraint_enforcement（+82 行）实现标签约束自动修复；#3167 新增 rule_aborted_flow_done_reconcile（+47 行）实现 aborted→done 流状态转换协调"
+        limit: 600
+        reason: "Check 规则实现文件，含 14 条规则函数；#2912 新增 rule_label_constraint_enforcement（+82 行）；#3167 新增 rule_aborted_flow_done_reconcile（+47 行）；#3238 新增 rule_blocked_flow_reconcile（+44 行）实现 blocked flow 无条件 reconcile"
 
       # Exceptions 聚合 —— 允许 480-600
       # Domain 层
@@ -65,7 +65,7 @@ code_limits:
         limit: 510
         reason: "GitHub Issues 操作聚合，包含 issue CRUD、PR 列表查询、字段验证（issue/PR 双重验证）、链接解析、批量查询等紧密耦合逻辑；Issue #2968 新增 PR 字段验证基础设施（_validate_pr_fields 函数 + GITHUB_KNOWN_PR_FIELDS 常量，+41 行）支持 PR 字段校验与拼写建议；PR #3113 新增智能错误分类（_classify_github_api_error 函数，+50 行）支持 E_API_RATE_LIMIT/E_API_TIMEOUT/E_API_NETWORK 等细粒度错误码推断"
       - path: "src/vibe3/clients/sqlite_flow_state_repo.py"
-        limit: 640
+        limit: 660
         reason: |
           Repo 层职责内聚，包含：
           - 基础 CRUD 操作（10 个 get 方法）
@@ -88,6 +88,7 @@ code_limits:
           PR #2542 新增 bulk retrieval 方法，修复 N+1 查询模式，减少 100x 数据库查询（+62 行）
           PR #2741 新增 get_branch_for_task_issue 方法，优化 get_flow_for_issue 性能（+28 行）
           Issue #3189 新增 get_flows_by_statuses 批量状态查询方法（WHERE flow_status IN (...)，+40 行），减少串行查询次数
+          Issue #3238 新增 remove_issue_link 方法支持依赖缓存定向清理（+18 行），限上调至 660
 
       - path: "src/vibe3/commands/status.py"
         limit: 490
@@ -363,8 +364,8 @@ code_limits:
         limit: 650
         reason: "Serve 命令测试集，覆盖 start/stop/status/resume/logs 命令、tmux session 管理、port auto-discovery、FailedGate resume 逻辑、全局单例实例管理等紧密耦合场景，新增 3 个集成测试（test_start_blocks_when_instance_running, test_status_displays_instance_directory, test_stop_clears_global_pid_file）验证全局单例行为；PR #1671 review 修复后略微超标；PR #3246 新增 find_repo_root mock（+8 行）修复 subprocess mock 泄露"
       - path: "tests/vibe3/domain/test_qualify_gate_remote.py"
-        limit: 610
-        reason: "Qualify gate remote-first + E2E blocked reconciliation 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支、blocked state change via service layer (#1206)，包含 #994 类 E2E 回归场景，测试类结构清晰，拆分收益低"
+        limit: 650
+        reason: "Qualify gate remote-first + E2E blocked reconciliation 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支、blocked state change via service layer (#1206)，包含 #994 类 E2E 回归场景；PR #3247 收敛 run_qualify_gate 到 reconcile_blocked 后新增 TestConvergedDispatchGate E2E 回归测试（+20 行）"
       - path: "tests/vibe3/domain/test_qualify_gate.py"
         limit: 600
         reason: "Qualify gate truth-first 决策流程测试集，覆盖 manual block、dependency block、auto-resume、stale state alignment、blocked state change via service layer (#1206) 等场景，共享 fixture；PR #1983 已将 GitHub closed 检测测试拆分至 test_qualify_gate_closed.py；Issue #2242 新增 test_auto_resume_blocked_with_none_flow_state_returns_ready 测试验证 flow_state=None 路径返回 READY；Issue #2353 新增 test_qualify_blocked_issue_reuses_truth 测试验证 truth 参数传递优化（消除双重 resolve_coordination 调用）；PR #2667 将 open PR 检测测试拆分至 test_qualify_gate_open_pr.py（-294 行）"
@@ -380,6 +381,12 @@ code_limits:
       - path: "tests/vibe3/runtime/test_heartbeat.py"
         limit: 500
         reason: "Heartbeat server 测试集，覆盖 tick loop、error tracking cleanup、actor registry cleanup、debug max ticks、service registration 等紧密耦合场景，新增 actor cleanup 测试后超标（#2553）"
+      - path: "tests/vibe3/services/test_blocked_state_service.py"
+        limit: 620
+        reason: "BlockedStateService 集成测试集，覆盖 set_block/clear_block/reconcile_blocked 三个统一原语的三源一致性（DB/body/label），包含 remove_issue_link、parse_projection_merges_legacy_dependencies、reconcile_blocked blocked/resume 状态转换等紧密耦合场景；PR #3247 新增 3 个测试（test_set_block_fails_closed_on_read_error、test_reconcile_blocked_restores_missing_remote_label、测试类 TrackingLabelService）验证 fail-closed 和 remote label restore 行为（+95 行）"
+      - path: "tests/vibe3/services/test_check_service_verify_branch.py"
+        limit: 520
+        reason: "Check service verify_branch 测试集，覆盖分支状态验证、label 约束、blocked flow reconcile、stale ready rebuild 等紧密耦合场景，共享 CheckContext 和 MockGitHub/MockStore fixture 基础设施"
 
       - path: "tests/vibe3/test_modularity/test_services_reexport_surface.py"
         limit: 500
@@ -420,9 +427,6 @@ code_limits:
       - path: "tests/vibe3/services/test_check_service.py"
         limit: 680
         reason: "Check service bridge issue 测试集，覆盖 9 个关键场景（bridge 创建、idempotency、API 失败保护、PR 编号精确匹配等），共享 mock setup，新增边缘情况测试后略微超标（#1895）；Issue #2329 rename handle_closed_pr → handle_pr_terminal_state 增加行数（长方法名需换行，2个超长函数名需 noqa 注释）；Issue #2432 新增 3 个测试覆盖 _transfer_dependencies 方法及其集成（+82 行）；PR #2667 删除 test_verify_branch_returns_warning_for_open_pr_with_running_worker 测试（-64 行），迁移至 qualify_gate 测试；PR #3058 follow-up 新增 test_transfer_dependencies_rejects_protected_branch 验证验证守卫功能（+42 行）"
-      - path: "tests/vibe3/services/test_check_service_verify_branch.py"
-        limit: 500
-        reason: "CheckService.verify_branch 测试集，覆盖 9 个紧密耦合场景（正常返回、缺失 flow、protected branch、merged/closed PR、missing worktree、runtime ownership warnings 回归、closed issue、stale blocked flow 解锁），共享 mock setup 和 SQLite fixture，拆分收益低；Issue #2432 新增 dependency check warning 测试（+75 行）"
       - path: "tests/vibe3/services/test_handoff_service.py"
         limit: 650
         reason: "Handoff service 测试集，覆盖 plan/report/audit/indicate 记录、artifact 解析、verdict 处理、next step 管理、passive artifact 记录等紧密耦合场景，共享 fixture 和 mock setup，拆分收益低；架构重构后新增 ref_field 参数验证测试略微超标（#1908）；Issue #3139 新增 handoff 事件排序、状态转换、current.md 初始化链等测试（+163 行）"

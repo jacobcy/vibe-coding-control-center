@@ -174,8 +174,7 @@ class DispatchQueueCollectionService:
         next collection cycle.
 
         Dependency Resolution Routing:
-            qualify_blocked_issue -> is_dependency_satisfied ->
-            DependencyResolutionService.is_dependency_resolved()
+            qualify_blocked_issue -> BlockedStateService.reconcile_blocked
 
         This centralized routing ensures consistent dependency checking
         across all code paths (dispatch, resume, consistency checks).

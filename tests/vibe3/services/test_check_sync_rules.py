@@ -1,7 +1,7 @@
 """Tests for CheckService with sync rules."""
 
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from vibe3.clients import (
     LocalSyncRules,
@@ -12,6 +12,7 @@ from vibe3.clients import (
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.services.check.service import CheckService
+from vibe3.services.flow.blocked_state_io import BlockedStateIO
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
@@ -128,9 +129,8 @@ class TestCheckServiceSyncRules:
 
         Regression test: when the remote issue carries state/blocked but the
         local flow_status is not "blocked", rule_blocked_label_sync must sync
-        local flow_status to "blocked" (cache-from-truth). It must NOT call
-        the unblock/resume path, which would do the opposite of the rule's
-        documented intent.
+        local flow_status to "blocked" via reconcile_blocked (authoritative
+        truth reconciliation: body, labels, and cache).
         """
         issue_number = 9998
         branch = f"task/issue-{issue_number}"
@@ -147,9 +147,28 @@ class TestCheckServiceSyncRules:
         github_client.view_issue.return_value = {
             "state": "OPEN",
             "title": "Test issue",
-            "body": "Description",
+            "body": (
+                "Description\n"
+                "<!-- vibe3-flow-state-start -->\n\n"
+                "**Vibe3 Flow State**\n\n"
+                "- **State**: blocked\n"
+                "- **Blocked reason**: Remote state/blocked label detected\n\n"
+                "<!-- vibe3-flow-state-end -->"
+            ),
             "labels": [{"name": "state/blocked"}],
         }
+        # reconcile_blocked reads issue body to determine authoritative truth
+        github_client.get_issue_body.return_value = (
+            "Description\n"
+            "<!-- vibe3-flow-state-start -->\n"
+            "\n"
+            "**Vibe3 Flow State**\n"
+            "\n"
+            "- **State**: blocked\n"
+            "- **Blocked reason**: Remote state/blocked label detected\n"
+            "\n"
+            "<!-- vibe3-flow-state-end -->"
+        )
 
         handoff_dir = get_branch_handoff_dir(tmp_path, branch)
         handoff_dir.mkdir(parents=True, exist_ok=True)
@@ -168,7 +187,12 @@ class TestCheckServiceSyncRules:
         )
         service._sync_rules = config
 
-        result = service.verify_current_flow()
+        # Patch write_label_state to avoid real GitHub label API calls
+        # during reconcile_blocked's label sync step.
+        with patch.object(
+            BlockedStateIO, "write_label_state", return_value="confirmed"
+        ):
+            result = service.verify_current_flow()
 
         assert result is not None
         assert result.is_valid is True
@@ -178,7 +202,7 @@ class TestCheckServiceSyncRules:
         assert flow is not None
         assert flow["flow_status"] == "blocked"
 
-        # Remote truth must remain untouched — sync is cache-only.
+        # Remote body projection already matches, so no update needed.
         github_client.update_issue_body.assert_not_called()
 
 

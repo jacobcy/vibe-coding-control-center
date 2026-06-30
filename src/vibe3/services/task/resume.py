@@ -363,32 +363,38 @@ class TaskResumeCandidates:
     def _check_blocked_by_dependency(
         self, issue_number: int, repo: str | None
     ) -> tuple[bool, str] | None:
-        """Check if blocked_by dependency is satisfied.
+        """Check if all body-truth dependencies are satisfied.
 
-        Returns None if no blocking dependency or dep is satisfied.
-        Returns (False, reason) if dep is still open or cannot be verified.
+        §6.4 degraded mode: fail-closed when GitHub API is unavailable.
         """
-        flow_dict = self._flow_service.get_flow_for_issue(issue_number)
-        if not flow_dict:
-            return None
-        blocked_by_issue = flow_dict.get("blocked_by_issue")
-        if not isinstance(blocked_by_issue, int) or blocked_by_issue <= 0:
-            return None
-
+        from vibe3.services.issue.body import parse_projection
         from vibe3.services.shared import DependencyResolutionService
 
-        resolution = DependencyResolutionService.is_dependency_resolved(
-            blocked_by_issue,
-            github_client=self._github_client,
-            repo=repo,
-        )
-        if not resolution.resolved:
+        try:
+            body = self._github_client.get_issue_body(issue_number)
+            if body is None:
+                raise RuntimeError(f"Issue #{issue_number} body is None")
+            proj = parse_projection(body)
+        except Exception:
             return (
                 False,
-                f"task 不满足 resume 条件，所依赖的 "
-                f"task #{blocked_by_issue} 尚未关闭 "
-                f"(state={resolution.github_state or 'unknown'})",
+                "无法读取 issue body 验证依赖状态，"
+                "保守拒绝 resume (§6.4 degraded mode)",
             )
+
+        for dep in proj.blocked_by or []:
+            resolution = DependencyResolutionService.is_dependency_resolved(
+                dep,
+                github_client=self._github_client,
+                repo=repo,
+            )
+            if not resolution.resolved:
+                return (
+                    False,
+                    f"task 不满足 resume 条件，所依赖的 "
+                    f"task #{dep} 尚未关闭 "
+                    f"(state={resolution.github_state or 'unknown'})",
+                )
         return None
 
 

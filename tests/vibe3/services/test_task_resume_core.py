@@ -7,6 +7,7 @@ import pytest
 from tests.vibe3.services.conftest import _make_operations
 from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
+from vibe3.services.task import TaskResumeUsecase
 
 
 def test_reset_issue_to_ready_label_auto_keeps_worktree() -> None:
@@ -46,7 +47,7 @@ def test_reset_issue_to_ready_label_auto_keeps_worktree() -> None:
                 label_state="",
             )
 
-            mock_service.unblock.assert_called_once()
+            mock_service.reconcile_blocked.assert_called_once()
             mock_cleanup_cls.assert_not_called()
 
 
@@ -77,3 +78,47 @@ def test_task_resume_operations_does_not_expose_scene_reset_helper() -> None:
     operations = _make_operations()
 
     assert not hasattr(operations, "reset_task_scene")
+
+
+def _make_usecase() -> TaskResumeUsecase:
+    """Create a TaskResumeUsecase with fully mocked dependencies."""
+    return TaskResumeUsecase(
+        status_service=MagicMock(),
+        label_service=MagicMock(),
+        flow_service=MagicMock(),
+        git_client=MagicMock(),
+        github_client=MagicMock(),
+        issue_flow_service=MagicMock(),
+    )
+
+
+def test_verify_rejects_when_multi_dependency_with_any_open() -> None:
+    """Resume rejected when ANY of multiple body-truth dependencies is unresolved."""
+    usecase = _make_usecase()
+    usecase.label_service.get_state.return_value = MagicMock(value="blocked")
+
+    # Issue body with multiple blocked-by dependencies
+    usecase.candidates._github_client.get_issue_body.return_value = (
+        "Some content\n\n"
+        "<!-- vibe3-flow-state-start -->\n"
+        "\n"
+        "**Vibe3 Flow State**\n"
+        "\n"
+        "- **State**: blocked\n"
+        "- **Blocked by**: #999, #1000\n"
+        "\n"
+        "<!-- vibe3-flow-state-end -->"
+    )
+
+    # First dep (#999) CLOSED, second dep (#1000) OPEN
+    usecase.candidates._github_client.view_issue.side_effect = [
+        {"state": "CLOSED", "labels": []},
+        {"state": "OPEN", "labels": []},
+    ]
+    can_resume, reason = usecase.candidates.verify_issue_state_for_resume(
+        123, "blocked", None
+    )
+
+    assert can_resume is False
+    assert "task #1000 尚未关闭" in reason
+    assert "(state=OPEN)" in reason

@@ -2,31 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Self
+from typing import Self
 
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.exceptions import UserError
+from vibe3.exceptions import SystemError, UserError
 from vibe3.services.shared.signatures import SignatureService
-
-if TYPE_CHECKING:
-    from vibe3.services.protocols import TaskQueryProtocol
 
 
 class FlowLifecycleMixin:
     """Mixin providing flow lifecycle operations."""
 
     store: SQLiteClient
-    _task_service: "TaskQueryProtocol | None" = None
-
-    def set_task_service(self, task_service: TaskQueryProtocol) -> None:
-        """Inject task service for dependency breaking."""
-        self._task_service = task_service
-
-    def _get_task_service(self) -> "TaskQueryProtocol | None":
-        """Return injected task service or None if not available."""
-        return self._task_service
 
     def block_flow(
         self: Self,
@@ -70,23 +58,6 @@ class FlowLifecycleMixin:
             flow_actor=flow_data.get("latest_actor"),
         )
 
-        if blocked_by_issue:
-            svc = self._get_task_service()
-            if svc is not None:
-                svc.link_issue(
-                    branch,
-                    blocked_by_issue,
-                    role="dependency",
-                    actor=effective_actor,
-                )
-            else:
-                logger.bind(
-                    domain="flow",
-                    action="block",
-                    branch=branch,
-                    blocked_by_issue=blocked_by_issue,
-                ).warning("TaskService not injected, skipping dependency link")
-
         issue_number: int | None = None
         from vibe3.services.issue.flow import IssueFlowService
 
@@ -94,12 +65,17 @@ class FlowLifecycleMixin:
         issue_number = issue_flow_service.resolve_task_issue_number(branch)
 
         service = BlockedStateService(store=self.store)
-        service.block_state_only(
+        if issue_number is None:
+            raise SystemError(
+                f"Cannot block flow '{branch}': no task issue linked. "
+                "Flow is in incomplete state — ensure task binding before blocking."
+            )
+        service.set_block(
+            issue_number=issue_number,
             branch=branch,
             reason=reason,
-            blocked_by_issue=blocked_by_issue,
+            tasks=[blocked_by_issue] if blocked_by_issue else [],
             actor=effective_actor,
-            issue_number=issue_number,
         )
 
         # Publish FlowBlocked event if we have a valid issue context

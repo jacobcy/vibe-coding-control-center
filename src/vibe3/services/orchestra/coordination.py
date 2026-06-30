@@ -57,7 +57,6 @@ class CoordinationResolver:
         projection_state_remote: str | None = None
         blocked_reason_remote = None
         blocked_by_issues_remote: list[int] = []
-        dependencies_remote: list[int] = []
         remote_success = False  # Track remote read success separately
 
         if issue_number:
@@ -69,7 +68,6 @@ class CoordinationResolver:
                     projection_state_remote = remote_truth.get("projection_state")
                     blocked_reason_remote = remote_truth.get("blocked_reason")
                     blocked_by_issues_remote = remote_truth.get("blocked_by_issues", [])
-                    dependencies_remote = remote_truth.get("dependencies", [])
             except Exception as e:
                 # GitHub API failure → enter degraded mode
                 degraded = get_degraded_manager()
@@ -107,45 +105,42 @@ class CoordinationResolver:
         # Handle blocked_by_issues with proper type narrowing
         if remote_success:
             blocked_by_issues = blocked_by_issues_remote
-        elif flow_state:
-            local_blocked_by = flow_state.get("blocked_by_issue")
-            blocked_by_issues = (
-                [local_blocked_by] if local_blocked_by is not None else []
-            )
         else:
-            blocked_by_issues = []
-        dependencies = (
-            dependencies_remote
-            if remote_success
-            else (self.store.get_dependency_links(branch))
-        )
+            if branch:
+                blocked_by_issues = self.store.get_dependency_links(branch)
+            else:
+                blocked_by_issues = []
+            if flow_state:
+                local_blocked_by = flow_state.get("blocked_by_issue")
+                if (
+                    local_blocked_by is not None
+                    and local_blocked_by not in blocked_by_issues
+                ):
+                    blocked_by_issues = [local_blocked_by] + blocked_by_issues
+
+        # Source provenance: remote-first with local fallback
+        body_fallback = DataSource.ISSUE_BODY_FALLBACK
+        local_fallback = DataSource.LOCAL_SQLITE
+
+        def _source(has_signal: bool) -> DataSource | None:
+            if remote_success:
+                return body_fallback
+            return local_fallback if has_signal else None
 
         truth = CoordinationTruth(
             # Issue body projection state (remote-first)
             projection_state=projection_state,
-            projection_state_source=(
-                DataSource.ISSUE_BODY_FALLBACK
-                if remote_success
-                else DataSource.LOCAL_SQLITE if flow_state else None
+            projection_state_source=_source(
+                bool(flow_state) or projection_state is not None
             ),
             # Collaboration: remote-first, fallback to local
             blocked_reason=blocked_reason,
-            blocked_reason_source=(
-                DataSource.ISSUE_BODY_FALLBACK
-                if remote_success
-                else DataSource.LOCAL_SQLITE if flow_state else None
+            blocked_reason_source=_source(
+                bool(flow_state) or blocked_reason is not None
             ),
             blocked_by_issues=blocked_by_issues,
-            blocked_by_issue_source=(
-                DataSource.ISSUE_BODY_FALLBACK
-                if remote_success
-                else DataSource.LOCAL_SQLITE if flow_state else None
-            ),
-            dependencies=dependencies,
-            dependencies_source=(
-                DataSource.ISSUE_BODY_FALLBACK
-                if remote_success
-                else DataSource.LOCAL_SQLITE if flow_state else None
+            blocked_by_issue_source=_source(
+                bool(flow_state) or bool(blocked_by_issues)
             ),
             # Execution: local-only
             worktree_path=(flow_state.get("worktree_path") if flow_state else None),
@@ -188,7 +183,6 @@ class CoordinationResolver:
                 "projection_state": projection.state,
                 "blocked_reason": projection.blocked_reason,
                 "blocked_by_issues": projection.blocked_by,
-                "dependencies": projection.dependencies,
             }
         except Exception:
             return None

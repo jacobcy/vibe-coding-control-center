@@ -40,6 +40,23 @@ class BlockedStateIO:
     # Write Operations
     # ========================================================================
 
+    def write_projection(
+        self,
+        issue_number: int,
+        projection: FlowStateProjection,
+    ) -> None:
+        """Write complete flow-state projection to issue body."""
+        current_body = self.github.get_issue_body(issue_number)
+        if current_body is None:
+            raise RuntimeError(f"Failed to read issue body: issue #{issue_number}")
+        merged = merge_projection(current_body, projection)
+        if merged == current_body:
+            return
+        if not self.github.update_issue_body(issue_number, merged):
+            raise RuntimeError(
+                f"Failed to update issue body projection: issue #{issue_number}"
+            )
+
     def write_body_projection(
         self,
         issue_number: int,
@@ -69,7 +86,6 @@ class BlockedStateIO:
             state="blocked",
             blocked_by=new_blocked_by,
             blocked_reason=reason,
-            dependencies=projection.dependencies,
         )
 
         merged = merge_projection(current_body, new_projection)
@@ -93,13 +109,10 @@ class BlockedStateIO:
                 f"Failed to read issue body for projection: issue #{issue_number}"
             )
 
-        projection = parse_projection(current_body)
-
         new_projection = FlowStateProjection(
             state="active",
             blocked_by=[],
             blocked_reason=None,
-            dependencies=projection.dependencies,
         )
 
         merged = merge_projection(current_body, new_projection)
@@ -171,7 +184,8 @@ class BlockedStateIO:
         target_state: IssueState,
         actor: str = "system",
         force: bool = False,
-    ) -> Literal["confirmed", "advanced", "blocked"]:
+        normalize: bool = False,
+    ) -> Literal["confirmed", "advanced", "blocked", "normalized"]:
         """Write state to issue labels.
 
         Args:
@@ -179,12 +193,20 @@ class BlockedStateIO:
             target_state: Target state to set
             actor: Actor performing the transition
             force: If True, bypass transition validation (for unblock/resume)
+            normalize: If True, replace every remote state label with the target
 
         Returns:
             "confirmed": Already in target state
             "advanced": Transition succeeded
             "blocked": Transition rejected by state machine
+            "normalized": Duplicate or stale state labels were replaced
         """
+        if normalize:
+            return self.label_service.replace_issue_state(
+                issue_number,
+                target_state,
+                actor=actor,
+            )
         return self.label_service.confirm_issue_state(
             issue_number,
             target_state,

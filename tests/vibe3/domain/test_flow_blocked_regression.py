@@ -38,7 +38,7 @@ class StubGitHubClient:
         self._issue_body = body
         return True
 
-    def view_issue(self, issue_number: int) -> dict:
+    def view_issue(self, issue_number: int, **kwargs: object) -> dict:
         return {
             "labels": [{"name": label} for label in self._labels],
         }
@@ -84,17 +84,15 @@ def test_blocked_state_is_written_through_service_path(tmp_path: Path) -> None:
         label_service=label_service,
     )
 
-    service.block(
+    service.set_block(
+        issue_number=123,
         branch="test-branch",
         reason="Test blocking",
-        blocked_by_issue=None,
         actor="test_actor",
-        issue_number=123,
     )
 
     flow_state = store.get_flow_state("test-branch")
     assert flow_state is not None
-    assert flow_state.get("flow_status") == "blocked"
     assert flow_state.get("blocked_reason") == "Test blocking"
 
 
@@ -159,7 +157,7 @@ def test_registered_flow_blocked_handlers_do_not_mutate_state(
 
     with patch.object(
         BlockedStateService,
-        "block",
+        "set_block",
         side_effect=AssertionError("FlowBlocked handler must not write state"),
     ) as mock_block:
         register_event_handlers()
@@ -195,36 +193,36 @@ def test_timeline_recorded_during_block_not_as_state_source(tmp_path: Path) -> N
         label_service=label_service,
     )
 
-    service.block(
+    service.set_block(
+        issue_number=123,
         branch="test-branch",
         reason="Timeline test",
-        blocked_by_issue=None,
         actor="test_actor",
-        issue_number=123,
     )
 
-    # Verify blocked state exists
+    # Verify blocked state exists in DB cache
     flow_state = store.get_flow_state("test-branch")
     assert flow_state is not None
-    assert flow_state.get("flow_status") == "blocked"
+    assert flow_state.get("blocked_reason") == "Timeline test"
 
-    # Verify timeline event exists
+    # Verify blocked state exists in issue body (authoritative truth)
+    body_state = BlockedStateIO(github_client=github).read_body_projection(123)
+    assert body_state.is_blocked is True
+
+    # Use raw SQL to directly delete any flow events - verify state remains intact.
+    # This proves the DB cache (not timeline events) is the authoritative local source.
     events = store.get_events("test-branch")
-    timeline_events = [e for e in events if e.get("event_type") == "flow_blocked"]
-    assert len(timeline_events) > 0
+    if events:
+        import sqlite3
 
-    # Delete timeline entry using raw SQL - blocked state should remain intact
-    # This verifies timeline is not the sole source of truth
-    import sqlite3
+        event_id = events[0]["id"]
+        with sqlite3.connect(store.db_path) as conn:
+            conn.execute("DELETE FROM flow_events WHERE id = ?", (event_id,))
 
-    event_id = timeline_events[0]["id"]
-    with sqlite3.connect(store.db_path) as conn:
-        conn.execute("DELETE FROM flow_events WHERE id = ?", (event_id,))
-
-    # Verify blocked state is still present
+    # Verify blocked state is still present in DB cache
     flow_state_after = store.get_flow_state("test-branch")
     assert flow_state_after is not None
-    assert flow_state_after.get("flow_status") == "blocked"
+    assert flow_state_after.get("blocked_reason") == "Timeline test"
 
 
 def test_multi_dependency_preserved_in_body_projection(tmp_path: Path) -> None:

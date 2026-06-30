@@ -258,8 +258,8 @@ def intake(
     else:
         typer.echo(f"#{issue_id} assigned to {local_manager}")
 
-    # Create placeholder flow if blocked-by is specified
-    if blocked_by is not None:
+    # Create placeholder flow if blocked-by or blocked-reason is specified
+    if blocked_by is not None or blocked_reason is not None:
         try:
             # Load full issue info for consistent flow creation
             issue_info = load_issue_info(issue_id, config=config.orchestra)
@@ -290,9 +290,12 @@ def intake(
             )
             raise
 
-        msg = f"  Placeholder flow created (blocked by #{blocked_by})"
-        if blocked_reason:
-            msg += f": {blocked_reason}"
+        if blocked_by is not None:
+            msg = f"  Placeholder flow created (blocked by #{blocked_by})"
+            if blocked_reason:
+                msg += f": {blocked_reason}"
+        else:
+            msg = f"  Placeholder flow created (blocked: {blocked_reason})"
         typer.echo(msg)
 
 
