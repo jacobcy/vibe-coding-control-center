@@ -8,7 +8,6 @@ from typing import Protocol
 
 from loguru import logger
 
-from vibe3.exceptions.error_codes import E_DISPATCH_FAILURE
 from vibe3.models import IssueInfo, IssueState
 from vibe3.observability import append_orchestra_event, get_degraded_manager
 from vibe3.services.orchestra import record_error
@@ -90,7 +89,7 @@ class DispatchPreflightService:
             )
             try:
                 record_error(
-                    error_code=E_DISPATCH_FAILURE,
+                    error_code="E_DISPATCH_FAILURE",
                     error_message=(
                         f"dispatch_preflight blocked qualify gate failed for "
                         f"#{issue.number}: {exc}"
@@ -148,7 +147,7 @@ class DispatchPreflightService:
             )
             try:
                 record_error(
-                    error_code=E_DISPATCH_FAILURE,
+                    error_code="E_DISPATCH_FAILURE",
                     error_message=(
                         f"dispatch_preflight active qualify gate failed for "
                         f"#{issue.number}: {exc}"

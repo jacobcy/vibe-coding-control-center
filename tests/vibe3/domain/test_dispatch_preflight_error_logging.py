@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.domain.dispatch_preflight import DispatchPreflightService
-from vibe3.exceptions.error_codes import E_DISPATCH_FAILURE
 from vibe3.models import IssueInfo, IssueState
 
 
@@ -61,7 +60,7 @@ def test_qualify_blocked_records_error_on_exception(
     # Verify record_error was called with correct parameters
     mock_record_error.assert_called_once()
     call_args = mock_record_error.call_args[1]
-    assert call_args["error_code"] == E_DISPATCH_FAILURE
+    assert call_args["error_code"] == "E_DISPATCH_FAILURE"
     assert call_args["issue_number"] == 123
     assert "no such column: aup_rejection_count" in call_args["error_message"]
     assert "blocked qualify gate failed" in call_args["error_message"]
@@ -100,7 +99,7 @@ def test_qualify_active_records_error_on_exception(
     # Verify record_error was called with correct parameters
     mock_record_error.assert_called_once()
     call_args = mock_record_error.call_args[1]
-    assert call_args["error_code"] == E_DISPATCH_FAILURE
+    assert call_args["error_code"] == "E_DISPATCH_FAILURE"
     assert call_args["issue_number"] == 456
     assert "qualify gate internal error" in call_args["error_message"]
     assert "active qualify gate failed" in call_args["error_message"]
