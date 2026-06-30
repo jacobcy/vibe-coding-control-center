@@ -347,14 +347,14 @@ def _full_status_dashboard(
     )
     from vibe3.services.task import (
         classify_task_issues_for_rendering,
-        fetch_task_status_data,
+        perform_status_fetch,
     )
 
     if check:
         run_full_check_shortcut()
 
     # Fetch all data via service layer
-    data = fetch_task_status_data(all_flows=all_flows)
+    data = perform_status_fetch(all_flows=all_flows)
 
     # Handle JSON/YAML output
     if output_format in ("json", "yaml"):

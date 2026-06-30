@@ -25,7 +25,6 @@
 - `service.py`: PR 主服务
 - `create.py`: PR 创建用例
 - `ready.py`: PR ready 用例
-- `scoring.py`: PR 质量评分
 - `analysis.py`: PR 变更影响分析
 - `review.py`: PR review briefing 编排
 - `utils.py`: PR 构建辅助

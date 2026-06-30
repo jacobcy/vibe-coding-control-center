@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import namedtuple
 from typing import TYPE_CHECKING, Any, cast
 
 from vibe3.models import FlowStatusResponse, IssueState, OrchestraConfig
-from vibe3.services.orchestra import OrchestraSnapshot
 from vibe3.services.shared import (
     StatusQueryService,
     has_orchestra_governed,
@@ -23,29 +22,20 @@ if TYPE_CHECKING:
 
 NON_ACTIVE_TASK_FLOW_STATUSES = frozenset({"done", "review", "failed", "aborted"})
 
-
-@dataclass
-class TaskStatusData:
-    """Container for all data needed by task status dashboard."""
-
-    config: OrchestraConfig
-    orch_snapshot: OrchestraSnapshot
-    snapshot_found: bool
-    flows: list[FlowStatusResponse]
-    orchestrated_issues: list[dict[str, object]]
+# Module-private carrier for the three-step fetch sequence.
+# Not exported — callers should call build_api_task_data (HTTP) or
+# perform_status_fetch (CLI dashboard), never reach into this tuple.
+_StatusFetchResult = namedtuple(
+    "_StatusFetchResult",
+    ["config", "orch_snapshot", "snapshot_found", "flows", "orchestrated_issues"],
+)
 
 
-def fetch_task_status_data(
-    all_flows: bool = False,
-) -> TaskStatusData:
-    """Fetch all data needed for task status dashboard.
+def perform_status_fetch(all_flows: bool = False) -> _StatusFetchResult:
+    """Run the three-step fetch sequence; return a private namedtuple.
 
-    Args:
-        all_flows: If True, include all flow statuses;
-            otherwise active/done/blocked only.
-
-    Returns:
-        TaskStatusData containing config, snapshot, flows, and issues.
+    Kept separate from build_api_task_data so the CLI dashboard can
+    reuse the same I/O flows without going through the JSON-clean dict.
     """
     import time
 
@@ -114,7 +104,7 @@ def fetch_task_status_data(
         supervisor_label=config.supervisor_handoff.issue_label,
     )
 
-    return TaskStatusData(
+    return _StatusFetchResult(
         config=config,
         orch_snapshot=orch_snapshot,
         snapshot_found=snapshot_found,
@@ -394,7 +384,7 @@ def build_api_task_data(all_flows: bool = False) -> dict[str, Any]:
     Returns:
         Dict with config_summary, server_status, classified_issues, flows.
     """
-    data = fetch_task_status_data(all_flows)
+    data = perform_status_fetch(all_flows)
     classified = classify_task_issues_for_rendering(
         data.orchestrated_issues, data.config
     )

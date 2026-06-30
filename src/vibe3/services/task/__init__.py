@@ -4,9 +4,9 @@ Public API Contract:
 - TaskService: Main task service
 - TaskShowService, TaskShowResult, TaskRefSummary, etc.: Show operations
 - TaskResumeUsecase, TaskResumeOperations, TaskResumeCandidates: Resume operations
-- TaskStatusBucket, TaskStatusData: Status types
+- TaskStatusBucket: Status types
 - MissingTaskIssueError, ensure_task_issue_bound, has_task_issue: Binding guard
-- build_api_task_data, fetch_task_status_data, classify_task_status: Status utilities
+- build_api_task_data, perform_status_fetch, classify_task_status: Status utilities
 
 All exports are part of the public API.
 """
@@ -35,10 +35,9 @@ if TYPE_CHECKING:
         TaskShowService,
     )
     from vibe3.services.task.status import (
-        TaskStatusData,
         build_api_task_data,
         classify_task_issues_for_rendering,
-        fetch_task_status_data,
+        perform_status_fetch,
     )
 
 __all__ = [
@@ -52,8 +51,6 @@ __all__ = [
     "TaskRefSummary",
     "TaskCommentSummary",
     "TaskPRSummary",
-    # Classes - status
-    "TaskStatusData",
     # Classes - resume
     "TaskResumeUsecase",
     "TaskResumeCandidates",
@@ -66,7 +63,7 @@ __all__ = [
     "build_bind_task_hint",
     # Functions - status
     "build_api_task_data",
-    "fetch_task_status_data",
+    "perform_status_fetch",
     "classify_task_issues_for_rendering",
     # Functions - classifier
     "classify_task_status",
@@ -83,8 +80,6 @@ _SYMBOL_MODULES = {
     "TaskRefSummary": "vibe3.services.task.show",
     "TaskCommentSummary": "vibe3.services.task.show",
     "TaskPRSummary": "vibe3.services.task.show",
-    # Classes - status
-    "TaskStatusData": "vibe3.services.task.status",
     # Classes - resume
     "TaskResumeUsecase": "vibe3.services.task.resume",
     "TaskResumeCandidates": "vibe3.services.task.resume",
@@ -97,7 +92,7 @@ _SYMBOL_MODULES = {
     "build_bind_task_hint": "vibe3.services.shared.binding_guard",
     # Functions - status
     "build_api_task_data": "vibe3.services.task.status",
-    "fetch_task_status_data": "vibe3.services.task.status",
+    "perform_status_fetch": "vibe3.services.task.status",
     "classify_task_issues_for_rendering": "vibe3.services.task.status",
     # Functions - classifier
     "classify_task_status": "vibe3.services.task.classifier",
