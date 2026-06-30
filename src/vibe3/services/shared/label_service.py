@@ -37,6 +37,12 @@ class LabelService:
     def get_state(self, issue_number: int) -> IssueState | None:
         """Get current orchestration state of an issue.
 
+        When multiple state/* labels coexist (stale label not yet cleaned
+        up), resolves to the highest-priority one (STATE_PRIORITY_ORDER)
+        instead of whichever label the API happened to list first. Picking
+        by iteration order let confirm_issue_state() short-circuit on a
+        stale label and never clean it up (issue #3182 regression).
+
         Args:
             issue_number: GitHub issue number
 
@@ -44,6 +50,8 @@ class LabelService:
             IssueState: Current state
             None: No state/* label found
         """
+        from vibe3.services.shared.labels import get_highest_priority_state
+
         logger.bind(
             external="github",
             operation="get_state",
@@ -57,12 +65,8 @@ class LabelService:
             )
             return None
 
-        for name in labels:
-            state = IssueState.from_label(name)
-            if state:
-                return state
-
-        return None
+        highest = get_highest_priority_state(labels)
+        return IssueState.from_label(highest) if highest else None
 
     def transition(
         self,
@@ -118,10 +122,31 @@ class LabelService:
         actor: str,
         force: bool = False,
     ) -> Literal["confirmed", "advanced", "blocked"]:
-        """Confirm target issue state with minimum action."""
-        current_state = self.get_state(issue_number)
-        if current_state == to_state:
-            return "confirmed"
+        """Confirm target issue state with minimum action.
+
+        Only short-circuits when the issue carries exactly the target
+        state/* label and nothing else. Matching on the highest-priority
+        label alone let a stale, lower-priority label coexist forever
+        whenever it happened to never conflict with a later target state.
+        """
+        from vibe3.services.shared.labels import get_state_labels
+
+        labels = self.issue_port.get_issue_labels(issue_number)
+        if labels is not None:
+            current_states = get_state_labels(labels)
+            if current_states == [to_state.to_label()]:
+                return "confirmed"
+            if to_state.to_label() in current_states:
+                # Target is already present (it's the highest-priority
+                # label) but a stale lower-priority label coexists. This
+                # isn't an FSM transition — go straight to set_state() to
+                # clean up the stale label(s) instead of validating a
+                # same-state A->A move through transition().
+                try:
+                    self.set_state(issue_number, to_state)
+                except SystemError:
+                    return "blocked"
+                return "advanced"
         try:
             self.transition(issue_number, to_state, actor=actor, force=force)
         except (InvalidTransitionError, SystemError):
