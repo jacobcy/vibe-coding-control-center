@@ -56,8 +56,8 @@ code_limits:
         limit: 615
         reason: "Schema DDL 与迁移聚合，包含 10 个表定义（snapshot_registry 已退役，DDL 已注释）、18+ 迁移步骤（含幂等历史数据提取），新增 severity 列迁移与回填逻辑，DDL 字符串 and 迁移逻辑紧密耦合不宜拆分；Issue #3085 新增内联 severity 推断逻辑（+18 行）消除跨层函数导入；Issue #3099 新增 AUP rejection 计数器字段迁移（aup_rejection_count, last_aup_rejection_at，+13 行）；Issue #3215 注释 snapshot_registry DDL（-12 行）；black formatting (+6 lines)"
       - path: "src/vibe3/clients/git_client.py"
-        limit: 660
-        reason: "Git 门面聚合，新增 get_all_branches_with_timestamps 支持过期资源清理，新增 find_repo_root() 统一 repo 根目录解析（带 lru_cache 缓存优化），新增 pack_refs_all() 支持 Git 引用存储一致性修复（Issue #2330），新增 get_remote_url() 支持 ConventionResolver 重构（Issue #2346）；Issue #2926 新增 _resolve_base_ref/_resolve_source 实现 origin/main 自动解析与 5 分钟 fetch 缓存（+59 行）；Issue #3218 新增 resolve_revision/get_diff_metadata 提供 inspect evidence surface 所需的精确 Git diff 元数据（+22 行）"
+        limit: 680
+        reason: "Git 门面聚合，新增 get_all_branches_with_timestamps 支持过期资源清理，新增 find_repo_root() 统一 repo 根目录解析（带 lru_cache 缓存优化），新增 pack_refs_all() 支持 Git 引用存储一致性修复（Issue #2330），新增 get_remote_url() 支持 ConventionResolver 重构（Issue #2346）；Issue #2926 新增 _resolve_base_ref/_resolve_source 实现 origin/main 自动解析与 5 分钟 fetch 缓存（+59 行）；Issue #3218 新增 resolve_revision/get_diff_metadata 提供 inspect evidence surface 所需的精确 Git diff 元数据（+22 行）；PR #3246 新增 cwd-aware GitClient.find_repo_root() 实例方法、布局诊断与 GitClientProtocol 协议同步（+14 行）"
       - path: "src/vibe3/clients/github_pr_read_ops.py"
         limit: 520
         reason: "GitHub PR 只读查询聚合，新增 CI 失败分类与检查步骤解析逻辑，包含失败分类、日志解析、状态映射等紧密耦合逻辑"
@@ -337,8 +337,8 @@ code_limits:
         limit: 460
         reason: "Git status ops 测试集，覆盖 get_changed_files/get_numstat/get_name_status/_numstat_via_merge_base/_name_status_via_merge_base/_filter_unified_diff_by_paths 等 6 个函数的完整测试（Issue #3009 A/M/D file classification），与 git_status_ops.py 源文件（limit 450）对应；包含 5 个测试类（TestGetNumstat/TestNumstatViaMergeBase/TestGetNameStatus/TestNameStatusViaMergeBase/TestGetChangedFilesPathspec/TestFilterUnifiedDiffByPaths）共 57 个测试方法，测试完整的 git status operations 契约，拆分会破坏测试组织结构；PR #3031 新增基础设施测试"
       - path: "tests/vibe3/clients/test_git_client.py"
-        limit: 500
-        reason: "GitClient 测试集，覆盖 BranchSource/CommitSource/PRSource 操作、merge conflict 检测、resolve_base_ref/resolve_source 的 TTL cache/expiry/failure 行为、repo root 解析（5 种路径模式）等 38 个紧密耦合场景，共享 mock setup 和 GitClient fixture，拆分收益低"
+        limit: 550
+        reason: "GitClient 测试集，覆盖 BranchSource/CommitSource/PRSource 操作、merge conflict 检测、resolve_base_ref/resolve_source 的 TTL cache/expiry/failure 行为、repo root 解析（含实例 cwd 隔离）、fetch refspec 构造验证（3 种输入模式，PR #3246）等 41 个紧密耦合场景，共享 mock setup 和 GitClient fixture，拆分收益低"
       - path: "tests/vibe3/clients/test_github_client_prs.py"
         limit: 550
         reason: "GitHub client PR 测试集，覆盖 auth check、PR create/update、review operations、CI 失败分类与检查步骤解析等多个场景，新增 failure category 测试后略微超标；#3026 加强断言参数验证后略微超标"
@@ -361,8 +361,8 @@ code_limits:
         limit: 470
         reason: "FailedGate 测试集，覆盖 unit + integration 测试（gate open/close、severity-aware checks、serve start preflight、heartbeat tick loop），合并后内聚度高，拆分会破坏测试场景完整性"
       - path: "tests/vibe3/orchestra/test_serve.py"
-        limit: 620
-        reason: "Serve 命令测试集，覆盖 start/stop/status/resume/logs 命令、tmux session 管理、port auto-discovery、FailedGate resume 逻辑、全局单例实例管理等紧密耦合场景，新增 3 个集成测试（test_start_blocks_when_instance_running, test_status_displays_instance_directory, test_stop_clears_global_pid_file）验证全局单例行为；PR #1671 review 修复后略微超标"
+        limit: 650
+        reason: "Serve 命令测试集，覆盖 start/stop/status/resume/logs 命令、tmux session 管理、port auto-discovery、FailedGate resume 逻辑、全局单例实例管理等紧密耦合场景，新增 3 个集成测试（test_start_blocks_when_instance_running, test_status_displays_instance_directory, test_stop_clears_global_pid_file）验证全局单例行为；PR #1671 review 修复后略微超标；PR #3246 新增 find_repo_root mock（+8 行）修复 subprocess mock 泄露"
       - path: "tests/vibe3/domain/test_qualify_gate_remote.py"
         limit: 650
         reason: "Qualify gate remote-first + E2E blocked reconciliation 测试集，覆盖 blocked_reason、dependencies、blocked_by_issue 的 remote/local 分支、blocked state change via service layer (#1206)，包含 #994 类 E2E 回归场景；PR #3247 收敛 run_qualify_gate 到 reconcile_blocked 后新增 TestConvergedDispatchGate E2E 回归测试（+20 行）"

@@ -37,12 +37,14 @@ if TYPE_CHECKING:
         clean_error_message,
     )
     from vibe3.utils.git_helpers import (
+        RepositoryLayoutError,
         find_repo_root,
         get_branch_handoff_dir,
         get_commit_message,
         get_current_branch,
         get_git_common_dir,
         get_remote_url,
+        resolve_repo_root_from_common_dir,
     )
     from vibe3.utils.hash_helpers import (
         compute_governance_hash,
@@ -87,6 +89,7 @@ _LAZY_IMPORTS = {
     "EVENT_TRANSITION_COUNT_EXCEEDED": "vibe3.utils.constants",
     "GENERIC_AGENT_MARKER_PATTERN": "vibe3.utils.constants",
     "PACK_REFS_INTERVAL_TICKS": "vibe3.utils.constants",
+    "RepositoryLayoutError": "vibe3.utils.git_helpers",
     "STARTING_TIMEOUT_SECONDS": "vibe3.utils.constants",
     "clean_error_message": "vibe3.utils.error_message_cleaner",
     "diagnose_backend_error": "vibe3.utils.codeagent_helpers",
@@ -114,6 +117,7 @@ _LAZY_IMPORTS = {
     "resolve_milestone_rank": "vibe3.utils.queue_ordering",
     "resolve_priority": "vibe3.utils.queue_ordering",
     "resolve_roadmap_rank": "vibe3.utils.queue_ordering",
+    "resolve_repo_root_from_common_dir": "vibe3.utils.git_helpers",
     "sanitize_prompt_for_display": "vibe3.utils.codeagent_helpers",
     "sanitize_task_shell_meta": "vibe3.utils.codeagent_helpers",
     "sort_ready_issues": "vibe3.utils.queue_ordering",
@@ -153,6 +157,7 @@ __all__ = [
     "EVENT_TRANSITION_COUNT_EXCEEDED",
     "GENERIC_AGENT_MARKER_PATTERN",
     "PACK_REFS_INTERVAL_TICKS",
+    "RepositoryLayoutError",
     "STARTING_TIMEOUT_SECONDS",
     "VERDICT_UNKNOWN",
     "clean_error_message",
@@ -182,6 +187,7 @@ __all__ = [
     "resolve_milestone_rank",
     "resolve_priority",
     "resolve_roadmap_rank",
+    "resolve_repo_root_from_common_dir",
     "sanitize_prompt_for_display",
     "sanitize_task_shell_meta",
     "stream_reader",

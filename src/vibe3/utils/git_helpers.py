@@ -1,5 +1,6 @@
 """Git helper utilities."""
 
+import configparser
 import functools
 import hashlib
 import subprocess
@@ -9,6 +10,98 @@ from loguru import logger
 
 # Delayed import to avoid utils → exceptions circular dependency
 # from vibe3.exceptions import GitError
+
+
+class RepositoryLayoutError(RuntimeError):
+    """Raised when repository topology cannot be resolved safely."""
+
+
+def _layout_error(
+    *,
+    reason: str,
+    git_common_dir: Path,
+    cwd: Path | None = None,
+    worktree_root: Path | None = None,
+) -> RepositoryLayoutError:
+    """Build an actionable repository-layout diagnostic."""
+    return RepositoryLayoutError(
+        "Cannot resolve repository management root: "
+        f"{reason}; cwd={cwd or Path.cwd()}; git_common_dir={git_common_dir}; "
+        f"worktree_root={worktree_root or 'unavailable'}"
+    )
+
+
+def resolve_repo_root_from_common_dir(
+    git_common: str | Path,
+    *,
+    cwd: Path | None = None,
+    worktree_root: Path | None = None,
+) -> Path:
+    """Resolve a repository management root from its Git common directory.
+
+    A non-bare repository stores its common directory at ``<root>/.git``.
+    A bare repository uses the repository directory itself as the common
+    directory. Only ``core.bare`` is authoritative; similarly named keys in
+    other sections must not affect topology detection.
+    """
+    common = Path(git_common).expanduser().resolve()
+    config_path = common / "config"
+
+    parser = configparser.RawConfigParser(
+        interpolation=None,
+        strict=False,
+        allow_no_value=True,
+    )
+    if config_path.is_file():
+        try:
+            with config_path.open(encoding="utf-8") as config_file:
+                parser.read_file(config_file)
+        except (OSError, UnicodeError, configparser.Error) as exc:
+            raise _layout_error(
+                reason=f"cannot read Git config {config_path}: {exc}",
+                git_common_dir=common,
+                cwd=cwd,
+                worktree_root=worktree_root,
+            ) from exc
+    elif common.name != ".git":
+        raise _layout_error(
+            reason=f"Git config is missing or unreadable: {config_path}",
+            git_common_dir=common,
+            cwd=cwd,
+            worktree_root=worktree_root,
+        )
+
+    core_section = next(
+        (section for section in parser.sections() if section.casefold() == "core"),
+        None,
+    )
+    if core_section is not None and parser.has_option(core_section, "bare"):
+        try:
+            is_bare = parser.getboolean(core_section, "bare")
+        except ValueError as exc:
+            raise _layout_error(
+                reason=f"invalid core.bare value in {config_path}: {exc}",
+                git_common_dir=common,
+                cwd=cwd,
+                worktree_root=worktree_root,
+            ) from exc
+        # A bare common dir named .git lives inside a checkout — the parent is
+        # the real management root (worktree topology with core.bare=true).
+        # True bare repos are almost never named .git, so this heuristic
+        # avoids misplacing worktree directories under .git/.
+        if is_bare and common.name == ".git":
+            return common.parent
+        return common if is_bare else common.parent
+
+    if common.name == ".git":
+        return common.parent
+
+    raise _layout_error(
+        reason=f"core.bare is not set in {config_path}",
+        git_common_dir=common,
+        cwd=cwd,
+        worktree_root=worktree_root,
+    )
 
 
 def get_branch_handoff_dir(git_dir: str, branch: str) -> Path:
@@ -200,7 +293,9 @@ def find_repo_root() -> Path:
     try:
         git_common = get_git_common_dir()
         if git_common:
-            return Path(git_common).parent
+            return resolve_repo_root_from_common_dir(git_common, cwd=Path.cwd())
+    except RepositoryLayoutError:
+        raise
     except Exception:
         pass
 
@@ -216,17 +311,23 @@ def find_repo_root() -> Path:
                 gitdir = Path(raw)
                 if not gitdir.is_absolute():
                     gitdir = (cwd / gitdir).resolve()
-                return gitdir.parent.parent.parent
-        except Exception:
-            pass
+                fallback_common = gitdir.parent.parent
+                return resolve_repo_root_from_common_dir(fallback_common, cwd=cwd)
+        except RepositoryLayoutError:
+            raise
+        except (OSError, UnicodeError, ValueError) as exc:
+            raise RepositoryLayoutError(
+                f"Cannot parse linked-worktree Git pointer: cwd={cwd}; "
+                f"git_file={git_path}; error={exc}"
+            ) from exc
 
     # If .git is a directory, cwd IS the main repo
     if git_path.is_dir():
-        return cwd
+        return resolve_repo_root_from_common_dir(git_path, cwd=cwd)
 
     # Last resort: walk up to find .git directory
     for parent in cwd.parents:
         if (parent / ".git").is_dir():
-            return parent
+            return resolve_repo_root_from_common_dir(parent / ".git", cwd=cwd)
 
     raise SystemError("Cannot resolve repository root — not inside a git repository")

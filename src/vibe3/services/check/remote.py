@@ -122,8 +122,10 @@ class CheckRemote:
         from vibe3.exceptions import classify_error_hybrid
 
         # Resolve repo path from git common dir
-        git_common_dir = this.git_client.get_git_common_dir()
-        repo_path = Path(git_common_dir).parent if git_common_dir else Path.cwd()
+        try:
+            repo_path = this.git_client.find_repo_root()
+        except Exception:
+            repo_path = Path.cwd()
 
         cache = MergedPRCache(repo_path)
         from vibe3.services.orchestra import record_error
