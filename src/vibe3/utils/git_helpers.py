@@ -85,6 +85,12 @@ def resolve_repo_root_from_common_dir(
                 cwd=cwd,
                 worktree_root=worktree_root,
             ) from exc
+        # A bare common dir named .git lives inside a checkout — the parent is
+        # the real management root (worktree topology with core.bare=true).
+        # True bare repos are almost never named .git, so this heuristic
+        # avoids misplacing worktree directories under .git/.
+        if is_bare and common.name == ".git":
+            return common.parent
         return common if is_bare else common.parent
 
     if common.name == ".git":
