@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import subprocess
 from typing import Protocol
 
@@ -82,24 +81,30 @@ class GhIssueLabelPort:
             return None
 
     def get_issue_labels(self, issue_number: int) -> list[str] | None:
-        result = self._run_command(
-            ["gh", "issue", "view", str(issue_number), "--json", "labels"],
-            issue_number=issue_number,
-        )
-        if result is None:
-            return None
+        """Fetch issue labels via GitHubClient.view_issue (shared gh I/O path).
 
-        if result.returncode != 0:
+        Delegates to the same `gh issue view` call GitHubClient already uses
+        elsewhere, instead of maintaining a second, independent subprocess
+        implementation of the identical operation.
+        """
+        from vibe3.clients.github_client import GitHubClient
+
+        payload = GitHubClient().view_issue(
+            issue_number, repo=self.repo, fields=["labels"]
+        )
+        if not isinstance(payload, dict):
             logger.bind(
                 external="github",
                 issue_number=issue_number,
-                error=result.stderr,
             ).warning("Failed to fetch issue labels")
             return None
 
-        data = json.loads(result.stdout)
-        labels = data.get("labels", [])
-        return [label.get("name", "") for label in labels if label.get("name")]
+        labels = payload.get("labels", [])
+        return [
+            label.get("name", "")
+            for label in labels
+            if isinstance(label, dict) and label.get("name")
+        ]
 
     def add_issue_label(self, issue_number: int, label: str) -> bool:
         result = self._run_command(
