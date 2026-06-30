@@ -15,7 +15,7 @@
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| __init__.py | 78 | Adapter 注册表（注册、查询、延迟加载） |
+| __init__.py | 68 | Adapter 注册表（注册、查询、延迟加载） |
 | vibe_center.py | 151 | VibeCenter 适配器 manifest 构建 |
 | github_flow.py | 36 | GitHub Flow 适配器 manifest 构建 |
 | resource_root.py | 63 | Resource root 解析（marker-based） |
@@ -24,11 +24,10 @@
 
 ## 公共 API
 
-从 `__init__.py` 的 `__all__` 导出的 3 个符号：
+从 `__init__.py` 的 `__all__` 导出的 2 个符号：
 
 - `register_adapter(manifest)` — 注册 adapter manifest
 - `get_adapter(name)` — 获取 adapter（支持 lazy loading）
-- `list_adapters()` — 列出所有注册的 adapter 名称
 
 注：`resource_root.py` 的 `resolve_resource_root()` 和 `ResourceRootNotFoundError` 为内部实现，未从 `adapters` 重导出。
 
