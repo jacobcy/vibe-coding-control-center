@@ -63,6 +63,7 @@ class SyncExecutionContext:
     branch: str | None
     store: SQLiteClient | None
     before_state_label: str | None
+    before_state_labels: frozenset[str]
     execution_cwd: Path
     commit_count_before: int | None = None
     before_issue_is_closed: bool = False
@@ -241,6 +242,7 @@ class CodeagentExecutionService:
         # Remote source of truth: GitHub issue labels, not local SQLite cache.
         # Also capture whether the issue is closed before agent execution.
         before_state_label: str | None = None
+        before_state_labels: set[str] = set()
         before_issue_is_closed = False
         if command.issue_number is not None:
             try:
@@ -260,8 +262,9 @@ class CodeagentExecutionService:
                             if isinstance(label, dict):
                                 name = label.get("name")
                                 if isinstance(name, str) and name.startswith("state/"):
-                                    before_state_label = name
-                                    break
+                                    before_state_labels.add(name)
+                                    if before_state_label is None:
+                                        before_state_label = name
                     # Check if issue is closed
                     if str(issue_payload.get("state", "")).upper() == "CLOSED":
                         before_issue_is_closed = True
@@ -288,6 +291,7 @@ class CodeagentExecutionService:
             branch=branch,
             store=store,
             before_state_label=before_state_label,
+            before_state_labels=frozenset(before_state_labels),
             execution_cwd=execution_cwd,
             commit_count_before=commit_count_before,
             before_issue_is_closed=before_issue_is_closed,
@@ -364,6 +368,7 @@ class CodeagentExecutionService:
                     actor=ctx.actor,
                     role=command.role,
                     before_state_label=ctx.before_state_label,
+                    before_state_labels=ctx.before_state_labels,
                     repo=getattr(self.config, "repo", None),
                     flow_state=flow_state,
                     tick_id=command.tick_id,

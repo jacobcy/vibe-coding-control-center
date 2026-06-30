@@ -31,8 +31,8 @@ class TestPlannerNoOpGate:
 
         with (
             patch(
-                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label",
-                return_value=("state/claimed", False),
+                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_labels",
+                return_value=(frozenset({"state/claimed"}), False),
             ),
             patch(
                 "vibe3.services.issue.failure.block_planner_noop_issue"
@@ -61,8 +61,8 @@ class TestPlannerNoOpGate:
 
         with (
             patch(
-                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label",
-                return_value=("state/handoff", False),
+                "vibe3.execution.state_verification.StateVerificationService.get_issue_state_labels",
+                return_value=(frozenset({"state/handoff"}), False),
             ),
             patch(
                 "vibe3.services.issue.failure.block_planner_noop_issue"

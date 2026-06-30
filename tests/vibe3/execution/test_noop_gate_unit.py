@@ -109,6 +109,38 @@ class TestApplyUnifiedNoopGate:
         assert "state/plan" in event_args[1]["detail"]
         assert "state/ready" in event_args[1]["detail"]
 
+    def test_added_state_label_passes_when_stale_label_remains(self) -> None:
+        """A newly added state is a transition even if the old label remains."""
+        store = _make_mock_store()
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue.failure.block_executor_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = {
+                "labels": [
+                    {"name": "state/in-progress"},
+                    {"name": "state/handoff"},
+                ],
+                "state": "open",
+            }
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=42,
+                branch="task/issue-42",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/in-progress",
+                before_state_labels=frozenset({"state/in-progress"}),
+            )
+
+        mock_block.assert_not_called()
+        event_args = store.add_event.call_args
+        assert event_args[0][1] == "state_transitioned"
+        assert event_args[1]["refs"]["after_state"] == "state/handoff"
+
     def test_blocks_executor_when_state_unchanged(self) -> None:
         """Executor is blocked when state is unchanged."""
         store = _make_mock_store()
@@ -474,8 +506,8 @@ class TestApplyUnifiedNoopGate:
         assert "state/handoff" in event_args[1]["detail"]
 
 
-def test_state_verification_picks_highest_priority_label(monkeypatch):
-    """Multi state label: highest priority (in-progress > handoff) must win."""
+def test_state_verification_returns_complete_state_label_set(monkeypatch):
+    """State verification preserves every remote state label."""
     from vibe3.execution.state_verification import StateVerificationService
 
     svc = StateVerificationService()
@@ -495,7 +527,10 @@ def test_state_verification_picks_highest_priority_label(monkeypatch):
         fake_view_issue,
     )
 
-    label, is_closed = svc.get_issue_state_label(42)
-    # "in-progress" beats "handoff" in STATE_PRIORITY_ORDER
-    assert label == "state/in-progress"
+    state_labels, is_closed = svc.get_issue_state_labels(42)
+    assert state_labels == frozenset({"state/handoff", "state/in-progress"})
     assert is_closed is False
+
+    # The singular API remains a compatibility view for existing callers.
+    label, _ = svc.get_issue_state_label(42)
+    assert label == "state/in-progress"

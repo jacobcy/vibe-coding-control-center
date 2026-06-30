@@ -52,6 +52,7 @@ def apply_unified_noop_gate(
     actor: str,
     role: ExecutionRole,
     before_state_label: str | None,
+    before_state_labels: frozenset[str] | None = None,
     repo: str | None = None,
     flow_state: dict | None = None,
     tick_id: int = 0,
@@ -78,7 +79,12 @@ def apply_unified_noop_gate(
     _block_fn = get_role_block_function(role)
     _contract = get_role_output_contract(role)
 
-    if not before_state_label:
+    effective_before_labels = (
+        before_state_labels
+        if before_state_labels is not None
+        else frozenset({before_state_label}) if before_state_label else frozenset()
+    )
+    if not effective_before_labels:
         logger.bind(
             domain="codeagent",
             role=role,
@@ -87,15 +93,24 @@ def apply_unified_noop_gate(
         ).info("No-op gate SKIP: issue has no state/ label")
         return
 
-    # Get after_state_label and after_issue_is_closed from single API call
+    # Read the complete state-label set in one API call. A newly added label is
+    # the transition target even when a stale, higher-priority label remains.
     verifier = StateVerificationService(store=store)
-    after_state_label, after_issue_is_closed = verifier.get_issue_state_label(
+    after_state_labels, after_issue_is_closed = verifier.get_issue_state_labels(
         issue_number=issue_number,
         repo=repo,
         branch=branch,
         flow_state=flow_state,
         tick_id=tick_id,
     )
+    from vibe3.services.shared.labels import get_highest_priority_state
+
+    added_state_labels = after_state_labels - effective_before_labels
+    target_candidates = added_state_labels or after_state_labels
+    after_state_label = get_highest_priority_state(list(target_candidates))
+    if after_state_label is None and target_candidates:
+        after_state_label = min(target_candidates)
+    state_set_changed = effective_before_labels != after_state_labels
 
     # If the issue was open before agent execution but is now closed,
     # treat this as a meaningful terminal transition regardless of state label.
@@ -347,7 +362,7 @@ def apply_unified_noop_gate(
             )
             return
 
-    if before_state_label == after_state_label:
+    if not state_set_changed:
         # Special case: executor publish (vibe run --skill publish)
         # creates a PR without changing the state label. When a PR
         # already exists on the branch, treat this as a valid pass

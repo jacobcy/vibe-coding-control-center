@@ -91,9 +91,9 @@ def test_resume_resets_single_step_limit_counter(tmp_path):
         return_value=mock_block_fn,
     ):
         with patch(
-            "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label"
+            "vibe3.execution.state_verification.StateVerificationService.get_issue_state_labels"
         ) as mock_state:
-            mock_state.return_value = ("state/handoff", False)
+            mock_state.return_value = (frozenset({"state/handoff"}), False)
 
             apply_unified_noop_gate(
                 store=db,
@@ -183,9 +183,9 @@ def test_resume_resets_hard_limit_counter(tmp_path):
         return_value=mock_block_fn,
     ):
         with patch(
-            "vibe3.execution.state_verification.StateVerificationService.get_issue_state_label"
+            "vibe3.execution.state_verification.StateVerificationService.get_issue_state_labels"
         ) as mock_state:
-            mock_state.return_value = ("state/handoff", False)
+            mock_state.return_value = (frozenset({"state/handoff"}), False)
 
             apply_unified_noop_gate(
                 store=db,
