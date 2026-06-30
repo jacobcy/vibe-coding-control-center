@@ -2,10 +2,9 @@
 
 Public API Contract:
 - HandoffService: Main handoff service
-- HandoffStatusService, HandoffStatusResult: Status tracking
+- HandoffStatusService: Status tracking
 - HandoffStorage: Storage operations
-- resolve_handoff_target, is_shared_handoff_ref, to_display_target: Resolution utilities
-- validate_authoritative_ref: Validation utilities
+- resolve_handoff_target: Resolution utilities
 
 All exports are part of the public API.
 """
@@ -13,49 +12,23 @@ All exports are part of the public API.
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from vibe3.services.handoff.resolution import (
-        is_shared_handoff_ref,
-        resolve_handoff_target,
-        to_display_target,
-    )
+    from vibe3.services.handoff.resolution import resolve_handoff_target
     from vibe3.services.handoff.service import HandoffService
-    from vibe3.services.handoff.status import (
-        HandoffStatusResult,
-        HandoffStatusService,
-    )
+    from vibe3.services.handoff.status import HandoffStatusService
     from vibe3.services.handoff.storage import HandoffStorage
-    from vibe3.services.handoff.validation import validate_authoritative_ref
 
 __all__ = [
-    # Classes - service
     "HandoffService",
-    # Classes - status
     "HandoffStatusService",
-    "HandoffStatusResult",
-    # Classes - storage
     "HandoffStorage",
-    # Functions - resolution
     "resolve_handoff_target",
-    "is_shared_handoff_ref",
-    "to_display_target",
-    # Functions - validation
-    "validate_authoritative_ref",
 ]
 
 _SYMBOL_MODULES = {
-    # Classes - service
     "HandoffService": "vibe3.services.handoff.service",
-    # Classes - status
     "HandoffStatusService": "vibe3.services.handoff.status",
-    "HandoffStatusResult": "vibe3.services.handoff.status",
-    # Classes - storage
     "HandoffStorage": "vibe3.services.handoff.storage",
-    # Functions - resolution
     "resolve_handoff_target": "vibe3.services.handoff.resolution",
-    "is_shared_handoff_ref": "vibe3.services.handoff.resolution",
-    "to_display_target": "vibe3.services.handoff.resolution",
-    # Functions - validation
-    "validate_authoritative_ref": "vibe3.services.handoff.validation",
 }
 
 

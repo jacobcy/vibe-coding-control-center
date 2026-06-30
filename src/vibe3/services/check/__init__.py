@@ -4,7 +4,6 @@ Public API Contract:
 - CheckService: Main check orchestration service
 - CheckResult: Result type for check operations
 - CheckCleanupService: Cleanup service for check resources
-- CheckPRService: PR-specific check operations
 - InitResult: Result type for initialization
 
 All other symbols are internal to the check package and should be imported directly.
@@ -14,7 +13,6 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from vibe3.services.check.cleanup import CheckCleanupService
-    from vibe3.services.check.pr_service import CheckPRService
     from vibe3.services.check.remote import InitResult
     from vibe3.services.check.service import CheckResult, CheckService
 
@@ -22,7 +20,6 @@ __all__ = [
     "CheckService",
     "CheckResult",
     "CheckCleanupService",
-    "CheckPRService",
     "InitResult",
 ]
 
@@ -30,7 +27,6 @@ _SYMBOL_MODULES = {
     "CheckService": "vibe3.services.check.service",
     "CheckResult": "vibe3.models.check_result",
     "CheckCleanupService": "vibe3.services.check.cleanup",
-    "CheckPRService": "vibe3.services.check.pr_service",
     "InitResult": "vibe3.services.check.remote",
 }
 

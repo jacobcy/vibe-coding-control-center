@@ -17,7 +17,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.exceptions import GitHubAPIError
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 from vibe3.services.flow import FlowService, FlowTimelineService
-from vibe3.services.issue import fail_issue
+from vibe3.services.issue.failure import fail_issue
 
 
 @pytest.fixture
