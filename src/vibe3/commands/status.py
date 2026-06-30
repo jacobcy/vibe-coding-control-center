@@ -345,16 +345,14 @@ def _full_status_dashboard(
         render_rfc_items,
         render_supervisor_issues,
     )
-    from vibe3.services.task import (
-        classify_task_issues_for_rendering,
-        fetch_task_status_data,
-    )
+    from vibe3.services.task import classify_task_issues_for_rendering
+    from vibe3.services.task.status import _perform_status_fetch
 
     if check:
         run_full_check_shortcut()
 
     # Fetch all data via service layer
-    data = fetch_task_status_data(all_flows=all_flows)
+    data = _perform_status_fetch(all_flows=all_flows)
 
     # Handle JSON/YAML output
     if output_format in ("json", "yaml"):
