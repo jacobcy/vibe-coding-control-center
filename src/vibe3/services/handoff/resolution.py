@@ -510,20 +510,3 @@ def resolve_handoff_target(
 
     # Namespace 2: relative path → worktree canonical ref
     return _resolve_worktree_artifact(target, branch, git_client)
-
-
-def is_shared_handoff_ref(ref_value: str) -> bool:
-    """Return True if the stored ref points to a shared handoff artifact."""
-    return ref_value.startswith(_SHARED_HANDOFF_PREFIX)
-
-
-def to_display_target(ref_value: str) -> str:
-    """Convert a stored ref value to a display target for ``handoff show``.
-
-    ``vibe3/handoff/task-xxx/run.md`` → ``@task-xxx/run.md``
-    Other relative paths → returned as-is (canonical worktree ref).
-    Absolute paths → returned as-is.
-    """
-    if ref_value.startswith(_SHARED_HANDOFF_PREFIX):
-        return "@" + ref_value[len(_SHARED_HANDOFF_PREFIX) :]
-    return ref_value

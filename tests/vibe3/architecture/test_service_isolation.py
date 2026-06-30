@@ -33,7 +33,6 @@ PUBLIC_APIS = {
         "IssueFlowService",
         "IssueTitleCacheService",
         "load_issue_info",
-        "fail_issue",
     },
     "services.task": {
         "TaskService",

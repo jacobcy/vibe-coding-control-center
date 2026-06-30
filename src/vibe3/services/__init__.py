@@ -57,7 +57,6 @@ if TYPE_CHECKING:
     from vibe3.services.issue.failure import (
         block_manager_noop_issue,
         fail_executor_issue,
-        fail_issue,
         fail_manager_issue,
         fail_planner_issue,
         fail_reviewer_issue,
@@ -205,7 +204,6 @@ __all__ = [
     "create_flow_manager",
     "emit_issue_failed",
     "fail_executor_issue",
-    "fail_issue",
     "fail_manager_issue",
     "fail_planner_issue",
     "fail_reviewer_issue",
@@ -302,7 +300,6 @@ _SYMBOL_MODULES = {
     "create_flow_manager": "vibe3.services.flow.factory",
     "emit_issue_failed": "vibe3.services.shared.binding_guard",
     "fail_executor_issue": "vibe3.services.issue.failure",
-    "fail_issue": "vibe3.services.issue.failure",
     "fail_manager_issue": "vibe3.services.issue.failure",
     "fail_planner_issue": "vibe3.services.issue.failure",
     "fail_reviewer_issue": "vibe3.services.issue.failure",
