@@ -84,6 +84,21 @@ def test_confirm_issue_state_cleans_up_stale_label_when_multiple_exist() -> None
     assert port.labels[123] == ["state/handoff"]
 
 
+def test_confirm_issue_state_cleans_up_stale_lower_priority_label() -> None:
+    """confirm_issue_state must not short-circuit just because the target
+    happens to already be the highest-priority label — a stale, lower
+    priority label coexisting must still get cleaned up, same invariant
+    replace_issue_state() already enforces for the blocked-reconcile path.
+    """
+    port = FakeIssuePort({123: ["state/handoff", "state/claimed"]})
+    service = LabelService(issue_port=port)
+
+    result = service.confirm_issue_state(123, IssueState.HANDOFF, actor="agent:run")
+
+    assert result == "advanced"
+    assert port.labels[123] == ["state/handoff"]
+
+
 def test_confirm_issue_state_returns_confirmed_when_already_target() -> None:
     port = FakeIssuePort({123: ["state/in-progress"]})
     service = LabelService(issue_port=port)
