@@ -71,6 +71,23 @@ def test_real_bare_repo_worktree_returns_bare_repo(tmp_path: Path) -> None:
     assert resolve_repo_root_from_common_dir(common) == bare_repo
 
 
+def test_non_bare_with_core_bare_true_returns_parent_checkout(
+    tmp_path: Path,
+) -> None:
+    """When core.bare=true is set in a non-bare repo with linked worktrees,
+    resolve_repo_root_from_common_dir must still return the parent checkout
+    (the real management root), not the .git directory."""
+    main, worktree = _create_non_bare_worktree(tmp_path)
+    # Simulate worktree topology: set core.bare=true in the main .git/config
+    _run_git(["config", "core.bare", "true"], main)
+    common = _run_git(
+        ["rev-parse", "--path-format=absolute", "--git-common-dir"], worktree
+    )
+    # common is main/.git, and even with core.bare=true it has linked
+    # worktrees — the management root must be the parent checkout.
+    assert resolve_repo_root_from_common_dir(common) == main
+
+
 def test_non_core_bare_key_does_not_mark_repo_bare(tmp_path: Path) -> None:
     """Only core.bare controls repository topology classification."""
     main, _ = _create_non_bare_worktree(tmp_path)
