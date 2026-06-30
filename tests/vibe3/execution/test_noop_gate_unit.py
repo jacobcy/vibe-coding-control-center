@@ -109,38 +109,6 @@ class TestApplyUnifiedNoopGate:
         assert "state/plan" in event_args[1]["detail"]
         assert "state/ready" in event_args[1]["detail"]
 
-    def test_added_state_label_passes_when_stale_label_remains(self) -> None:
-        """A newly added state is a transition even if the old label remains."""
-        store = _make_mock_store()
-
-        with (
-            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
-            patch(
-                "vibe3.services.issue.failure.block_executor_noop_issue"
-            ) as mock_block,
-        ):
-            mock_gh.return_value.view_issue.return_value = {
-                "labels": [
-                    {"name": "state/in-progress"},
-                    {"name": "state/handoff"},
-                ],
-                "state": "open",
-            }
-            apply_unified_noop_gate(
-                store=store,
-                issue_number=42,
-                branch="task/issue-42",
-                actor="agent:run",
-                role="executor",
-                before_state_label="state/in-progress",
-                before_state_labels=frozenset({"state/in-progress"}),
-            )
-
-        mock_block.assert_not_called()
-        event_args = store.add_event.call_args
-        assert event_args[0][1] == "state_transitioned"
-        assert event_args[1]["refs"]["after_state"] == "state/handoff"
-
     def test_blocks_executor_when_state_unchanged(self) -> None:
         """Executor is blocked when state is unchanged."""
         store = _make_mock_store()

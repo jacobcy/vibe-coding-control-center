@@ -166,13 +166,9 @@ class TestExecuteSyncGateIntegration:
                 "vibe3.execution.codeagent_runner.apply_unified_noop_gate"
             ) as mock_gate,
         ):
-            mock_gh.return_value.view_issue.return_value = {
-                "labels": [
-                    {"name": "state/plan"},
-                    {"name": "state/handoff"},
-                ],
-                "state": "open",
-            }
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/plan"
+            )
             mock_backend.return_value.run.return_value = agent_result
             mock_opts.return_value = MagicMock()
             service = CodeagentExecutionService()
@@ -181,9 +177,6 @@ class TestExecuteSyncGateIntegration:
         # Verify before_state_label was captured from GitHub
         gate_kwargs = mock_gate.call_args[1]
         assert gate_kwargs["before_state_label"] == "state/plan"
-        assert gate_kwargs["before_state_labels"] == frozenset(
-            {"state/plan", "state/handoff"}
-        )
 
     def test_executor_records_passive_run_artifact_when_report_ref_missing(
         self,

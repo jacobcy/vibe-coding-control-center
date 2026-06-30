@@ -46,7 +46,7 @@ def test_verify_branch_recovers_missing_state_label_from_flow_refs(
         "vibe3.services.flow.blocked_state_io.LabelService"
     ) as mock_label_service_cls:
         mock_label_service = MagicMock()
-        mock_label_service.confirm_issue_state.return_value = "advanced"
+        mock_label_service.replace_issue_state.return_value = "normalized"
         mock_label_service_cls.return_value = mock_label_service
 
         service = CheckService(
@@ -56,11 +56,10 @@ def test_verify_branch_recovers_missing_state_label_from_flow_refs(
         result = service.verify_branch(branch)
 
         assert result.is_valid is True
-        mock_label_service.confirm_issue_state.assert_called_once_with(
+        mock_label_service.replace_issue_state.assert_called_once_with(
             501,
             IssueState.IN_PROGRESS,
             actor="recovery:resume",
-            force=True,
         )
 
 
