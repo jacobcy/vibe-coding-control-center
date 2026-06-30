@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
-from vibe3.clients import parse_linked_issues
-from vibe3.models import IssueLink, IssueState
+from vibe3.clients import normalize_labels, parse_linked_issues
+from vibe3.models import FlowState, IssueLink, IssueState
+from vibe3.services.shared.labels import resolve_state_label
 
 
 @dataclass
@@ -25,23 +26,33 @@ if TYPE_CHECKING:
     pass
 
 
-def issue_state_from_payload(issue: object) -> IssueState | None:
-    """Extract issue state from GitHub payload."""
+def issue_state_from_payload(
+    issue: object,
+    *,
+    flow_state: dict[str, object] | FlowState | None = None,
+) -> IssueState | None:
+    """Extract issue state from GitHub payload.
+
+    Resolution authority (in order):
+    1. **Flow truth** - when ``flow_state`` is supplied, derive the label
+       from the local execution artifacts via ``infer_resume_label`` (the
+       same signal used by ``vibe3 task resume --label auto``).  This takes
+       precedence over whatever GitHub API happened to return.
+    2. **Static fallback** - when ``flow_state`` is absent, fall back to
+       ``get_highest_priority_state`` (``_STATE_PRIORITY_ORDER``).
+
+    Without this layered resolution, an issue carrying stale lower-priority
+    labels could mask its real state when the mitigation in
+    ``sync_rules.local.multi_state_label_fix`` is disabled.
+    """
     if not isinstance(issue, dict):
         return None
-    labels = issue.get("labels")
-    if not isinstance(labels, list):
+    raw_labels = issue.get("labels")
+    if not isinstance(raw_labels, list):
         return None
-    for item in labels:
-        if not isinstance(item, dict):
-            continue
-        name = item.get("name")
-        if not isinstance(name, str):
-            continue
-        parsed = IssueState.from_label(name)
-        if parsed is not None:
-            return parsed
-    return None
+    labels = normalize_labels(raw_labels)
+    highest = resolve_state_label(labels, flow_state=flow_state)
+    return IssueState.from_label(highest) if highest else None
 
 
 def requires_handoff(issue_state: IssueState | None) -> bool:

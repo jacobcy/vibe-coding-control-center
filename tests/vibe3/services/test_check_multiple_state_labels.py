@@ -206,3 +206,184 @@ def test_merge_ready_included_in_priority_list(check_service):
 
         assert len(warnings) == 1
         assert len(issues) == 0
+
+
+class TestIssueStateFromPayload:
+    """Direct unit tests for issue_state_from_payload() function."""
+
+    def test_github_order_differs_from_priority(self):
+        """Test that priority order wins, not GitHub API order."""
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        # GitHub returns [blocked, ready], but blocked has higher priority
+        issue = {"labels": [{"name": "state/blocked"}, {"name": "state/ready"}]}
+        result = issue_state_from_payload(issue)
+        assert result == IssueState.BLOCKED
+
+    def test_github_order_reversed_vs_priority(self):
+        """Test that priority wins when GitHub lists in reverse."""
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        # GitHub returns [ready, handoff, blocked], but blocked is highest
+        issue = {
+            "labels": [
+                {"name": "state/ready"},
+                {"name": "state/handoff"},
+                {"name": "state/blocked"},
+            ]
+        }
+        result = issue_state_from_payload(issue)
+        assert result == IssueState.BLOCKED
+
+    def test_single_state_label(self):
+        """Test that single state label is correctly extracted."""
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        issue = {"labels": [{"name": "state/handoff"}]}
+        result = issue_state_from_payload(issue)
+        assert result == IssueState.HANDOFF
+
+    def test_no_state_labels(self):
+        """Test that non-state labels return None."""
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        issue = {"labels": [{"name": "priority/high"}, {"name": "bug"}]}
+        result = issue_state_from_payload(issue)
+        assert result is None
+
+    def test_non_list_labels(self):
+        """Test that non-list labels field returns None."""
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        issue = {"labels": "not-a-list"}
+        result = issue_state_from_payload(issue)
+        assert result is None
+
+    def test_not_a_dict(self):
+        """Test that non-dict payload returns None."""
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        result = issue_state_from_payload("not-a-dict")
+        assert result is None
+
+    def test_mixed_known_unknown_state(self):
+        """Test that unknown state prefixes are ignored, known wins."""
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        # state/unknown-future is not in priority order, state/review is
+        issue = {
+            "labels": [
+                {"name": "state/unknown-future"},
+                {"name": "state/review"},
+            ]
+        }
+        result = issue_state_from_payload(issue)
+        assert result == IssueState.REVIEW
+
+    def test_empty_labels(self):
+        """Test that empty labels list returns None."""
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        issue = {"labels": []}
+        result = issue_state_from_payload(issue)
+        assert result is None
+
+
+class TestIssueStateFromFlowState:
+    """Direct unit tests for issue_state_from_payload() flow-truth path.
+
+    When a ``FlowState`` is supplied, the local execution artifacts
+    (``pr_ref`` / ``report_ref`` / ``latest_verdict`` etc.) take precedence
+    over whatever GitHub API happened to return — matching the semantics of
+    ``vibe3 task resume --label auto``.
+    """
+
+    def test_flow_with_report_ref_overrides_stale_labels(self):
+        """plan_ref + report_ref -> REVIEW, even if issue still has stale labels."""
+        from vibe3.models import FlowState
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        issue = {
+            "labels": [
+                {"name": "state/blocked"},
+                {"name": "state/ready"},
+            ]
+        }
+        flow_state = FlowState(
+            branch="task/issue-1",
+            flow_slug="default",
+            flow_status="active",
+            plan_ref="runs/1",
+            report_ref="runs/123",
+        )
+        result = issue_state_from_payload(issue, flow_state=flow_state)
+        assert result == IssueState.REVIEW
+
+    def test_flow_with_pr_ref_overrides_priority(self):
+        """Flow with pr_ref -> HANDOFF, even if issue has higher-priority labels."""
+        from vibe3.models import FlowState
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        issue = {
+            "labels": [
+                {"name": "state/blocked"},
+                {"name": "state/review"},
+            ]
+        }
+        flow_state = FlowState(
+            branch="task/issue-1",
+            flow_slug="default",
+            flow_status="active",
+            pr_ref="https://github.com/x/pull/1",
+        )
+        result = issue_state_from_payload(issue, flow_state=flow_state)
+        assert result == IssueState.HANDOFF
+
+    def test_flow_with_plan_ref_only(self):
+        """Flow with only plan_ref -> IN_PROGRESS."""
+        from vibe3.models import FlowState
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        issue = {"labels": [{"name": "state/ready"}]}
+        flow_state = FlowState(
+            branch="task/issue-1",
+            flow_slug="default",
+            flow_status="active",
+            plan_ref="runs/1",
+        )
+        result = issue_state_from_payload(issue, flow_state=flow_state)
+        assert result == IssueState.IN_PROGRESS
+
+    def test_flow_with_pass_verdict(self):
+        """Flow with PASS verdict -> MERGE_READY."""
+        from vibe3.models import FlowState, VerdictRecord
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        issue = {"labels": [{"name": "state/review"}]}
+        flow_state = FlowState(
+            branch="task/issue-1",
+            flow_slug="default",
+            flow_status="active",
+            latest_verdict=VerdictRecord(
+                verdict="PASS",
+                actor="test",
+                role="reviewer",
+                timestamp="2026-01-01T00:00:00",
+                flow_branch="task/issue-1",
+            ),
+        )
+        result = issue_state_from_payload(issue, flow_state=flow_state)
+        assert result == IssueState.MERGE_READY
+
+    def test_no_flow_state_falls_back_to_priority(self):
+        """Without flow_state, fall back to static priority order."""
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        issue = {
+            "labels": [
+                {"name": "state/ready"},
+                {"name": "state/blocked"},
+            ]
+        }
+        result = issue_state_from_payload(issue)
+        assert result == IssueState.BLOCKED
