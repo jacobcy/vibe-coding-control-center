@@ -106,13 +106,12 @@ def _dispatch_role_intent(
             # Check if bottom layer already recorded a specific error
             # If yes, skip E_DISPATCH_FAILURE to avoid duplicate
             # If no, record E_DISPATCH_FAILURE for infrastructure visibility
-            from vibe3.services.shared import has_recent_specific_error
+            from vibe3.services.orchestra import ErrorTrackingService
 
-            if has_recent_specific_error(
+            if ErrorTrackingService.get_instance(store=store).has_recent_specific_error(
                 issue_number=issue_number,
                 branch=branch,
                 within_seconds=60,
-                store=store,
             ):
                 # Bottom layer recorded specific error - skip duplicate
                 logger.bind(

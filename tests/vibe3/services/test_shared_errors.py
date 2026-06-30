@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from vibe3.services.shared.errors import log_dispatch_error
+from vibe3.services.shared.errors import has_recent_specific_error, log_dispatch_error
 
 
 class TestLogDispatchError:
@@ -65,3 +65,48 @@ class TestLogDispatchError:
 
         expected = f"Review dispatch failed: {full_text[:200]}..."
         mock_logger.bind.return_value.warning.assert_called_once_with(expected)
+
+
+class TestHasRecentSpecificError:
+    """Tests for has_recent_specific_error thin-reexport shell."""
+
+    def test_delegates_to_error_tracking_service(self) -> None:
+        """Verify shared shell delegates to ErrorTrackingService."""
+        mock_store = MagicMock()
+        mock_service = MagicMock()
+        mock_service.has_recent_specific_error.return_value = True
+
+        with patch(
+            "vibe3.services.orchestra.error_tracking.service.ErrorTrackingService.get_instance",
+            return_value=mock_service,
+        ):
+            result = has_recent_specific_error(
+                issue_number=123,
+                branch="test-branch",
+                within_seconds=60,
+                store=mock_store,
+            )
+
+        assert result is True
+        mock_service.has_recent_specific_error.assert_called_once_with(
+            issue_number=123,
+            branch="test-branch",
+            within_seconds=60,
+        )
+
+    def test_returns_false_on_exception(self) -> None:
+        """Verify conservative False return on exception."""
+        mock_store = MagicMock()
+
+        with patch(
+            "vibe3.services.orchestra.error_tracking.service.ErrorTrackingService.get_instance",
+            side_effect=Exception("Service error"),
+        ):
+            result = has_recent_specific_error(
+                issue_number=123,
+                branch="test-branch",
+                within_seconds=60,
+                store=mock_store,
+            )
+
+        assert result is False

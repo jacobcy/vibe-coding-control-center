@@ -53,6 +53,9 @@ from vibe3.services.orchestra.error_tracking.queries import (
 from vibe3.services.orchestra.error_tracking.queries import (
     has_model_config_error as _has_model_config_error,
 )
+from vibe3.services.orchestra.error_tracking.queries import (
+    has_recent_specific_error as _has_recent_specific_error,
+)
 
 
 class ErrorTrackingService:
@@ -252,6 +255,23 @@ class ErrorTrackingService:
     def has_critical_error(self) -> bool:
         """Check if there are any CRITICAL severity errors."""
         return _has_critical_error(self.db_path)
+
+    def has_recent_specific_error(
+        self,
+        issue_number: int | None,
+        branch: str | None,
+        within_seconds: int = 60,
+    ) -> bool:
+        """Check if a specific (non-dispatch) error was recently recorded."""
+        try:
+            return _has_recent_specific_error(
+                self.db_path,
+                issue_number=issue_number,
+                branch=branch,
+                within_seconds=within_seconds,
+            )
+        except Exception:
+            return False
 
     def get_critical_error_codes(self) -> list[str]:
         """Get error codes of CRITICAL severity errors."""
