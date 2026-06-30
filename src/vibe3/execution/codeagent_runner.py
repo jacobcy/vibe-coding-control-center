@@ -29,6 +29,7 @@ from vibe3.execution.execution_lifecycle import (
 from vibe3.execution.noop_gate import apply_unified_noop_gate
 from vibe3.execution.session_service import load_session_id
 from vibe3.models import AgentOptions, ExecutionRequest
+from vibe3.services.flow import FlowService
 from vibe3.services.handoff import HandoffService
 from vibe3.services.shared import format_agent_actor
 
@@ -373,6 +374,7 @@ class CodeagentExecutionService:
                     flow_state=flow_state,
                     tick_id=command.tick_id,
                     before_issue_is_closed=ctx.before_issue_is_closed,
+                    flow_service=FlowService(),
                 )
 
                 # Persist transition_count after gate call
