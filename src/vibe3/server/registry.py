@@ -44,8 +44,15 @@ def _resolve_dispatcher_models_root(
 
 
 def _resolve_orchestra_log_dir(launch_cwd: Path | None = None) -> Path:
-    """Resolve the shared orchestra log root anchored to the launch cwd."""
-    return (launch_cwd or Path.cwd()).resolve() / "temp" / "logs"
+    """Resolve the shared orchestra log root anchored to the repo root.
+
+    Always uses find_repo_root() to anchor temp/logs in the repository root,
+    regardless of the current working directory at launch time.
+    The launch_cwd parameter is retained for backward compatibility but ignored.
+    """
+    from vibe3.utils import find_repo_root
+
+    return find_repo_root() / "temp" / "logs"
 
 
 def _build_server(config: "OrchestraConfig") -> tuple["HeartbeatServer", "FastAPI"]:
