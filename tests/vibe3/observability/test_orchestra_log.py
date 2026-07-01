@@ -476,3 +476,23 @@ def test_supervisor_event_format(tmp_path: Path, enable_event_log):
     assert "[supervisor]" not in content
     # But it should have a timestamp
     assert content.startswith("[")
+
+
+# Step 9: Test logs_root function (2 tests)
+
+
+def test_logs_root_anchored_to_find_repo_root(tmp_path: Path, monkeypatch) -> None:
+    """logs_root() returns main-repo /temp/logs, not cwd."""
+    from unittest.mock import patch
+
+    monkeypatch.delenv("VIBE3_ASYNC_LOG_DIR", raising=False)
+    with patch(
+        "vibe3.utils.find_repo_root",
+        return_value=tmp_path,
+    ):
+        assert mod.logs_root() == tmp_path / "temp" / "logs"
+
+
+def test_logs_root_honors_env_override(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("VIBE3_ASYNC_LOG_DIR", str(tmp_path / "override"))
+    assert mod.logs_root() == (tmp_path / "override").resolve()

@@ -188,6 +188,7 @@ def handle_governance_scan_started(
     env["VIBE3_ASYNC_CHILD"] = "1"
     # Ensure governance child process can write to events.log
     env["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
+    env["VIBE3_ASYNC_LOG_DIR"] = str(root / "temp" / "logs")
 
     request = ExecutionRequest(
         role="governance",

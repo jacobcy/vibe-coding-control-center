@@ -133,6 +133,7 @@ def build_issue_async_cli_request(
     command_root = resolve_async_cli_project_root(root)
     env = dict(os.environ)
     env["VIBE3_ASYNC_CHILD"] = "1"
+    env["VIBE3_ASYNC_LOG_DIR"] = str(root / "temp" / "logs")
     return ExecutionRequest(
         role=role,
         target_branch=target_branch,
