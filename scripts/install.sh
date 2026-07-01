@@ -134,29 +134,122 @@ _add_vibe_dir_to_direnv_whitelist() {
         return 0
     fi
 
-    mkdir -p "$DIRENV_CONF_DIR"
-
-    # Check if the entry already exists in the TOML file
     if [[ -f "$DIRENV_CONF" ]]; then
-        if grep -qF "$WHITELIST_ENTRY" "$DIRENV_CONF"; then
+        # Full-quote match: only consider the entry already registered in a prefix
+        # array (avoids false-positive substring hits on sibling paths).
+        if grep -qF "\"$WHITELIST_ENTRY\"" "$DIRENV_CONF"; then
             log_info "direnv whitelist already contains $WHITELIST_ENTRY"
             return 0
         fi
     fi
 
+    mkdir -p "$DIRENV_CONF_DIR"
+
     local tmp="$DIRENV_CONF.tmp.$$.whitelist"
-    {
-        if [[ -f "$DIRENV_CONF" ]]; then cat "$DIRENV_CONF"; fi
-        echo ""
-        echo "# auto-added by scripts/install.sh (vibe)"
-        echo "[whitelist]"
-        echo "prefix = [\"$WHITELIST_ENTRY\"]"
-    } > "$tmp" && mv "$tmp" "$DIRENV_CONF" || {
+    if [[ -f "$DIRENV_CONF" ]]; then
+        # Merge every prefix entry seen under any [whitelist] block into a single
+        # consolidated section. Appending a second [whitelist] block would produce
+        # invalid TOML for strict parsers (e.g. Python tomllib rejects duplicate
+        # table keys), so we collapse all existing entries + the new one into one.
+        # stripqs() trims the first/last double-quote of each entry using
+        # position-based substr: BSD/macOS awk 20200816 drops the $ anchor when
+        # gsub() is called with an alternation like /^["]+|["]+$/ on inputs that
+        # begin with a non-" character (leading whitespace before the opening DQ).
+        local awk_body
+        awk_body="$(cat <<'AWKEOF'
+BEGIN {
+    print "# auto-added by scripts/install.sh (vibe)"
+    in_wl = 0
+    flushed = 0
+    acc = ""
+    seen_count = 0
+    new_already = 0
+}
+function stripqs(s,    first, last, i) {
+    first = 0
+    last = 0
+    for (i = 1; i <= length(s); i++) {
+        if (substr(s, i, 1) == "\"") {
+            if (first == 0) first = i
+            last = i
+        }
+    }
+    if (first == 0) return s
+    if (first == last) {
+        return substr(s, 1, first-1) substr(s, first+1)
+    }
+    return substr(s, 1, first-1) substr(s, first+1, last-first-1) substr(s, last+1)
+}
+function add_entry(p) {
+    p = stripqs(p)
+    sub(/^[[:space:]]+|[[:space:]]+$/, "", p)
+    if (p == "") return
+    seen_count++
+    seen[seen_count] = p
+    if (p == entry) new_already = 1
+}
+function add_entries_from(line,    raw, n, i, part) {
+    raw = line
+    sub(/^[[:space:]]*prefix[[:space:]]*=[[:space:]]*\[?/, "", raw)
+    sub(/\]?[[:space:]]*$/, "", raw)
+    if (raw == "") return
+    n = split(raw, parts, ",")
+    for (i = 1; i <= n; i++) add_entry(parts[i])
+}
+function flush(    i, first) {
+    if (flushed) return
+    flushed = 1
+    printf "[whitelist]\nprefix = ["
+    first = 1
+    for (i = 1; i <= seen_count; i++) {
+        if (!first) printf ", "
+        printf "\"%s\"", seen[i]
+        first = 0
+    }
+    if (!new_already) {
+        if (!first) printf ", "
+        printf "\"%s\"", entry
+    }
+    printf "]\n"
+}
+/^[[:space:]]*\[/ {
+    if (in_wl) { flush(); in_wl = 0 }
+    if ($0 ~ /^[[:space:]]*\[whitelist\][[:space:]]*$/) { in_wl = 1; next }
+    in_wl = 0
+    print
+    next
+}
+in_wl {
+    line = $0
+    gsub(/^[[:space:]]+/, "", line)
+    if (acc != "") acc = acc " " line; else acc = line
+    if (line ~ /\][[:space:]]*$/) {
+        if (acc ~ /prefix[[:space:]]*=/) add_entries_from(acc)
+        acc = ""
+    }
+    next
+}
+{ print }
+END { flush() }
+AWKEOF
+)"
+        if ! awk -v entry="$WHITELIST_ENTRY" "$awk_body" "$DIRENV_CONF" > "$tmp" 2>/dev/null; then
+            cp "$DIRENV_CONF" "$tmp"
+        fi
+    else
+        {
+            echo "# auto-added by scripts/install.sh (vibe)"
+            echo "[whitelist]"
+            echo "prefix = [\"$WHITELIST_ENTRY\"]"
+        } > "$tmp"
+    fi
+    if mv "$tmp" "$DIRENV_CONF"; then
+        log_success "Added $WHITELIST_ENTRY to direnv whitelist ($DIRENV_CONF)"
+    else
         rm -f "$tmp"
         log_warn "Failed to update direnv whitelist — please add manually: $WHITELIST_ENTRY"
         return 0
-    }
-    log_success "Added $WHITELIST_ENTRY to direnv whitelist ($DIRENV_CONF)"
+    fi
 }
 
 # --- Pre-flight checks ---
