@@ -289,11 +289,11 @@ code_limits:
         limit: 510
         reason: "Job contract models 测试集，覆盖 JobEnvelope/JobContext/JobResult 构造、序列化、frozen 约束、semantic equivalence、dispatch intent 表示、actor_id 字段等紧密耦合场景；#2172 新增 TestJobResult.test_actor_id_field 和 test_actor_id_defaults_to_none 测试后略微超标；#2177 新增 adapter_hash 字段测试（+27 行）"
       - path: "tests/vibe3/agents/test_codeagent_backend.py"
-        limit: 700
-        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建、preset 传递（新增 preset 执行路径保留测试）等紧密耦合逻辑；#2265 follow-up 新增实际 prompt file payload 长度诊断回归测试后略微超标；Issue #3135 更新 dry-run backend/model 显示测试（+17 行）"
+        limit: 720
+        reason: "Codeagent backend 核心测试，覆盖 sync/async 执行、tmux 管理、命令构建、preset 传递（新增 preset 执行路径保留测试）等紧密耦合逻辑；#2265 follow-up 新增实际 prompt file payload 长度诊断回归测试后略微超标；Issue #3135 更新 dry-run backend/model 显示测试（+17 行）；Issue #3259 新增 default_log_dir repo root anchor 测试（+11 行）"
       - path: "tests/vibe3/domain/handlers/test_governance_scan.py"
-        limit: 450
-        reason: "Governance scan handler 测试集，覆盖 governance dispatch、circuit breaker、concurrent session limit、material override propagation 等场景；Issue #3074 新增 material_override 传递测试（+58 行）验证 -r <material> 标志通过事件链路正确传递"
+        limit: 500
+        reason: "Governance scan handler 测试集，覆盖 governance dispatch、circuit breaker、concurrent session limit、material override propagation 等场景；Issue #3074 新增 material_override 传递测试（+58 行）验证 -r <material> 标志通过事件链路正确传递；Issue #3259 新增 VIBE3_ASYNC_LOG_DIR injection 测试类（+62 行）"
       - path: "tests/vibe3/domain/handlers/test_manual_dispatch.py"
         limit: 560
         reason: "Manual dispatch handler 测试集，覆盖 plan/run/review intent 错误路径、成功路径、backend/model 字段传播等 28+ 个测试场景；Issue #3122 新增 TestBackendModelPropagation 测试类；Issue #3135 新增 async 路径 backend/model 回填测试；Issue #3137 新增 sync/async branch review metadata 填充测试（+58 行，558 行 total）"
@@ -395,8 +395,8 @@ code_limits:
         limit: 500
         reason: "Services barrel architecture 测试集，新增 2 个 __all__ policy 验证测试（test_root_barrel_all_matches_approved_public_api、test_domain_barrels_all_matches_approved_api），覆盖 AST 解析与 _SYMBOL_MODULES 映射一致性验证，强内聚架构质量门禁"
       - path: "tests/vibe3/exceptions/test_error_tracking.py"
-        limit: 650
-        reason: "Error tracking 测试集，新增 9 个测试（5 个 get_all_errors_status + 4 个 _display_error_tracking），覆盖 severity 分类、threshold 计数、时间窗口逻辑、NULL severity 默认处理、历史 vs 窗口错误显示"
+        limit: 660
+        reason: "Error tracking 测试集。#3277 review 修复简化 ErrorTrackingService 为单注册表后，5 个测试文件中的 legacy _instance 访问改为 ErrorTrackingService._registry[db_path] 或 get_instance(store=...) 双行形式，配合 black 重排导致 +3 行；同时清理了一个未使用的 svc 局部变量。原 9 个 get_all_errors_status/_display_error_tracking 测试 + cleanup/severity/status/record_error 全套测试均保留，强内聚 threshold 行为一致性，拆分会破坏测试场景完整性"
       - path: "tests/vibe3/services/test_task_service_fresh_db.py"
         limit: 430
         reason: "TaskService fresh DB 测试集，覆盖 issue 链接、角色重分类、flow 降级、ref 选择等核心业务逻辑，包含完整的 mock setup 和参数化状态转换测试，拆分会破坏测试场景完整性；更新 FakeGitHub.view_issue 添加 fields 参数支持后略微超标（+4 行）"
@@ -467,8 +467,8 @@ code_limits:
         limit: 575
         reason: "Internal command 测试集，覆盖 manager/apply/governance/bootstrap 命令、guard 逻辑、参数传递、可选 issue 解析等 22 个紧密耦合场景；Issue #3067 新增 6 个可选 issue 参数测试和 1 个 show_prompt 强制 sync 路径测试验证新功能（+136 行）；Issue #3135 重构 dry-run display 测试（+62 行），新增 async skip/throttled display 测试（+28 行）"
       - path: "tests/vibe3/observability/test_orchestra_log.py"
-        limit: 480
-        reason: "Orchestra log 测试集，覆盖 log dir resolution、persistent handle lifecycle、event appending with level filtering、run separator、governance event dual logging、color parameter behavior、supervisor log functions 等 28 个测试（20 existing + 4 color tests + 4 supervisor tests）；Issue #3192 新增 4 个 color behavior 测试（TTY on/off、color=None、unknown color degradation）验证 ANSI escape codes 嵌入逻辑（+83 行）；Issue #3194 新增 4 个 supervisor log 测试（supervisor_log_dir/supervisor_events_log_path/governance_scans_dir/supervisor_event dual logging），以及 governance_scans_dir 测试（+81 行），从 419 行增至 478 行；测试围绕 append_orchestra_event/append_governance_event/append_supervisor_event 统一接口，拆分会破坏测试场景完整性"
+        limit: 510
+        reason: "Orchestra log 测试集，覆盖 log dir resolution、persistent handle lifecycle、event appending with level filtering、run separator、governance event dual logging、color parameter behavior、supervisor log functions 等 30 个测试；Issue #3192 新增 4 个 color behavior 测试（+83 行）；Issue #3194 新增 4 个 supervisor log 测试（+81 行）；Issue #3259 新增 2 个 logs_root anchor 测试（+20 行），验证 find_repo_root 锚定主仓库根目录"
 
 
   total_file_loc:

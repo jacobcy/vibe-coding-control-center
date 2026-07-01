@@ -13,6 +13,7 @@ from vibe3.models import (
     IssueInfo,
     WorktreeRequirement,
 )
+from vibe3.observability import logs_root
 
 
 def resolve_orchestra_repo_root() -> Path:
@@ -133,6 +134,7 @@ def build_issue_async_cli_request(
     command_root = resolve_async_cli_project_root(root)
     env = dict(os.environ)
     env["VIBE3_ASYNC_CHILD"] = "1"
+    env["VIBE3_ASYNC_LOG_DIR"] = str(logs_root())
     return ExecutionRequest(
         role=role,
         target_branch=target_branch,

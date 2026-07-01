@@ -149,10 +149,9 @@ def default_log_dir() -> Path:
     Returns:
         Path to async log directory
     """
-    override_dir = os.environ.get("VIBE3_ASYNC_LOG_DIR", "").strip()
-    if override_dir:
-        return Path(override_dir).expanduser().resolve()
-    return Path(__file__).resolve().parents[4] / "temp" / "logs"
+    from vibe3.observability import logs_root
+
+    return logs_root()
 
 
 def resolve_async_log_path(log_dir: Path, execution_name: str) -> Path:

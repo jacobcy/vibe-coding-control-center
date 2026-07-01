@@ -226,7 +226,9 @@ class CodeagentBackend:
         )
 
         saved_log_path: Path | None = None
-        log_dir = Path(project_root) / "temp" / "logs"
+        from vibe3.observability import logs_root
+
+        log_dir = logs_root()
         if "issue-" in project_root or any("issue-" in arg for arg in command):
             import re
 

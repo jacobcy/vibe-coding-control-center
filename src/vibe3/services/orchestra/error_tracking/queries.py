@@ -389,6 +389,8 @@ def has_recent_specific_error(
             cursor = conn.execute(query, params)
             count = cursor.fetchone()[0]
             return bool(count > 0)
-    except Exception:
-        # If query fails, be conservative and return False
+    except (sqlite3.OperationalError, sqlite3.DatabaseError):
+        # Be conservative and return False on DB errors (missing DB, table not
+        # present, permissions). Other exceptions should NOT be masked — they
+        # signal logic bugs that should surface.
         return False

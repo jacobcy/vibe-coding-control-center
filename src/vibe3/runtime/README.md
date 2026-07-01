@@ -70,7 +70,7 @@ while running:
 
 ```
 runtime/
-├── heartbeat.py → service_protocol, orchestra/logging（设计例外，见下文）
+├── heartbeat.py → service_protocol, observability.orchestra_log
 ├── circuit_breaker.py → （无内部依赖）
 └── service_protocol.py → （无内部依赖）
 ```
@@ -79,23 +79,13 @@ runtime/
 - loguru: 日志记录
 - pydantic: 数据模型
 - vibe3.models.orchestra_config: 配置模型
-- vibe3.orchestra.logging: 日志工具（**设计例外**）
+- vibe3.observability.orchestra_log: 事件日志（append_orchestra_event 等）
 
 **被依赖**:
 - server/: 启动 HeartbeatServer
 - orchestra/: 注册 services
 - services/: 实现 ServiceBase 协议
 
-## 架构问题说明
-
-### runtime → orchestra/logging 依赖
-
-**发现**: `heartbeat.py` 导入 `vibe3.orchestra.logging`
-
-**问题**: runtime 作为基础设施层，理论上不应依赖上层 orchestra 模块，这违反了分层原则。
-
-**原因**: 该依赖用于日志工具复用，可能是历史设计决策。
-
-**处理**: 标注为"设计例外"，暂不强制重构。后续架构治理时可评估是否需要将日志工具下沉到基础层。
+## 架构说明
 
 **记录**: 已通过 handoff 记录此发现。

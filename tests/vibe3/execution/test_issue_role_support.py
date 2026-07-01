@@ -131,3 +131,25 @@ def test_build_issue_sync_prompt_request_with_session_does_not_pin_cwd() -> None
 
     assert request.refs["session_id"] == "session-431"
     assert request.cwd is None
+
+
+def test_build_issue_async_cli_request_sets_async_log_dir() -> None:
+    """Async issue dispatch sets VIBE3_ASYNC_LOG_DIR for child process."""
+    issue = IssueInfo(number=431, title="Test issue", labels=[])
+
+    request = build_issue_async_cli_request(
+        role="manager",
+        issue=issue,
+        target_branch="task/issue-431",
+        command_args=["run", "--issue", "431"],
+        actor="agent:manager",
+        execution_name="vibe3-manager-issue-431",
+        refs=None,
+        worktree_requirement=WorktreeRequirement.PERMANENT,
+        repo_path=MAIN_REPO,
+    )
+
+    from vibe3.observability import logs_root
+
+    assert request.env["VIBE3_ASYNC_LOG_DIR"] == str(logs_root())
+    assert request.env["VIBE3_ASYNC_CHILD"] == "1"

@@ -22,7 +22,7 @@ from vibe3.execution.codeagent_support import resolve_display_agent_options
 from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_interfaces import GovernanceEventLogger, GovernanceFunctions
 from vibe3.models import ExecutionLaunchResult, ExecutionRequest
-from vibe3.observability import write_prompt_provenance
+from vibe3.observability import logs_root, write_prompt_provenance
 from vibe3.prompts import PromptManifest, collect_dry_run_provenance
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 from vibe3.services.shared import log_dispatch_error
@@ -297,7 +297,7 @@ def run_governance_async(
     env["VIBE3_ASYNC_CHILD"] = "1"
     env["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
     # Force logs to be written to the target project, not the vibe repo
-    env["VIBE3_ASYNC_LOG_DIR"] = str(root / "temp" / "logs")
+    env["VIBE3_ASYNC_LOG_DIR"] = str(logs_root())
 
     request = ExecutionRequest(
         role="governance",

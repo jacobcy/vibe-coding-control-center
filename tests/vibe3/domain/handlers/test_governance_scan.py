@@ -1,9 +1,13 @@
 """Tests for governance scan domain event handler."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.models import ExecutionLaunchResult
+from vibe3.observability import logs_root
+
+MAIN_REPO = Path("/test/repos/vibe-center/main")
 
 
 class TestGovernanceScanHandler:
@@ -430,3 +434,61 @@ class TestGovernanceScanHandler:
         assert call_kwargs["exception"] is exc
         assert call_kwargs["tick_id"] == 5
         assert call_kwargs["dispatch_source"] == "automatic"
+
+
+class TestGovernanceScanDispatchEnvInjection:
+    """Governance dispatch sets VIBE3_ASYNC_LOG_DIR for child process."""
+
+    @patch("vibe3.environment.session_registry.SessionRegistryService")
+    @patch("vibe3.clients.sqlite_client.SQLiteClient")
+    @patch("vibe3.services.orchestra.OrchestraStatusService")
+    @patch("vibe3.orchestra.flow_dispatch.FlowManager")
+    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.observability.orchestra_log.append_governance_event")
+    @patch("vibe3.domain.handlers.governance_scan.load_orchestra_config")
+    @patch(
+        "vibe3.execution.issue_role_support.resolve_orchestra_repo_root",
+        return_value=MAIN_REPO,
+    )
+    def test_dispatch_sets_vibe3_async_log_dir(
+        self,
+        mock_resolve_root: MagicMock,
+        mock_from_settings: MagicMock,
+        mock_append_governance_event: MagicMock,
+        mock_coordinator_cls: MagicMock,
+        mock_flow_cls: MagicMock,
+        mock_status_cls: MagicMock,
+        mock_store_cls: MagicMock,
+        mock_registry_cls: MagicMock,
+    ) -> None:
+        from vibe3.domain.handlers.governance_scan import (
+            handle_governance_scan_started,
+        )
+
+        mock_config = MagicMock(dry_run=False, governance_max_concurrent=1)
+        mock_from_settings.return_value = mock_config
+
+        mock_registry = MagicMock()
+        mock_registry.list_live_governance_sessions.return_value = []
+        mock_registry_cls.return_value = mock_registry
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=True, tmux_session="vibe3-gov-1", log_path="/tmp/gov.log"
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
+
+        mock_status = MagicMock()
+        mock_snapshot = MagicMock()
+        mock_snapshot.circuit_breaker_state = "closed"
+        mock_status.snapshot.return_value = mock_snapshot
+        mock_status_cls.return_value = mock_status
+
+        handle_governance_scan_started(
+            GovernanceScanStarted(tick_count=5, execution_count=3)
+        )
+
+        mock_coordinator.dispatch_execution.assert_called_once()
+        request = mock_coordinator.dispatch_execution.call_args.args[0]
+        assert request.env.get("VIBE3_ASYNC_LOG_DIR") == str(logs_root())
+        assert request.env.get("VIBE3_ASYNC_CHILD") == "1"

@@ -208,6 +208,19 @@ class TestCodeagentBackend:
 
         assert default_log_dir() == Path("/tmp/orchestra-logs").resolve()
 
+    def test_default_log_dir_anchored_to_repo_root(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """Without env override, default_log_dir uses find_repo_root anchor."""
+        from unittest.mock import patch
+
+        monkeypatch.delenv("VIBE3_ASYNC_LOG_DIR", raising=False)
+        with patch(
+            "vibe3.utils.find_repo_root",
+            return_value=tmp_path,
+        ):
+            assert default_log_dir() == tmp_path / "temp" / "logs"
+
     def test_resolve_async_log_path_routes_plan_issue_logs_into_issue_dir(self) -> None:
         """Plan issue logs should live under temp/logs/orchestra/issues/issue-N."""
         log_path = resolve_async_log_path(

@@ -46,12 +46,14 @@ def _resolve_dispatcher_models_root(
 def _resolve_orchestra_log_dir() -> Path:
     """Resolve the shared orchestra log root anchored to the repo root.
 
-    Always uses find_repo_root() to anchor temp/logs in the repository root,
-    regardless of the current working directory at launch time.
+    Delegates to ``logs_root()`` — the canonical resolver that walks
+    ``.git/worktrees/<name>`` back to the main checkout when running from a
+    worktree, or honors ``$VIBE3_ASYNC_LOG_DIR`` when a caller manages its own
+    temp dir.
     """
-    from vibe3.utils import find_repo_root
+    from vibe3.observability import logs_root
 
-    return find_repo_root() / "temp" / "logs"
+    return logs_root()
 
 
 def _build_server(config: "OrchestraConfig") -> tuple["HeartbeatServer", "FastAPI"]:
@@ -492,14 +494,17 @@ def _build_async_serve_command(
 
 def _start_async_serve(config: "OrchestraConfig", verbose: int) -> tuple[bool, str]:
     """Start serve command in tmux session with streaming output."""
-    from vibe3.observability import orchestra_events_log_path, orchestra_log_dir
+    from vibe3.observability import orchestra_log_dir
 
     session_name = ORCHESTRA_TMUX_SESSION
-    launch_cwd = Path.cwd()
-    cmd = _build_async_serve_command(config, verbose, launch_cwd=launch_cwd)
+    cmd = _build_async_serve_command(config, verbose, launch_cwd=Path.cwd())
 
-    # Use async_launcher's streaming output logic
-    log_path = orchestra_events_log_path(launch_cwd)
+    # Use async_launcher's streaming output logic. The pipe-pane target MUST
+    # use the same anchor as the child process' logs_root(), so both paths
+    # resolve against the main repo root (.git/worktrees/<name> walked back)
+    # regardless of the launching process' cwd.
+    log_dir = _resolve_orchestra_log_dir()
+    log_path = log_dir / "orchestra" / "events.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -534,8 +539,8 @@ def _start_async_serve(config: "OrchestraConfig", verbose: int) -> tuple[bool, s
     return (
         True,
         f"Started Orchestra server in tmux session: {session_name}\n"
-        f"Main log: {orchestra_events_log_path(launch_cwd)}\n"
-        f"Log dir: {orchestra_log_dir(launch_cwd)}\n"
+        f"Main log: {log_path}\n"
+        f"Log dir: {orchestra_log_dir(log_dir)}\n"
         "Use `uv run python src/vibe3/cli.py serve status` or "
         "`tmux attach -t vibe3-orchestra-serve` to inspect",
     )

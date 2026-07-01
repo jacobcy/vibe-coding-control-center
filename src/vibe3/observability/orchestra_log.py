@@ -10,20 +10,52 @@ from pathlib import Path
 from typing import IO
 
 
-def orchestra_log_dir(repo_root: Path | None = None) -> Path:
-    override_dir = os.environ.get("VIBE3_ASYNC_LOG_DIR", "").strip()
-    if override_dir:
-        path = Path(override_dir).expanduser().resolve() / "orchestra"
-    else:
-        from vibe3.utils import find_repo_root
+def logs_root(*, env_key: str = "VIBE3_ASYNC_LOG_DIR") -> Path:
+    """Resolve the shared ``temp/logs`` root anchored to the main repo root.
 
-        root = repo_root or find_repo_root()
-        path = root / "temp" / "logs" / "orchestra"
+    Order of precedence:
+    1. ``env_key`` override (default: ``VIBE3_ASYNC_LOG_DIR``) — for tests and
+       cross-project execution where callers manage their own temp dir.
+    2. ``find_repo_root()`` — in a worktree this walks the
+       ``.git/worktrees/<name>`` ``gitdir`` pointer back to the main checkout.
+
+    This is the canonical resolver for every temp/logs reference in the
+    codebase. Sibling functions (``orchestra_log_dir``, ``governance_log_dir``,
+    …) delegate here, and async-child env injection callers resolve the child
+    dir via this function. After the unification in #3259, nothing beneath
+    ``orchestra_log`` should hardcode ``temp/logs`` or re-read
+    ``VIBE3_ASYNC_LOG_DIR`` directly.
+    """
+    override = os.environ.get(env_key, "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    from vibe3.utils import find_repo_root
+
+    return find_repo_root() / "temp" / "logs"
+
+
+def orchestra_log_dir(repo_root: Path | None = None) -> Path:
+    if repo_root is None:
+        base = logs_root()
+    else:
+        override = os.environ.get("VIBE3_ASYNC_LOG_DIR", "").strip()
+        base = Path(override).expanduser().resolve() if override else repo_root
+    path = base / "orchestra"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def orchestra_events_log_path(repo_root: Path | None = None) -> Path:
+    """Return the path to the orchestra events.log file.
+
+    Args:
+        repo_root: Optional repository root override. When None, resolves via
+                   ``logs_root()`` (main-repo-anchored, honors
+                   ``$VIBE3_ASYNC_LOG_DIR``).
+
+    Returns:
+        ``<logs_root_or_repo_root>/orchestra/events.log``
+    """
     return orchestra_log_dir(repo_root) / "events.log"
 
 

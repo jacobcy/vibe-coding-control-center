@@ -45,9 +45,9 @@ entries:
     responsibilities: [job_queue_lifecycle]
     reason: Persists orchestra queue state
     review_floor: repeated
-  - path: src/vibe3/orchestra/logging.py
+  - path: src/vibe3/observability/orchestra_log.py
     responsibilities: [status_metadata]
-    reason: Emits orchestra status metadata
+    reason: Canonical orchestra status metadata logging (events.log, run separators)
     review_floor: repeated
   - path: src/vibe3/orchestra/global_dispatch_coordinator.py
     responsibilities: [dispatch_coordination]
