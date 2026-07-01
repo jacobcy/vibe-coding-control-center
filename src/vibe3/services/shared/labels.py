@@ -1,4 +1,10 @@
-"""Label utility functions."""
+"""Label utility functions — single source of truth.
+
+This module owns label normalization, lifecycle/execution state predicates,
+and priority ordering. Downstream callers import via
+``from vibe3.services.shared.labels import <symbol>`` (in-package) or via the
+``vibe3.services`` / ``vibe3.clients`` barrels (cross-package public API).
+"""
 
 from __future__ import annotations
 
@@ -7,16 +13,13 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients import (
-    GhIssueLabelPort,
-    TriggerableRoleDefinitionProtocol,
-    has_manager_assignee,
-    normalize_assignees,
-    normalize_labels,
-)
 from vibe3.models import OrchestraConfig
 
 if TYPE_CHECKING:
+    from vibe3.clients import (
+        GhIssueLabelPort,
+        TriggerableRoleDefinitionProtocol,
+    )
     from vibe3.models import DispatchExclusion, IssueInfo
 
 
@@ -27,6 +30,55 @@ __all__ = [
     "has_manager_assignee",
     "should_skip_from_queue",
 ]
+
+
+def normalize_labels(raw_labels: object) -> list[str]:
+    """Extract label names from GitHub issue payload labels field.
+
+    Compatible with both GitHub API list[dict] and plain list[str].
+    """
+    if not isinstance(raw_labels, list):
+        return []
+    result: list[str] = []
+    for item in raw_labels:
+        if isinstance(item, dict):
+            name = item.get("name")
+            if isinstance(name, str):
+                result.append(name)
+        elif isinstance(item, str):
+            result.append(item)
+        else:
+            logger.bind(domain="shared/labels").debug(
+                "normalize_labels: skipping unexpected item type: {}", type(item)
+            )
+    return result
+
+
+def normalize_assignees(raw_assignees: object) -> list[str]:
+    """Extract assignee logins from GitHub issue payload assignees field."""
+    if not isinstance(raw_assignees, list):
+        return []
+    assignees: list[str] = []
+    for item in raw_assignees:
+        if isinstance(item, dict):
+            login = item.get("login")
+            if isinstance(login, str) and login:
+                assignees.append(login)
+    return assignees
+
+
+def has_manager_assignee(
+    assignees: list[str],
+    manager_usernames: list[str] | tuple[str, ...],
+) -> bool:
+    """Whether issue assignees still include a configured manager username.
+
+    Returns True if ``manager_usernames`` is empty (no restriction configured)
+    so that issues are not unconditionally filtered out.
+    """
+    if not manager_usernames:
+        return True
+    return any(assignee in manager_usernames for assignee in assignees)
 
 
 @functools.lru_cache(maxsize=8)
@@ -114,6 +166,8 @@ def clean_old_state_labels(
 # ---------------------------------------------------------------------------
 
 _ROADMAP_LABELS = frozenset({"roadmap/rfc", "roadmap/epic"})
+# Public alias — kept for backward compatibility with cross-package barrels.
+ROADMAP_LIFECYCLE_LABELS = _ROADMAP_LABELS
 EXECUTION_STATES = frozenset({"merge-ready", "review", "in-progress", "claimed"})
 _STATE_PRIORITY_ORDER = (
     "blocked",
@@ -125,6 +179,8 @@ _STATE_PRIORITY_ORDER = (
     "claimed",
     "ready",
 )
+# Public alias — kept for cross-package barrels and single source of truth.
+STATE_PRIORITY_ORDER = _STATE_PRIORITY_ORDER
 
 ORCHESTRA_GOVERNED_LABEL = "orchestra-governed"
 
@@ -239,6 +295,3 @@ def classify_dispatch_eligibility(
             )
 
     return reasons
-
-
-# LabelAnomaly and collect_label_anomalies moved to label_anomalies.py

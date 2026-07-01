@@ -58,7 +58,7 @@ class TestSyncRulesModel:
 
     def test_all_disabled_no_anomalies(self):
         """When all remote rules disabled, no anomalies detected."""
-        from vibe3.clients.label_utils import collect_label_anomalies
+        from vibe3.services.shared.label_anomalies import collect_label_anomalies
 
         config = SyncRulesConfig(
             remote=RemoteSyncRules(
