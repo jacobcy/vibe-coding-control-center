@@ -132,6 +132,63 @@ class QualifyGateService:
             ),
         )
 
+        # Advisory notification for downstream dependents (non-blocking)
+        try:
+            from vibe3.services.dispatch import DependencyClosureGate
+
+            DependencyClosureGate.notify_downstream(
+                issue_number=issue.number,
+                store=self._store,
+                github_client=self._github,
+            )
+        except Exception as exc:
+            # Non-critical advisory - don't block terminalization
+            from loguru import logger
+
+            logger.bind(
+                domain="dispatch",
+                action="terminalize_closed_issue",
+                issue_number=issue.number,
+                error=str(exc),
+            ).warning(f"Failed to notify downstream dependents: {exc}")
+
+    def _should_transition_to_review(
+        self, branch: str, flow_state: dict[str, object] | None
+    ) -> bool:
+        if not flow_state or flow_state.get("flow_status") != "active":
+            return False
+        if not any(
+            flow_state.get(status) == "running"
+            for status in ("planner_status", "executor_status")
+        ):
+            return False
+        pr = self._get_open_pr_for_branch(branch)
+        if not pr:
+            return False
+        self._transition_flow_to_review(branch, pr)
+        return True
+
+    def _get_open_pr_for_branch(self, branch: str) -> "PRResponse | None":
+        from vibe3.models import PRState
+
+        try:
+            prs = self._github.list_prs_for_branch(branch)
+            return next((pr for pr in prs if pr.state == PRState.OPEN), None)
+        except Exception:
+            return None
+
+    def _transition_flow_to_review(self, branch: str, pr: "PRResponse") -> None:
+        transition_to_review(
+            branch=branch,
+            pr=pr,
+            store=self._store,
+            flow_manager=self._flow_manager,
+            github=self._github,
+            flow_status_service_cls=_service_symbol(
+                "FlowStatusService", _ORIG_FLOW_STATUS_SERVICE
+            ),
+        )
+
     def _check_worktree_health(
         self,
         issue: IssueInfo,

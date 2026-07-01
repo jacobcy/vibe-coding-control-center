@@ -145,6 +145,21 @@ class WebhookIssueClosed(DomainEvent):
 
 
 @dataclass(frozen=True)
+class IssueResolvedDependency(DomainEvent):
+    """Published when a closed issue may resolve dependency blockers.
+
+    Signals that downstream flows blocked by this issue should be
+    re-evaluated via BlockedStateService.reconcile_blocked.
+    """
+
+    issue_number: int
+    merged: bool
+    pr_number: int | None = None
+    actor: str = "system:dispatch"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
 class ManualPlanIntent(DomainEvent):
     """Published when CLI plan command is invoked."""
 
