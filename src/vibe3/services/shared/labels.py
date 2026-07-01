@@ -287,40 +287,6 @@ def resolve_state_label(
         if flow_state is not None:
             return infer_resume_label(flow_state).to_label()
     return get_highest_priority_state(labels)
-    """Resolve which ``state/*`` label should govern for a given issue.
-
-    Two authority layers:
-    1. **Flow truth** - when ``flow_state`` is supplied, derive the label
-       from the local execution artifacts (``infer_resume_label``).  This is
-       the canonical resume signal used by ``vibe3 task resume --label auto``
-       and the blocked reconciliation path, and takes precedence over whatever
-       GitHub API happens to have returned.
-    2. **Static fallback** - when ``flow_state`` is absent (read paths that
-       do not carry flow context) fall back to
-       ``get_highest_priority_state`` (``_STATE_PRIORITY_ORDER``).
-
-    When neither authority yields a parsable state label, returns ``None``.
-
-    Args:
-        labels: Normalised label strings (already run through
-            ``normalize_labels`` by the caller).
-        flow_state: Optional local execution-state model used to infer the
-            resume label.  When ``None``, the static fallback is used.
-
-    Returns:
-        A single ``state/<name>`` string, or ``None``.
-    """
-    if flow_state is not None:
-        from vibe3.services.flow.resume_resolver import infer_resume_label
-
-        if not isinstance(flow_state, FlowState):
-            try:
-                flow_state = FlowState.model_validate(flow_state)
-            except Exception:
-                flow_state = None
-        if flow_state is not None:
-            return infer_resume_label(flow_state).to_label()
-    return get_highest_priority_state(labels)
 
 
 # ---------------------------------------------------------------------------

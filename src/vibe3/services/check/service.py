@@ -16,7 +16,7 @@ from vibe3.clients import (
     load_sync_rules,
 )
 from vibe3.config import VibeConfig
-from vibe3.models import CheckResult, FlowState, IssueState
+from vibe3.models import CheckResult, IssueState
 from vibe3.services.check.lock import check_lock
 from vibe3.services.check.pr_service import CheckPRService
 from vibe3.services.check.remote import (
@@ -326,21 +326,9 @@ class CheckService(CheckRemote):
                     if isinstance(raw_labels, list):
                         issue_labels = normalize_labels(raw_labels)
                         issue_labels_loaded = True
-                    # Prefer a authoritative FlowState parse; tolerate any
-                    # store schema drift by keeping the static fallback path
-                    # working when model_validate fails (test mocks use
-                    # partial dict rows without flow_slug).
-                    flow_for_resolve: FlowState | None = None
-                    if flow_data is not None and not isinstance(flow_data, FlowState):
-                        try:
-                            flow_for_resolve = FlowState.model_validate(flow_data)
-                        except Exception:
-                            flow_for_resolve = None
-                    elif isinstance(flow_data, FlowState):
-                        flow_for_resolve = flow_data
                     orchestration_state = issue_state_from_payload(
                         issue,
-                        flow_state=flow_for_resolve,
+                        flow_state=flow_data,
                     )
                     if str(issue.get("state", "")).upper() == "CLOSED":
                         task_issue_closed = True

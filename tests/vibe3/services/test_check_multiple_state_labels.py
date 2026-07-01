@@ -375,6 +375,49 @@ class TestIssueStateFromFlowState:
         result = issue_state_from_payload(issue, flow_state=flow_state)
         assert result == IssueState.MERGE_READY
 
+    def test_flow_state_as_partial_dict_degraded_to_fallback(self):
+        """Dict rows missing required fields must degrade to static fallback.
+
+        This mirrors the service-layer tolerant path: partial dict rows from
+        test mocks (or schema-drift SQLite snapshots) drop to
+        ``get_highest_priority_state`` instead of crashing.
+        """
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        issue = {
+            "labels": [
+                {"name": "state/ready"},
+                {"name": "state/blocked"},
+            ]
+        }
+        # Missing required `branch` and `flow_slug` fields.
+        result = issue_state_from_payload(issue, flow_state={})
+        assert result == IssueState.BLOCKED
+
+    def test_flow_state_as_partial_dict_missing_verdict(self):
+        """Dict row without verdict/refs falls back to READY (no plan_ref).
+
+        When the local flow has no pr_ref / verdict / report_ref / plan_ref,
+        ``infer_resume_label`` returns READY — the canonical "ready to be
+        picked up" state.  This is the flow-truth authority, so it wins over
+        the stale GitHub labels.
+        """
+        from vibe3.services.check.remote import issue_state_from_payload
+
+        issue = {
+            "labels": [
+                {"name": "state/review"},
+                {"name": "state/handoff"},
+            ]
+        }
+        flow_state = {
+            "branch": "task/issue-1",
+            "flow_slug": "default",
+            "flow_status": "active",
+        }
+        result = issue_state_from_payload(issue, flow_state=flow_state)
+        assert result == IssueState.READY
+
     def test_no_flow_state_falls_back_to_priority(self):
         """Without flow_state, fall back to static priority order."""
         from vibe3.services.check.remote import issue_state_from_payload
