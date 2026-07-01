@@ -49,8 +49,14 @@ async def test_tick_calls_on_tick_for_all_services() -> None:
 def test_run_separator_appends_instead_of_truncating(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """Run separator should append to existing events.log, not overwrite it."""
-    from vibe3.orchestra.logging import append_orchestra_run_separator
+    """Run separator should append to existing events.log, not overwrite it.
+
+    append_orchestra_run_separator() always opens events.log in append mode
+    (never "w"). The test asserts both that pre-existing content is preserved
+    AND that a new run separator is appended, so future refactorers who
+    change open mode to "w" will reverse-fail here.
+    """
+    from vibe3.observability.orchestra_log import append_orchestra_run_separator
 
     # Clear any environment variables that might affect log directory
     monkeypatch.delenv("VIBE3_ASYNC_LOG_DIR", raising=False)

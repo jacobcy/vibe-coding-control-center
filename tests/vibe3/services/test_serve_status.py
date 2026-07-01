@@ -31,28 +31,30 @@ def temp_store(tmp_path: Path) -> SQLiteClient:
 
 def test_status_shows_severity_breakdown(temp_store: SQLiteClient) -> None:
     """Test that serve status displays severity breakdown."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     # Record errors with different severities
-    ErrorTrackingService.get_instance().record_error(
+    ErrorTrackingService.get_instance(store=temp_store).record_error(
         error_code="E_MODEL_NOT_FOUND",
         error_message="Model not found",  # CRITICAL
     )
-    ErrorTrackingService.get_instance().record_error(
+    ErrorTrackingService.get_instance(store=temp_store).record_error(
         error_code="E_API_RATE_LIMIT",
         error_message="Rate limit",  # ERROR
     )
-    ErrorTrackingService.get_instance().record_error(
+    ErrorTrackingService.get_instance(store=temp_store).record_error(
         error_code="E_EXEC_NO_OUTPUT",
         error_message="No output",  # WARNING
     )
-    ErrorTrackingService.get_instance().record_error(
+    ErrorTrackingService.get_instance(store=temp_store).record_error(
         error_code="E_CAPACITY_SKIP",
         error_message="Skip",  # WARNING
     )
 
     # Get status
-    status = ErrorTrackingService.get_instance().get_status()
+    status = ErrorTrackingService.get_instance(store=temp_store).get_status()
 
     # Check severity-based counts
     assert status["critical_count"] == 1

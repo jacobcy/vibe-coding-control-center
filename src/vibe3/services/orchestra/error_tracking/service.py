@@ -80,72 +80,40 @@ class ErrorTrackingService:
     # Default retention period (days)
     DEFAULT_RETENTION_DAYS = 7
 
-    # Global singleton instance (backward compatibility)
-    _instance: ErrorTrackingService | None = None
-
-    # Per-db-path registry for multi-instance support
+    # Per-db-path registry. The "default" instance (no store) is registered
+    # under the default SQLiteClient.db_path key so that get_instance() and
+    # clear_instance() operate on a single source of truth.
     _registry: dict[str, ErrorTrackingService] = {}
-
-    # Default instance for backward compatibility
-    _default_instance: ErrorTrackingService | None = None
 
     @classmethod
     def get_instance(cls, store: SQLiteClient | None = None) -> ErrorTrackingService:
-        """Get error tracking instance.
+        """Get error tracking instance keyed by store.db_path.
 
         Args:
-            store: Optional SQLiteClient for persistence. If None, returns/creates
-                   the default instance for backward compatibility.
+            store: Optional SQLiteClient for persistence. If None, the default
+                   SQLiteClient is used (backward compatibility).
 
         Returns:
-            ErrorTrackingService instance keyed by store.db_path if store provided,
-            otherwise the default instance.
+            ErrorTrackingService instance keyed by store.db_path.
         """
-        if store is None:
-            # Backward compatibility: check _instance first (tests may set it directly)
-            if cls._instance is not None:
-                return cls._instance
-            # If no _instance, create default instance
-            if cls._default_instance is None:
-                cls._default_instance = cls()
-                cls._instance = cls._default_instance  # Keep _instance in sync
-            return cls._default_instance
-        else:
-            # Per-db-path instance
-            db_path = store.db_path
-            if db_path not in cls._registry:
-                cls._registry[db_path] = cls(store=store)
-            return cls._registry[db_path]
+        effective_store = store or SQLiteClient()
+        db_path = effective_store.db_path
+        if db_path not in cls._registry:
+            cls._registry[db_path] = cls(store=effective_store)
+        return cls._registry[db_path]
 
     @classmethod
     def clear_instance(cls, db_path: str | None = None) -> None:
         """Clear instance(s) for testing.
 
         Args:
-            db_path: If provided, clear the instance for that db_path from
-                     _registry. Also clears _instance/_default_instance if
-                     their db_path matches. If None, clear all instances
-                     (default + registry).
+            db_path: If provided, clear the instance for that db_path. If None,
+                     clear all instances (default + registry).
         """
         if db_path is None:
-            # Clear all instances (prevent test state leakage)
-            cls._default_instance = None
-            cls._instance = None  # Keep _instance in sync
-            cls._registry.clear()  # Clear all per-db-path instances
+            cls._registry.clear()
         else:
-            # Clear specific db_path instance from registry
             cls._registry.pop(db_path, None)
-            # Also clear _instance/_default_instance if they match
-            if (
-                cls._instance is not None
-                and getattr(cls._instance, "db_path", None) == db_path
-            ):
-                cls._instance = None
-            if (
-                cls._default_instance is not None
-                and getattr(cls._default_instance, "db_path", None) == db_path
-            ):
-                cls._default_instance = None
 
     def __init__(
         self, store: SQLiteClient | None = None, retention_days: int | None = None

@@ -20,13 +20,9 @@ from vibe3.services.orchestra.error_tracking.service import ErrorTrackingService
 def reset_error_tracking() -> Iterator[None]:
     """Reset ErrorTrackingService singleton between tests."""
     yield
-    db_paths = [i.db_path for i in ErrorTrackingService._registry.values()]
-    if ErrorTrackingService._instance:
-        db_paths.append(ErrorTrackingService._instance.db_path)
-    if ErrorTrackingService._default_instance:
-        db_paths.append(ErrorTrackingService._default_instance.db_path)
+    db_paths = list(ErrorTrackingService._registry.keys())
     ErrorTrackingService.clear_instance()
-    for db_path in set(db_paths):
+    for db_path in db_paths:
         # Only handle "no such table" errors - these occur when the DB file
         # was deleted by concurrent test cleanup. Other errors should propagate.
         try:
@@ -55,7 +51,9 @@ def temp_store(tmp_path: Path) -> SQLiteClient:
 
 def test_failed_gate_open(temp_store: SQLiteClient) -> None:
     """Gate should be open when no errors are recorded."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
     gate = FailedGate(store=temp_store)
     result = gate.check()
     assert not result.blocked
@@ -64,8 +62,10 @@ def test_failed_gate_open(temp_store: SQLiteClient) -> None:
 
 def test_failed_gate_blocked_by_model_error(temp_store: SQLiteClient) -> None:
     """Gate should block immediately on model config errors."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
-    ErrorTrackingService._instance.record_error("E_MODEL_NOT_FOUND", "Model not found")
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
+    svc.record_error("E_MODEL_NOT_FOUND", "Model not found")
     gate = FailedGate(store=temp_store)
     result = gate.check()
     assert result.blocked
@@ -74,11 +74,11 @@ def test_failed_gate_blocked_by_model_error(temp_store: SQLiteClient) -> None:
 
 def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
     """Gate should block when ERROR-severity error threshold is reached."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
-    ErrorTrackingService._instance.record_error(
-        "E_API_RATE_LIMIT", "Rate limit", tick_id=1
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
     )
-    ErrorTrackingService._instance.record_error("E_API_TIMEOUT", "Timeout", tick_id=2)
+    svc.record_error("E_API_RATE_LIMIT", "Rate limit", tick_id=1)
+    svc.record_error("E_API_TIMEOUT", "Timeout", tick_id=2)
     gate = FailedGate(store=temp_store)
     result = gate.check()
     assert result.blocked
@@ -87,8 +87,10 @@ def test_failed_gate_blocked_by_api_threshold(temp_store: SQLiteClient) -> None:
 
 def test_failed_gate_clear(temp_store: SQLiteClient) -> None:
     """Gate should clear and allow operation after manual resume."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
-    ErrorTrackingService._instance.record_error("E_MODEL_NOT_FOUND", "Model error")
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
+    svc.record_error("E_MODEL_NOT_FOUND", "Model error")
     gate = FailedGate(store=temp_store)
     result = gate.check()
     assert result.blocked
@@ -99,10 +101,10 @@ def test_failed_gate_clear(temp_store: SQLiteClient) -> None:
 
 def test_failed_gate_persists_state(temp_store: SQLiteClient) -> None:
     """Gate state should persist across instances."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
-    ErrorTrackingService._instance.record_error(
-        "E_MODEL_PERMISSION", "Permission denied"
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
     )
+    svc.record_error("E_MODEL_PERMISSION", "Permission denied")
     gate1 = FailedGate(store=temp_store)
     result1 = gate1.check()
     assert result1.blocked
@@ -114,8 +116,10 @@ def test_failed_gate_persists_state(temp_store: SQLiteClient) -> None:
 
 def test_failed_gate_increment_blocked_ticks(temp_store: SQLiteClient) -> None:
     """Gate should increment blocked_ticks when active."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
-    ErrorTrackingService._instance.record_error("E_MODEL_CONFIG", "Config error")
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
+    svc.record_error("E_MODEL_CONFIG", "Config error")
     gate = FailedGate(store=temp_store)
     result = gate.check()
     assert result.blocked
@@ -176,7 +180,7 @@ def test_clear_instance_specific_db_path(tmp_path: Path) -> None:
 
 
 def test_clear_instance_with_db_path_clears_matching_singleton(tmp_path: Path) -> None:
-    """clear_instance(db_path) should also clear _instance if it matches."""
+    """clear_instance(db_path) should also clear the matching registry entry."""
     db_path = tmp_path / "test.db"
     conn = sqlite3.connect(db_path)
     from vibe3.clients.sqlite_schema import init_schema
@@ -184,13 +188,15 @@ def test_clear_instance_with_db_path_clears_matching_singleton(tmp_path: Path) -
     init_schema(conn)
     conn.close()
     store = SQLiteClient(db_path=str(db_path))
-    ErrorTrackingService._instance = ErrorTrackingService(store=store)
-    assert ErrorTrackingService._instance is not None
-    assert ErrorTrackingService._instance.db_path == str(db_path)
+    svc = ErrorTrackingService._registry[str(db_path)] = ErrorTrackingService(
+        store=store
+    )
+    assert svc is not None
+    assert svc.db_path == str(db_path)
     ErrorTrackingService.clear_instance(db_path=str(db_path))
     assert (
-        ErrorTrackingService._instance is None
-    ), "clear_instance(db_path) should clear _instance if db_path matches"
+        str(db_path) not in ErrorTrackingService._registry
+    ), "clear_instance(db_path) should clear the matching registry entry"
 
 
 def test_get_instance_with_and_without_store(tmp_path: Path) -> None:
@@ -221,10 +227,12 @@ def test_get_instance_with_and_without_store(tmp_path: Path) -> None:
 
 def test_warning_does_not_close_gate(temp_store: SQLiteClient) -> None:
     """Test that WARNING severity errors don't close the gate."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
     gate = FailedGate(store=temp_store)
     for i in range(5):
-        ErrorTrackingService.get_instance().record_error(
+        ErrorTrackingService.get_instance(store=temp_store).record_error(
             error_code="E_EXEC_NO_OUTPUT",
             error_message=f"No output {i}",
         )
@@ -234,9 +242,11 @@ def test_warning_does_not_close_gate(temp_store: SQLiteClient) -> None:
 
 def test_critical_closes_gate_immediately(temp_store: SQLiteClient) -> None:
     """Test that CRITICAL severity closes gate immediately."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
     gate = FailedGate(store=temp_store)
-    ErrorTrackingService.get_instance().record_error(
+    ErrorTrackingService.get_instance(store=temp_store).record_error(
         error_code="E_MODEL_NOT_FOUND",
         error_message="Model not found",
     )
@@ -250,7 +260,9 @@ class TestFailedGateIntegration:
 
     def test_serve_start_preflight_blocked(self, temp_store: SQLiteClient) -> None:
         """serve start should fail if FailedGate reports blocked."""
-        ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+        ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+            store=temp_store
+        )
         with patch("vibe3.server.app.load_orchestra_config") as mock_cfg:
             mock_cfg.return_value = OrchestraConfig(enabled=True)
             with patch("vibe3.orchestra.failed_gate.FailedGate.check") as mock_check:
@@ -279,7 +291,9 @@ class TestFailedGateIntegration:
         self, temp_store: SQLiteClient
     ) -> None:
         """Heartbeat runtime should skip on_tick() when FailedGate is ACTIVE."""
-        ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+        ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+            store=temp_store
+        )
         config = OrchestraConfig(polling_interval=1)
         mock_gate = MagicMock()
         mock_gate.check.return_value = GateResult(blocked=True, reason="Blocked")

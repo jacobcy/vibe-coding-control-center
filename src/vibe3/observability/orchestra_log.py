@@ -46,6 +46,16 @@ def orchestra_log_dir(repo_root: Path | None = None) -> Path:
 
 
 def orchestra_events_log_path(repo_root: Path | None = None) -> Path:
+    """Return the path to the orchestra events.log file.
+
+    Args:
+        repo_root: Optional repository root override. When None, resolves via
+                   ``logs_root()`` (main-repo-anchored, honors
+                   ``$VIBE3_ASYNC_LOG_DIR``).
+
+    Returns:
+        ``<logs_root_or_repo_root>/orchestra/events.log``
+    """
     return orchestra_log_dir(repo_root) / "events.log"
 
 

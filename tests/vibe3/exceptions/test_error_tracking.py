@@ -11,7 +11,9 @@ from vibe3.services.orchestra.error_tracking.service import ErrorTrackingService
 
 def test_cleanup_deletes_old_records(temp_store: SQLiteClient) -> None:
     """Cleanup should delete records older than retention period."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     # Insert old records (older than 7 days)
     with sqlite3.connect(temp_store.db_path) as conn:
@@ -30,7 +32,7 @@ def test_cleanup_deletes_old_records(temp_store: SQLiteClient) -> None:
         conn.commit()
 
     # Run cleanup
-    deleted = ErrorTrackingService._instance.cleanup_old_errors()
+    deleted = svc.cleanup_old_errors()
 
     # Verify deletion
     assert deleted == 2
@@ -43,14 +45,18 @@ def test_cleanup_deletes_old_records(temp_store: SQLiteClient) -> None:
 
 def test_cleanup_empty_table_returns_zero(temp_store: SQLiteClient) -> None:
     """Cleanup should be a no-op on an empty error log."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
-    assert ErrorTrackingService._instance.cleanup_old_errors() == 0
+    assert svc.cleanup_old_errors() == 0
 
 
 def test_cleanup_preserves_recent_records(temp_store: SQLiteClient) -> None:
     """Cleanup should preserve records within retention period."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     # Insert recent records (within 7 days)
     with sqlite3.connect(temp_store.db_path) as conn:
@@ -69,7 +75,7 @@ def test_cleanup_preserves_recent_records(temp_store: SQLiteClient) -> None:
         conn.commit()
 
     # Run cleanup
-    deleted = ErrorTrackingService._instance.cleanup_old_errors()
+    deleted = svc.cleanup_old_errors()
 
     # Verify no deletion
     assert deleted == 0
@@ -82,7 +88,9 @@ def test_cleanup_preserves_recent_records(temp_store: SQLiteClient) -> None:
 
 def test_cleanup_returns_correct_count(temp_store: SQLiteClient) -> None:
     """Cleanup should return the correct number of deleted records."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     # Insert mixed records (old and new)
     with sqlite3.connect(temp_store.db_path) as conn:
@@ -101,7 +109,7 @@ def test_cleanup_returns_correct_count(temp_store: SQLiteClient) -> None:
         conn.commit()
 
     # Run cleanup
-    deleted = ErrorTrackingService._instance.cleanup_old_errors()
+    deleted = svc.cleanup_old_errors()
 
     # Verify count
     assert deleted == 1
@@ -118,7 +126,7 @@ def test_cleanup_returns_correct_count(temp_store: SQLiteClient) -> None:
 def test_cleanup_with_custom_retention(temp_store: SQLiteClient) -> None:
     """Cleanup should respect custom retention_days value."""
     # Create service with 3-day retention
-    ErrorTrackingService._instance = ErrorTrackingService(
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
         store=temp_store, retention_days=3
     )
 
@@ -141,7 +149,7 @@ def test_cleanup_with_custom_retention(temp_store: SQLiteClient) -> None:
         conn.commit()
 
     # Run cleanup with 3-day retention
-    deleted = ErrorTrackingService._instance.cleanup_old_errors()
+    deleted = svc.cleanup_old_errors()
 
     # Verify deletion
     assert deleted == 1
@@ -166,13 +174,13 @@ def test_cleanup_does_not_affect_threshold_detection(
     temp_store: SQLiteClient,
 ) -> None:
     """Cleanup should not affect API error threshold detection in 10-minute window."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     # Insert recent API errors (within 10 minutes)
-    ErrorTrackingService._instance.record_error("E_API_TIMEOUT", "Recent API error 1")
-    ErrorTrackingService._instance.record_error(
-        "E_API_RATE_LIMIT", "Recent API error 2"
-    )
+    svc.record_error("E_API_TIMEOUT", "Recent API error 1")
+    svc.record_error("E_API_RATE_LIMIT", "Recent API error 2")
 
     # Insert old API error (outside threshold window but within retention)
     with sqlite3.connect(temp_store.db_path) as conn:
@@ -185,33 +193,33 @@ def test_cleanup_does_not_affect_threshold_detection(
         conn.commit()
 
     # Verify threshold detection before cleanup
-    api_count_before = ErrorTrackingService._instance.get_api_error_count()
+    api_count_before = svc.get_api_error_count()
     assert api_count_before == 2  # Only count recent errors (10-minute window)
 
     # Run cleanup (should not delete any records, all within 7-day retention)
-    deleted = ErrorTrackingService._instance.cleanup_old_errors()
+    deleted = svc.cleanup_old_errors()
     assert deleted == 0
 
     # Verify threshold detection after cleanup
-    api_count_after = ErrorTrackingService._instance.get_api_error_count()
+    api_count_after = svc.get_api_error_count()
     assert api_count_after == 2  # Still same count
 
 
 def test_get_status_category_sums_match_total(temp_store: SQLiteClient) -> None:
     """get_status() should count actual errors, not unique error codes."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     # Record errors with duplicate codes
     for _ in range(3):
-        ErrorTrackingService._instance.record_error("E_API_RATE_LIMIT", "Rate limit")
+        svc.record_error("E_API_RATE_LIMIT", "Rate limit")
     for _ in range(5):
-        ErrorTrackingService._instance.record_error(
-            "E_EXEC_UNKNOWN", "Unknown exec error"
-        )
+        svc.record_error("E_EXEC_UNKNOWN", "Unknown exec error")
     for _ in range(2):
-        ErrorTrackingService._instance.record_error("E_EXEC_NO_OUTPUT", "No output")
+        svc.record_error("E_EXEC_NO_OUTPUT", "No output")
 
-    status = ErrorTrackingService._instance.get_status()
+    status = svc.get_status()
 
     # Verify category sums match total
     assert status["total_errors"] == 10
@@ -226,10 +234,12 @@ def test_get_status_category_sums_match_total(temp_store: SQLiteClient) -> None:
 
 def test_record_error_minimal_call(temp_store: SQLiteClient) -> None:
     """record_error should work with only required parameters."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     # Call with minimal parameters (WARNING-severity error, no threshold)
-    threshold_reached, error_count = ErrorTrackingService._instance.record_error(
+    threshold_reached, error_count = svc.record_error(
         "E_EXEC_NO_OUTPUT", "Test message"  # WARNING severity in registry
     )
 
@@ -257,11 +267,13 @@ def test_record_error_minimal_call(temp_store: SQLiteClient) -> None:
 
 def test_record_error_tick_only(temp_store: SQLiteClient) -> None:
     """record_error should work with tick_id but no issue_number/branch."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     # Call with tick_id only (mirrors governance_sync_runner usage)
     # Using WARNING-severity error to test non-threshold case
-    threshold_reached, error_count = ErrorTrackingService._instance.record_error(
+    threshold_reached, error_count = svc.record_error(
         "E_EXEC_NO_OUTPUT", "Test message", tick_id=42
     )
 
@@ -292,13 +304,15 @@ def test_record_error_tick_only(temp_store: SQLiteClient) -> None:
 
 def test_record_error_with_explicit_severity(temp_store: SQLiteClient) -> None:
     """record_error should accept severity parameter and store it."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     # Import here to avoid circular dependency
     from vibe3.exceptions.error_severity import ErrorSeverity
 
     # Record error with explicit severity
-    threshold_reached, error_count = ErrorTrackingService._instance.record_error(
+    threshold_reached, error_count = svc.record_error(
         "E_API_RATE_LIMIT",
         "Rate limit exceeded",
         severity=ErrorSeverity.ERROR,
@@ -322,12 +336,14 @@ def test_record_error_infers_severity_from_registry(
     temp_store: SQLiteClient,
 ) -> None:
     """record_error should infer severity from error registry when not provided."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     # Import here to avoid circular dependency
 
     # Record error without severity (should infer from registry)
-    ErrorTrackingService._instance.record_error(
+    svc.record_error(
         "E_MODEL_NOT_FOUND",  # CRITICAL in registry
         "Model not found",
     )
@@ -350,91 +366,99 @@ def test_get_threshold_error_count_counts_error_severity(
     temp_store: SQLiteClient,
 ) -> None:
     """get_threshold_error_count should count only ERROR-severity errors."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     from vibe3.exceptions.error_severity import ErrorSeverity
 
     # Record errors of different severities
-    ErrorTrackingService._instance.record_error(
+    svc.record_error(
         "E_API_RATE_LIMIT",
         "Rate limit",
         severity=ErrorSeverity.ERROR,
     )
-    ErrorTrackingService._instance.record_error(
+    svc.record_error(
         "E_API_TIMEOUT",
         "Timeout",
         severity=ErrorSeverity.ERROR,
     )
-    ErrorTrackingService._instance.record_error(
+    svc.record_error(
         "E_MODEL_NOT_FOUND",
         "Model error",
         severity=ErrorSeverity.CRITICAL,
     )
-    ErrorTrackingService._instance.record_error(
+    svc.record_error(
         "E_EXEC_NO_OUTPUT",
         "No output",
         severity=ErrorSeverity.WARNING,
     )
 
     # Count should only include ERROR-severity errors
-    count = ErrorTrackingService._instance.get_threshold_error_count()
+    count = svc.get_threshold_error_count()
     assert count == 2  # Only ERROR, not CRITICAL or WARNING
 
 
 def test_get_warning_count_counts_warning_severity(temp_store: SQLiteClient) -> None:
     """get_warning_count should count only WARNING-severity errors."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     from vibe3.exceptions.error_severity import ErrorSeverity
 
     # Record errors of different severities
-    ErrorTrackingService._instance.record_error(
+    svc.record_error(
         "E_EXEC_NO_OUTPUT",
         "No output 1",
         severity=ErrorSeverity.WARNING,
     )
-    ErrorTrackingService._instance.record_error(
+    svc.record_error(
         "E_EXEC_NO_OUTPUT",
         "No output 2",
         severity=ErrorSeverity.WARNING,
     )
-    ErrorTrackingService._instance.record_error(
+    svc.record_error(
         "E_API_RATE_LIMIT",
         "Rate limit",
         severity=ErrorSeverity.ERROR,
     )
 
     # Count should only include WARNING-severity errors
-    count = ErrorTrackingService._instance.get_warning_count()
+    count = svc.get_warning_count()
     assert count == 2
 
 
 def test_threshold_count_uses_severity_not_prefix(temp_store: SQLiteClient) -> None:
     """Threshold counting should be by severity, not error code prefix."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     from vibe3.exceptions.error_severity import ErrorSeverity
 
     # Record a custom error code with ERROR severity
-    ErrorTrackingService._instance.record_error(
+    svc.record_error(
         "E_CUSTOM_ERROR",  # Not E_API_* or E_EXEC_*
         "Custom error",
         severity=ErrorSeverity.ERROR,
     )
 
     # Should be counted by severity
-    count = ErrorTrackingService._instance.get_threshold_error_count()
+    count = svc.get_threshold_error_count()
     assert count == 1
 
 
 def test_threshold_count_respects_time_window(temp_store: SQLiteClient) -> None:
     """get_threshold_error_count should respect time window."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     from vibe3.exceptions.error_severity import ErrorSeverity
 
     # Record recent error
-    ErrorTrackingService._instance.record_error(
+    svc.record_error(
         "E_API_RATE_LIMIT",
         "Recent",
         severity=ErrorSeverity.ERROR,
@@ -452,7 +476,7 @@ def test_threshold_count_respects_time_window(temp_store: SQLiteClient) -> None:
         conn.commit()
 
     # Count should only include recent error
-    count = ErrorTrackingService._instance.get_threshold_error_count()
+    count = svc.get_threshold_error_count()
     assert count == 1
 
 
@@ -541,17 +565,15 @@ def test_get_all_errors_status_total_includes_unknown_severity(
     temp_store: SQLiteClient,
 ) -> None:
     """get_all_errors_status() should count ALL severity values in total_errors."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     from vibe3.exceptions.error_severity import ErrorSeverity
 
     # Insert known severity errors via service
-    ErrorTrackingService._instance.record_error(
-        "E_API_RATE_LIMIT", "Error 1", severity=ErrorSeverity.ERROR
-    )
-    ErrorTrackingService._instance.record_error(
-        "E_EXEC_NO_OUTPUT", "Warning 1", severity=ErrorSeverity.WARNING
-    )
+    svc.record_error("E_API_RATE_LIMIT", "Error 1", severity=ErrorSeverity.ERROR)
+    svc.record_error("E_EXEC_NO_OUTPUT", "Warning 1", severity=ErrorSeverity.WARNING)
 
     # Insert unknown severity error via direct SQL (simulating future severity values)
     with sqlite3.connect(temp_store.db_path) as conn:
@@ -580,7 +602,9 @@ def test_get_all_errors_status_null_severity_defaults_to_error(
     temp_store: SQLiteClient,
 ) -> None:
     """NULL severity should be counted under ERROR (existing behavior preserved)."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     # Insert row with NULL severity via direct SQL
     with sqlite3.connect(temp_store.db_path) as conn:
@@ -606,20 +630,16 @@ def test_get_all_errors_status_no_unknown_severity_returns_empty_dict(
     temp_store: SQLiteClient,
 ) -> None:
     """When no unknown severities exist, unknown_severity_counts should be empty."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     from vibe3.exceptions.error_severity import ErrorSeverity
 
     # Insert only known severity errors
-    ErrorTrackingService._instance.record_error(
-        "E_MODEL_NOT_FOUND", "Critical", severity=ErrorSeverity.CRITICAL
-    )
-    ErrorTrackingService._instance.record_error(
-        "E_API_RATE_LIMIT", "Error", severity=ErrorSeverity.ERROR
-    )
-    ErrorTrackingService._instance.record_error(
-        "E_EXEC_NO_OUTPUT", "Warning", severity=ErrorSeverity.WARNING
-    )
+    svc.record_error("E_MODEL_NOT_FOUND", "Critical", severity=ErrorSeverity.CRITICAL)
+    svc.record_error("E_API_RATE_LIMIT", "Error", severity=ErrorSeverity.ERROR)
+    svc.record_error("E_EXEC_NO_OUTPUT", "Warning", severity=ErrorSeverity.WARNING)
 
     from vibe3.services.orchestra.error_tracking.queries import get_all_errors_status
 

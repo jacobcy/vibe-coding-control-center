@@ -8,9 +8,11 @@ from vibe3.services.orchestra.error_tracking.service import ErrorTrackingService
 
 def test_get_all_errors_status_empty_db(temp_store: SQLiteClient) -> None:
     """get_all_errors_status should return all zeros on empty database."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
-    status = ErrorTrackingService._instance.get_all_errors_status()
+    status = svc.get_all_errors_status()
 
     assert status["total_errors"] == 0
     assert status["critical_count"] == 0
@@ -20,19 +22,21 @@ def test_get_all_errors_status_empty_db(temp_store: SQLiteClient) -> None:
 
 def test_get_all_errors_status_single_severity(temp_store: SQLiteClient) -> None:
     """get_all_errors_status should count errors of a single severity."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     from vibe3.exceptions.error_severity import ErrorSeverity
 
     # Insert 3 ERROR-severity records
     for i in range(3):
-        ErrorTrackingService._instance.record_error(
+        svc.record_error(
             "E_API_RATE_LIMIT",
             f"Rate limit {i}",
             severity=ErrorSeverity.ERROR,
         )
 
-    status = ErrorTrackingService._instance.get_all_errors_status()
+    status = svc.get_all_errors_status()
 
     assert status["total_errors"] == 3
     assert status["error_count"] == 3
@@ -42,30 +46,32 @@ def test_get_all_errors_status_single_severity(temp_store: SQLiteClient) -> None
 
 def test_get_all_errors_status_severity_buckets(temp_store: SQLiteClient) -> None:
     """get_all_errors_status should correctly bucket mixed severity levels."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     from vibe3.exceptions.error_severity import ErrorSeverity
 
     # Insert 2 CRITICAL + 3 ERROR + 1 WARNING
     for i in range(2):
-        ErrorTrackingService._instance.record_error(
+        svc.record_error(
             "E_MODEL_NOT_FOUND",
             f"Model error {i}",
             severity=ErrorSeverity.CRITICAL,
         )
     for i in range(3):
-        ErrorTrackingService._instance.record_error(
+        svc.record_error(
             "E_API_RATE_LIMIT",
             f"Rate limit {i}",
             severity=ErrorSeverity.ERROR,
         )
-    ErrorTrackingService._instance.record_error(
+    svc.record_error(
         "E_EXEC_NO_OUTPUT",
         "No output",
         severity=ErrorSeverity.WARNING,
     )
 
-    status = ErrorTrackingService._instance.get_all_errors_status()
+    status = svc.get_all_errors_status()
 
     assert status["critical_count"] == 2
     assert status["error_count"] == 3
@@ -81,7 +87,9 @@ def test_get_all_errors_status_null_severity_via_service_defaults_to_error(
     temp_store: SQLiteClient,
 ) -> None:
     """get_all_errors_status via service method should count NULL severity as ERROR."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     # Insert row with NULL severity via raw SQL (omitting severity column)
     with sqlite3.connect(temp_store.db_path) as conn:
@@ -93,7 +101,7 @@ def test_get_all_errors_status_null_severity_via_service_defaults_to_error(
         )
         conn.commit()
 
-    status = ErrorTrackingService._instance.get_all_errors_status()
+    status = svc.get_all_errors_status()
 
     # NULL severity should be counted as ERROR
     assert status["error_count"] == 1
@@ -104,12 +112,14 @@ def test_get_all_errors_status_null_severity_via_service_defaults_to_error(
 
 def test_get_all_errors_status_ignores_time_window(temp_store: SQLiteClient) -> None:
     """get_all_errors_status should count all errors regardless of time window."""
-    ErrorTrackingService._instance = ErrorTrackingService(store=temp_store)
+    svc = ErrorTrackingService._registry[temp_store.db_path] = ErrorTrackingService(
+        store=temp_store
+    )
 
     from vibe3.exceptions.error_severity import ErrorSeverity
 
     # Insert recent error (within window)
-    ErrorTrackingService._instance.record_error(
+    svc.record_error(
         "E_API_RATE_LIMIT",
         "Recent error",
         severity=ErrorSeverity.ERROR,
@@ -130,9 +140,9 @@ def test_get_all_errors_status_ignores_time_window(temp_store: SQLiteClient) -> 
         conn.commit()
 
     # get_all_errors_status should count BOTH errors (no time filter)
-    all_status = ErrorTrackingService._instance.get_all_errors_status()
+    all_status = svc.get_all_errors_status()
     assert all_status["total_errors"] == 2
 
     # get_status (windowed) should only count recent error
-    windowed_status = ErrorTrackingService._instance.get_status()
+    windowed_status = svc.get_status()
     assert windowed_status["total_errors"] == 1
