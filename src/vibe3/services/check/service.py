@@ -326,7 +326,10 @@ class CheckService(CheckRemote):
                     if isinstance(raw_labels, list):
                         issue_labels = normalize_labels(raw_labels)
                         issue_labels_loaded = True
-                    orchestration_state = issue_state_from_payload(issue)
+                    orchestration_state = issue_state_from_payload(
+                        issue,
+                        flow_state=flow_data,
+                    )
                     if str(issue.get("state", "")).upper() == "CLOSED":
                         task_issue_closed = True
 
