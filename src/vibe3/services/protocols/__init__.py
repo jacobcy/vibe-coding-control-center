@@ -8,11 +8,13 @@ if TYPE_CHECKING:
         FlowQueryProtocol,
         FlowTimelineProtocol,
     )
+    from vibe3.services.protocols.pr_cache_protocol import PRCachePort
     from vibe3.services.protocols.task_protocols import TaskQueryProtocol
 
 __all__: list[str] = [
     "FlowBootstrapProtocol",
     "FlowQueryProtocol",
     "FlowTimelineProtocol",
+    "PRCachePort",
     "TaskQueryProtocol",
 ]

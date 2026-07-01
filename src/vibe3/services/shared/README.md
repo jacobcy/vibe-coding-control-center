@@ -18,6 +18,7 @@
 - Queue dirty flag（队列脏标记）
 - Signature service（签名管理）
 - Spec ref service（规格引用管理）
+- Status pipeline（共享 Issue 状态聚合流水线）
 - Status query service（状态查询）
 - Timeline parsing（时间线解析）
 - Version service（版本管理）
@@ -31,7 +32,7 @@
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | labels.py | 244 | 状态标签常量与编排逻辑 |
-| label_service.py | 211 | Label CRUD 服务（GitHub API） |
+| label_service.py | 272 | Label CRUD 服务（GitHub API） |
 
 ### 路径与 Git
 
@@ -58,30 +59,32 @@
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | artifacts.py | 82 | Artifact 解析器 |
-| binding_guard.py | 92 | 任务绑定验证、事件发射、角色辅助 |
+| binding_guard.py | 85 | 任务绑定验证、事件发射、角色辅助 |
 | comment.py | 86 | Comment 类型检测 |
 | context_cache.py | 96 | Flow 上下文缓存服务 |
-| dependency_resolution.py | 117 | 依赖解析服务 |
+| dependency_resolution.py | 98 | 依赖解析服务 |
 | file_loader.py | 126 | Material/Policy 文件加载器 |
 | loc.py | 141 | LOC 分析服务 |
 | queue_dirty.py | 72 | Queue dirty flag 管理 |
-| signatures.py | 127 | 签名管理服务 |
+| signatures.py | 126 | 签名管理服务 |
 | spec_ref.py | 271 | Spec 引用管理服务 |
-| status_query.py | 452 | 状态查询服务 |
+| status_pipeline.py | 319 | 共享 Issue 状态聚合流水线（IssueStatusAggregator, IssueStatusEntry） |
+| status_query.py | 456 | 状态查询服务 |
 | timeline.py | 89 | Timeline 解析工具 |
 | versions.py | 121 | 版本管理服务 |
 
-**总计**：20 文件，3136 行
+**总计**：21 文件，3486 行
 
 ## 公共 API
 
-从 `__init__.py` 导出的 54 个符号：
+从 `__init__.py` 导出的 56 个符号：
 
 ### Label 体系（13 个）
 
 - `LabelService` - Label CRUD 服务
 - `classify_dispatch_eligibility` - 分发资格分类
 - `clean_old_state_labels` - 清理旧状态标签
+- `get_highest_priority_state` - 获取最高优先级状态
 - `get_state_labels` - 获取状态标签集合
 - `has_manager_assignee` - 检查 manager assignee
 - `has_orchestra_governed` - 检查 orchestra governed 标签
@@ -90,6 +93,11 @@
 - `normalize_labels` - 规范化 labels
 - `should_skip_from_queue` - 是否应从队列跳过
 - `ORCHESTRA_GOVERNED_LABEL` - Orchestra governed 标签常量
+
+### 状态聚合（2 个）
+
+- `IssueStatusAggregator` - 共享 Issue 状态聚合流水线
+- `IssueStatusEntry` - Issue 状态数据类
 
 ### 路径与 Git（8 个）
 
@@ -144,6 +152,9 @@
 
 ### 模块间依赖
 
+- `status_pipeline.py` → `status_query.py`（共享 helper 函数：extract_queue_metadata, is_orchestra_managed_flow_branch, issue_priority, sort_ready_issue_dicts）
+- `status_pipeline.py` → `clients/git_client.py`, `clients/github_client.py`（Git/GitHub 操作）
+- `status_pipeline.py` → `services/protocols`（PRCachePort, PR 缓存抽象）
 - `status_query.py` → `labels.py`（状态标签查询）
 - `label_service.py` → `clients/github_labels.py`（GitHub Label API）
 - `branch_resolver.py` → `branches.py`（分支命名规则）

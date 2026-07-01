@@ -92,6 +92,10 @@ if TYPE_CHECKING:
     )
     from vibe3.services.shared.signatures import SignatureService
     from vibe3.services.shared.spec_ref import SpecRefService
+    from vibe3.services.shared.status_pipeline import (
+        IssueStatusAggregator,
+        IssueStatusEntry,
+    )
     from vibe3.services.shared.status_query import (
         StatusQueryService,
         is_auto_task_branch,
@@ -109,6 +113,8 @@ __all__ = [
     "DependencyResolutionService",
     "FlowContextCacheService",
     "GitPathProtocol",
+    "IssueStatusAggregator",
+    "IssueStatusEntry",
     "LabelService",
     "LOCStats",
     "LocService",
@@ -162,6 +168,8 @@ _SYMBOL_MODULES = {
     "DependencyResolutionService": "vibe3.services.shared.dependency_resolution",
     "FlowContextCacheService": "vibe3.services.shared.context_cache",
     "GitPathProtocol": "vibe3.services.shared.paths",
+    "IssueStatusAggregator": "vibe3.services.shared.status_pipeline",
+    "IssueStatusEntry": "vibe3.services.shared.status_pipeline",
     "LabelService": "vibe3.services.shared.label_service",
     "LOCStats": "vibe3.services.shared.loc",
     "LocService": "vibe3.services.shared.loc",

@@ -13,45 +13,24 @@ from vibe3.clients import (
     GitClient,
     GitHubClient,
     GitHubClientProtocol,
-    parse_blocked_by,
 )
 from vibe3.config import get_manager_usernames
 from vibe3.models import IssueState, OrchestraConfig
 from vibe3.observability import orchestra_events_log_path
 from vibe3.services.pr.service import PRService
-from vibe3.services.shared.label_service import LabelService
-from vibe3.services.shared.status_query import (
-    extract_primary_assignee_login,
-    extract_queue_metadata,
-    is_orchestra_managed_flow_branch,
-    issue_priority,
-    sort_ready_issue_dicts,
+from vibe3.services.shared.status_pipeline import (
+    IssueStatusAggregator,
+)
+from vibe3.services.shared.status_pipeline import (
+    IssueStatusEntry as _IssueStatusEntry,
 )
 
 if TYPE_CHECKING:
     from vibe3.runtime import CircuitBreaker
 
 
-@dataclass(frozen=True)
-class IssueStatusEntry:
-    """Aggregated status for a single issue."""
-
-    number: int
-    title: str
-    state: IssueState | None
-    assignee: str | None
-    has_flow: bool
-    flow_branch: str | None
-    has_worktree: bool
-    worktree_path: str | None
-    has_pr: bool
-    pr_number: int | None
-    blocked_by: tuple[int, ...] = ()
-    # Queue metadata fields
-    milestone: str | None = None
-    roadmap: str | None = None
-    priority: int = 0
-    queue_rank: int | None = None
+# Backward-compat re-export: consumers import from orchestra.status
+IssueStatusEntry = _IssueStatusEntry
 
 
 @dataclass(frozen=True)
@@ -107,23 +86,6 @@ def format_issue_runtime_line(entry: IssueStatusEntry) -> str:
 def is_running_issue(entry: IssueStatusEntry) -> bool:
     """Check if issue has active runtime resources."""
     return entry.has_flow or entry.has_worktree or entry.has_pr
-
-
-def _extract_state_from_labels(labels: list) -> IssueState | None:
-    """Extract state from issue labels without API call.
-
-    Args:
-        labels: List of label dicts from GitHub issue response
-
-    Returns:
-        IssueState if state/* label found, None otherwise
-    """
-    for label in labels:
-        name = label.get("name", "") if isinstance(label, dict) else str(label)
-        state = IssueState.from_label(name)
-        if state:
-            return state
-    return None
 
 
 class OrchestraStatusService:
@@ -199,7 +161,6 @@ class OrchestraStatusService:
 
         self._circuit_breaker = circuit_breaker
         self._git = git_client or GitClient()
-        self._label_service = LabelService(repo=config.repo)
         self._failed_gate = failed_gate
 
     @classmethod
@@ -291,171 +252,32 @@ class OrchestraStatusService:
 
         # Get issues assigned to manager usernames
         issues = self._get_manager_issues()
-        worktrees = self._get_worktree_map()
 
-        # First pass: collect issue rows and flow branches for batch PR lookup
-        issue_rows: list[dict[str, Any]] = []
-        flow_branches: set[str] = set()
-        active_flows = 0
-
-        for issue in issues:
-            number = issue.get("number")
-            if not number:
-                continue
-
-            title = issue.get("title", "")
-            assignee = extract_primary_assignee_login(issue.get("assignees"))
-
-            # Get state from issue labels (already fetched in list_issues)
-            # Avoid N+1 API calls by not calling get_state() per issue
-            state = _extract_state_from_labels(issue.get("labels", []))
-
-            # Check flow
-            flow = self._orchestrator.get_flow_for_issue(number)
-            if flow and not is_orchestra_managed_flow_branch(flow.get("branch")):
-                continue
-            has_flow = flow is not None
-            flow_branch = flow.get("branch") if flow else None
-            if has_flow:
-                active_flows += 1
-                if flow_branch:
-                    flow_branches.add(flow_branch)
-
-            # Check worktree
-            branch_name = flow_branch or f"task/issue-{number}"
-            worktree_path = worktrees.get(branch_name)
-            has_worktree = worktree_path is not None
-
-            # Parse blocked_by from issue body
-            blocked_by_list = parse_blocked_by(issue.get("body") or "")
-
-            labels, milestone, priority, roadmap = extract_queue_metadata(
-                issue.get("labels"),
-                issue.get("milestone"),
-            )
-
-            # Skip supervisor issues - handled by supervisor/apply, not manager chain
-            if "supervisor" in labels:
-                continue
-
-            issue_rows.append(
-                {
-                    "number": number,
-                    "title": title,
-                    "state": state,
-                    "assignee": assignee,
-                    "has_flow": has_flow,
-                    "flow_branch": flow_branch,
-                    "has_worktree": has_worktree,
-                    "worktree_path": worktree_path,
-                    "flow": flow,
-                    "blocked_by": tuple(blocked_by_list),
-                    "milestone": milestone,
-                    "roadmap": roadmap,
-                    "priority": priority,
-                    "labels": labels,
-                }
-            )
-
-        # Batch PR lookup: read-only cache hydration without context-cache writes
-        branch_to_pr: dict[str, Any] = {}
-        if flow_branches:
-            try:
-                pr_service = PRService(
-                    github_client=cast(GitHubClientProtocol, self._github),
-                    git_client=self._git,
-                    store=getattr(self._orchestrator, "store", None),
-                )
-                all_prs = pr_service.refresh_recent_pr_cache(sync_context_cache=False)
-                branch_to_pr = {
-                    b: pr for b, pr in all_prs.items() if b in flow_branches
-                }
-            except Exception as exc:
-                log.warning(f"Failed to batch hydrate PR status: {exc}")
-
-        # Second pass: build issue data with PR info from batch lookup
-        ready_issues_data: list[dict[str, Any]] = []
-        other_issues_data: list[dict[str, Any]] = []
-
-        for row in issue_rows:
-            flow_branch = row["flow_branch"]
-            flow = row["flow"]
-
-            # Determine PR number from batch cache or stored flow value
-            pr_number = None
-            if row["has_flow"] and flow_branch:
-                cached_pr = branch_to_pr.get(flow_branch)
-                # Coerce pr_number to int if present (may be stored as string)
-                pr_number_raw = flow.get("pr_number") if flow else None
-                pr_number = cached_pr.number if cached_pr else None
-                if pr_number is None and pr_number_raw:
-                    try:
-                        pr_number = int(pr_number_raw)
-                    except (ValueError, TypeError):
-                        pass  # Leave as None if conversion fails
-
-            issue_data = {
-                "number": row["number"],
-                "title": row["title"],
-                "state": row["state"],
-                "assignee": row["assignee"],
-                "has_flow": row["has_flow"],
-                "flow_branch": row["flow_branch"],
-                "has_worktree": row["has_worktree"],
-                "worktree_path": row["worktree_path"],
-                "has_pr": pr_number is not None,
-                "pr_number": pr_number,
-                "blocked_by": row["blocked_by"],
-                "milestone": row["milestone"],
-                "roadmap": row["roadmap"],
-                "priority": row["priority"],
-                "labels": row["labels"],
-            }
-
-            if row["state"] == IssueState.READY:
-                ready_issues_data.append(issue_data)
-            else:
-                other_issues_data.append(issue_data)
-
-        # Sort ready issues and assign real queue ranks
-        sorted_ready_data = sort_ready_issue_dicts(ready_issues_data)
-
-        other_issues_data.sort(
-            key=lambda item: (
-                *(
-                    issue_priority(item["state"])
-                    if isinstance(item["state"], IssueState)
-                    else (4, "unknown")
-                ),
-                item["number"],
-            )
+        # Delegate aggregation to shared IssueStatusAggregator
+        aggregator = IssueStatusAggregator(
+            github=self._github,
+            git=self._git,
+            pr_service_factory=lambda **kw: PRService(
+                github_client=cast(GitHubClientProtocol, self._github),
+                git_client=self._git,
+                store=getattr(self._orchestrator, "store", None),
+                **kw,
+            ),
+            worktree_map_provider=None,  # Use aggregator's default implementation
+            orchestrator=self._orchestrator,
         )
 
-        # Combine: ready issues first (sorted with real ranks), then others
-        all_issues_data = sorted_ready_data + other_issues_data
+        # Aggregate issues (orchestra: read-only PR cache, no context-cache writes)
+        entries = aggregator.aggregate(
+            issues=issues,
+            queued=queued or set(),
+            sync_context_cache=False,  # Orchestra path: read-only PR cache hydration
+        )
 
-        # Build final entries
-        entries: list[IssueStatusEntry] = []
-        for data in all_issues_data:
-            entries.append(
-                IssueStatusEntry(
-                    number=data["number"],
-                    title=data["title"],
-                    state=data["state"],
-                    assignee=data["assignee"],
-                    has_flow=data["has_flow"],
-                    flow_branch=data["flow_branch"],
-                    has_worktree=data["has_worktree"],
-                    worktree_path=data["worktree_path"],
-                    has_pr=data["has_pr"],
-                    pr_number=data["pr_number"],
-                    blocked_by=data["blocked_by"],
-                    milestone=data["milestone"],
-                    roadmap=data["roadmap"],
-                    priority=data["priority"],
-                    queue_rank=data.get("queue_rank"),
-                )
-            )
+        # Compute tallies from entries
+        active_flows = sum(1 for entry in entries if entry.has_flow)
+        worktrees = aggregator.fetch_worktree_map()
+        active_worktrees = len(worktrees)
 
         # Check failed gate
         dispatch_blocked = False
@@ -475,9 +297,9 @@ class OrchestraStatusService:
         snapshot = OrchestraSnapshot(
             timestamp=time.time(),
             server_running=True,
-            active_issues=tuple(entries),
+            active_issues=entries,
             active_flows=active_flows,
-            active_worktrees=len(worktrees),
+            active_worktrees=active_worktrees,
             queued_issues=tuple(queued) if queued else (),
             circuit_breaker_state=self._get_circuit_breaker_state(),
             circuit_breaker_failures=self._get_circuit_breaker_failures(),
@@ -493,7 +315,7 @@ class OrchestraStatusService:
 
         log.debug(
             f"Snapshot built: {len(entries)} issues, {active_flows} flows, "
-            f"{len(worktrees)} worktrees"
+            f"{active_worktrees} worktrees"
         )
         return snapshot
 
@@ -525,16 +347,6 @@ class OrchestraStatusService:
                     f"Failed to list issues for {username}: {exc}"
                 )
         return issues
-
-    def _get_worktree_map(self) -> dict[str, str]:
-        try:
-            worktrees = self._git.list_worktrees()
-            return {
-                branch.removeprefix("refs/heads/"): path for path, branch in worktrees
-            }
-        except Exception as exc:
-            logger.bind(domain="orchestra").warning(f"Failed to list worktrees: {exc}")
-            return {}
 
     @staticmethod
     def get_manager_usernames(config: OrchestraConfig) -> tuple[str, ...]:
