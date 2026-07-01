@@ -84,6 +84,11 @@ class PRService:
             except Exception:
                 try:
                     git_common_dir = self.git_client.get_git_common_dir()
+                    # Keep this on git-common-dir (main repo), not Path.cwd():
+                    # cwd breaks RecentPRCache resolution inside linked worktree
+                    # checkouts where `.git` is a file, even as a last-resort
+                    # fallback. The primary find_repo_root() path already handles
+                    # bare repos correctly.
                     repo_path = (
                         Path(git_common_dir).parent
                         if git_common_dir

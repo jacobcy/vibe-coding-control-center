@@ -16,6 +16,32 @@ _vibe_alias_require_loaded() {
 # @featured
 alias wtls='git worktree list'
 
+# @description Resolve top-level repository root (COMMON PARENT) that works in bare
+# repo, linked worktree, and non-bare checkout.
+# Uses git-common-dir + is-bare-repository logic (same pattern as wtnew()).
+#   - bare repo:    abs_dir IS the repo root
+#   - non-bare:     abs_dir = <main>/.git  → dirname gives main repo root
+# Note: --git-common-dir always points to main repo's .git, even from linked worktree.
+#       Callers that need the CURRENT worktree root (e.g. vup with no target)
+#       should use `git rev-parse --show-toplevel` instead.
+# Returns: repo root path to stdout, empty string on failure
+_vibe_worktree_repo_root() {
+  local git_cmd; git_cmd="$(vibe_find_cmd git)" || return 1
+  local abs_dir
+  abs_dir="$($git_cmd rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+  [[ -n "$abs_dir" && -d "$abs_dir" ]] || return 1
+
+  # bare repo: abs_dir itself is the repo root
+  if [[ "$($git_cmd -C "$abs_dir" rev-parse --is-bare-repository 2>/dev/null)" == "true" ]]; then
+    echo "$abs_dir"
+    return 0
+  fi
+
+  # non-bare: abs_dir = <main>/.git → dirname gives main repo root
+  # (works for both normal checkout and linked worktree — common dir is always main)
+  dirname "$abs_dir"
+}
+
 _vibe_worktree_run_init() {
   local repo_root="$1"
   local worktree_path="$2"
@@ -41,7 +67,7 @@ _wt_find() {
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || return 1
   local awk_cmd; awk_cmd="$(vibe_find_cmd awk)" || return 1
 
-  local main_dir; main_dir="$($git_cmd rev-parse --show-toplevel 2>/dev/null)"
+  local main_dir; main_dir="$(_vibe_worktree_repo_root)"
   [[ -z "$main_dir" ]] && return 1
 
   local -a all_paths=()
@@ -200,7 +226,7 @@ wtrm() {
   done
   [[ -n "$target" ]] || { vibe_die "usage: wtrm [--yes] [--delete-remote] <wt-dir|path|all|wildcard>"; return 1; }
 
-  local main_dir; main_dir="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || { vibe_die "Not in git repo"; return 1; }
+  local main_dir; main_dir="$(_vibe_worktree_repo_root)" || { vibe_die "Not in git repo"; return 1; }
 
   _wtrm_one() {
     local p="$1" label="${1##*/}"
@@ -326,8 +352,11 @@ vup() {
   # Resolve target to directory path using _wt_find
   local dir_path
   if [[ -z "$target" ]]; then
-    # No argument: use current git worktree root
-    dir_path="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+    # No argument: use CURRENT git worktree root (may be linked worktree).
+    # Use --show-toplevel here: --git-common-dir returns the main repo's .git,
+    # which would misname the tmux session when run from a linked worktree.
+    local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
+    dir_path="$("$git_cmd" rev-parse --show-toplevel 2>/dev/null)" || {
       vibe_die "Not in a git worktree"
       return 1
     }
