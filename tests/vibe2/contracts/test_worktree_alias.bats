@@ -66,14 +66,14 @@ run_wt_from_bare_repo() {
 }
 
 @test "wt/wtrm --help do not fatal from bare repo root" {
-  # Test that wt (no args) works from bare repo root - lists worktrees without fatal
+  # Test that wt (no args) lists worktrees from bare repo root without fatal error
   run_wt_from_bare_repo "wt 2>&1"
   [ "$status" -eq 0 ]
-  # Should list worktrees, not fatal with "this operation must be run in a work tree"
-  [[ "$output" =~ "(bare)" ]] || [[ "$output" == "" ]]
+  [[ "$output" == *"(bare)"* ]]                       # must show bare worktree marker
+  [[ "$output" != *"fatal:"* ]]                       # negative guard: ensure no regression
 
   # Test that wtrm --help works from bare repo root
   run_wt_from_bare_repo "wtrm --help 2>&1"
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "usage: wtrm" ]]
+  [[ "$output" == *"usage: wtrm"* ]]
 }

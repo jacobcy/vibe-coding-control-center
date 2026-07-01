@@ -16,11 +16,17 @@ _vibe_alias_require_loaded() {
 # @featured
 alias wtls='git worktree list'
 
-# @description Resolve repository root that works in bare repo, worktree, and non-bare checkout
-# Uses git-common-dir + is-bare-repository logic (same pattern as wtnew())
+# @description Resolve top-level repository root (COMMON PARENT) that works in bare
+# repo, linked worktree, and non-bare checkout.
+# Uses git-common-dir + is-bare-repository logic (same pattern as wtnew()).
+#   - bare repo:    abs_dir IS the repo root
+#   - non-bare:     abs_dir = <main>/.git  → dirname gives main repo root
+# Note: --git-common-dir always points to main repo's .git, even from linked worktree.
+#       Callers that need the CURRENT worktree root (e.g. vup with no target)
+#       should use `git rev-parse --show-toplevel` instead.
 # Returns: repo root path to stdout, empty string on failure
 _vibe_worktree_repo_root() {
-  local git_cmd; git_cmd="$(command -v git)" || return 1
+  local git_cmd; git_cmd="$(vibe_find_cmd git)" || return 1
   local abs_dir
   abs_dir="$($git_cmd rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
   [[ -n "$abs_dir" && -d "$abs_dir" ]] || return 1
@@ -31,7 +37,8 @@ _vibe_worktree_repo_root() {
     return 0
   fi
 
-  # non-bare: abs_dir = <root>/.git or <main>/.git/worktrees/<name> → take dirname
+  # non-bare: abs_dir = <main>/.git → dirname gives main repo root
+  # (works for both normal checkout and linked worktree — common dir is always main)
   dirname "$abs_dir"
 }
 
@@ -345,8 +352,11 @@ vup() {
   # Resolve target to directory path using _wt_find
   local dir_path
   if [[ -z "$target" ]]; then
-    # No argument: use current git worktree root
-    dir_path="$(_vibe_worktree_repo_root)" || {
+    # No argument: use CURRENT git worktree root (may be linked worktree).
+    # Use --show-toplevel here: --git-common-dir returns the main repo's .git,
+    # which would misname the tmux session when run from a linked worktree.
+    local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
+    dir_path="$("$git_cmd" rev-parse --show-toplevel 2>/dev/null)" || {
       vibe_die "Not in a git worktree"
       return 1
     }
