@@ -55,7 +55,7 @@ def test_run_separator_appends_instead_of_truncating(
     # Clear any environment variables that might affect log directory
     monkeypatch.delenv("VIBE3_ASYNC_LOG_DIR", raising=False)
     monkeypatch.setenv("VIBE3_ORCHESTRA_EVENT_LOG", "1")
-    log_path = tmp_path / "temp" / "logs" / "orchestra" / "events.log"
+    log_path = tmp_path / "orchestra" / "events.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text("old event from previous run\n", encoding="utf-8")
     append_orchestra_run_separator(repo_root=tmp_path, title="server run start")

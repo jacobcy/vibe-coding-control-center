@@ -149,5 +149,7 @@ def test_build_issue_async_cli_request_sets_async_log_dir() -> None:
         repo_path=MAIN_REPO,
     )
 
-    assert request.env["VIBE3_ASYNC_LOG_DIR"] == str(MAIN_REPO / "temp" / "logs")
+    from vibe3.observability import logs_root
+
+    assert request.env["VIBE3_ASYNC_LOG_DIR"] == str(logs_root())
     assert request.env["VIBE3_ASYNC_CHILD"] == "1"

@@ -46,12 +46,14 @@ def _resolve_dispatcher_models_root(
 def _resolve_orchestra_log_dir() -> Path:
     """Resolve the shared orchestra log root anchored to the repo root.
 
-    Always uses find_repo_root() to anchor temp/logs in the repository root,
-    regardless of the current working directory at launch time.
+    Delegates to ``logs_root()`` — the canonical resolver that walks
+    ``.git/worktrees/<name>`` back to the main checkout when running from a
+    worktree, or honors ``$VIBE3_ASYNC_LOG_DIR`` when a caller manages its own
+    temp dir.
     """
-    from vibe3.utils import find_repo_root
+    from vibe3.observability import logs_root
 
-    return find_repo_root() / "temp" / "logs"
+    return logs_root()
 
 
 def _build_server(config: "OrchestraConfig") -> tuple["HeartbeatServer", "FastAPI"]:

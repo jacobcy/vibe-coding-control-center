@@ -44,9 +44,9 @@ def enable_event_log(monkeypatch):
 
 
 def test_orchestra_log_dir_default(tmp_path: Path):
-    """orchestra_log_dir returns tmp_path / temp / logs / orchestra and creates it."""
+    """orchestra_log_dir returns tmp_path / orchestra and creates it."""
     result = mod.orchestra_log_dir(repo_root=tmp_path)
-    assert result == tmp_path / "temp" / "logs" / "orchestra"
+    assert result == tmp_path / "orchestra"
     assert result.exists()
     assert result.is_dir()
 
@@ -104,7 +104,7 @@ def test_ensure_events_handle_opens_file(tmp_path: Path, enable_event_log):
     assert mod._events_handle is not None
     assert mod._events_handle is handle
     assert mod._events_path is not None
-    assert mod._events_path == tmp_path / "temp" / "logs" / "orchestra" / "events.log"
+    assert mod._events_path == tmp_path / "orchestra" / "events.log"
     assert mod._events_path.exists()
 
 
@@ -136,7 +136,7 @@ def test_ensure_events_handle_reopens_on_path_change(tmp_path: Path, enable_even
     assert handle_a is not handle_b
     assert mod._events_handle is handle_b
     assert path_a != path_b
-    assert path_b == repo_b / "temp" / "logs" / "orchestra" / "events.log"
+    assert path_b == repo_b / "orchestra" / "events.log"
 
 
 def test_close_events_log(enable_event_log, tmp_path: Path):
@@ -184,7 +184,7 @@ def test_append_event_disabled(tmp_path: Path):
     """
     result = mod.append_orchestra_event("component", "message", repo_root=tmp_path)
 
-    expected_path = tmp_path / "temp" / "logs" / "orchestra" / "events.log"
+    expected_path = tmp_path / "orchestra" / "events.log"
     assert result == expected_path
     assert not expected_path.exists()
 
@@ -275,7 +275,7 @@ def test_run_separator_disabled(tmp_path: Path):
     """append_orchestra_run_separator returns path but writes nothing when disabled."""
     result = mod.append_orchestra_run_separator(repo_root=tmp_path)
 
-    expected_path = tmp_path / "temp" / "logs" / "orchestra" / "events.log"
+    expected_path = tmp_path / "orchestra" / "events.log"
     assert result == expected_path
     assert not expected_path.exists()
 
@@ -299,13 +299,13 @@ def test_governance_event_writes_to_both_files(tmp_path: Path, enable_event_log)
     """append_governance_event writes to both governance.log and events.log."""
     result = mod.append_governance_event("governance message", repo_root=tmp_path)
 
-    # Check governance.log
+    # Check governor.log
     assert result.exists()
     governance_content = result.read_text()
     assert "governance message" in governance_content
 
     # Check events.log (via delegation to append_orchestra_event)
-    events_path = tmp_path / "temp" / "logs" / "orchestra" / "events.log"
+    events_path = tmp_path / "orchestra" / "events.log"
     assert events_path.exists()
     events_content = events_path.read_text()
     assert "governance message" in events_content
@@ -319,7 +319,7 @@ def test_governance_event_creates_governance_dir(tmp_path: Path):
     """
     result = mod.append_governance_event("test message", repo_root=tmp_path)
 
-    governance_dir = tmp_path / "temp" / "logs" / "orchestra" / "governance"
+    governance_dir = tmp_path / "orchestra" / "governance"
     assert governance_dir.exists()
     assert result.parent == governance_dir
 
@@ -459,7 +459,7 @@ def test_supervisor_event_writes_to_both_files(tmp_path: Path, enable_event_log)
     assert "supervisor message" in supervisor_content
 
     # Check events.log (via delegation to append_orchestra_event)
-    events_path = tmp_path / "temp" / "logs" / "orchestra" / "events.log"
+    events_path = tmp_path / "orchestra" / "events.log"
     assert events_path.exists()
     events_content = events_path.read_text()
     assert "supervisor message" in events_content
@@ -482,7 +482,7 @@ def test_supervisor_event_format(tmp_path: Path, enable_event_log):
 
 
 def test_logs_root_anchored_to_find_repo_root(tmp_path: Path, monkeypatch) -> None:
-    """logs_root() returns main-repo /temp/logs, not cwd."""
+    """logs_root() returns main-repo / temp/logs, not cwd."""
     from unittest.mock import patch
 
     monkeypatch.delenv("VIBE3_ASYNC_LOG_DIR", raising=False)

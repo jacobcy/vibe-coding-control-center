@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.models import ExecutionLaunchResult
+from vibe3.observability import logs_root
 
 MAIN_REPO = Path("/test/repos/vibe-center/main")
 
@@ -489,7 +490,5 @@ class TestGovernanceScanDispatchEnvInjection:
 
         mock_coordinator.dispatch_execution.assert_called_once()
         request = mock_coordinator.dispatch_execution.call_args.args[0]
-        assert request.env.get("VIBE3_ASYNC_LOG_DIR") == str(
-            MAIN_REPO / "temp" / "logs"
-        )
+        assert request.env.get("VIBE3_ASYNC_LOG_DIR") == str(logs_root())
         assert request.env.get("VIBE3_ASYNC_CHILD") == "1"

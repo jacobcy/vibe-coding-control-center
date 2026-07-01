@@ -18,6 +18,7 @@ from vibe3.config import GOVERNANCE_GATE_CONFIG, load_orchestra_config
 from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.handler_registry import register_handler
 from vibe3.models import ExecutionLaunchResult, ExecutionRequest
+from vibe3.observability import logs_root
 from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 
 if TYPE_CHECKING:
@@ -188,7 +189,7 @@ def handle_governance_scan_started(
     env["VIBE3_ASYNC_CHILD"] = "1"
     # Ensure governance child process can write to events.log
     env["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
-    env["VIBE3_ASYNC_LOG_DIR"] = str(root / "temp" / "logs")
+    env["VIBE3_ASYNC_LOG_DIR"] = str(logs_root())
 
     request = ExecutionRequest(
         role="governance",

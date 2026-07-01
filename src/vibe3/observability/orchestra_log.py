@@ -19,15 +19,12 @@ def logs_root(*, env_key: str = "VIBE3_ASYNC_LOG_DIR") -> Path:
     2. ``find_repo_root()`` — in a worktree this walks the
        ``.git/worktrees/<name>`` ``gitdir`` pointer back to the main checkout.
 
-    Callers building env dicts for async children (``job_executor``,
-    ``governance_sync_runner``) should pass the resolved value via ``env_key``
-    rather than relying on this fallback. This function exists as the canonical
-    default for ad-hoc / sync code paths where no env var is set yet
-    (historically ``default_log_dir`` and ``codeagent._run_subprocess``).
-
-    Cached via ``lru_cache`` — equivalent git layout for the lifetime of the
-    process. Cache is cleared transparently in tests that patch
-    ``find_repo_root``.
+    This is the canonical resolver for every temp/logs reference in the
+    codebase. Sibling functions (``orchestra_log_dir``, ``governance_log_dir``,
+    …) delegate here, and async-child env injection callers resolve the child
+    dir via this function. After the unification in #3259, nothing beneath
+    ``orchestra_log`` should hardcode ``temp/logs`` or re-read
+    ``VIBE3_ASYNC_LOG_DIR`` directly.
     """
     override = os.environ.get(env_key, "").strip()
     if override:
@@ -38,14 +35,12 @@ def logs_root(*, env_key: str = "VIBE3_ASYNC_LOG_DIR") -> Path:
 
 
 def orchestra_log_dir(repo_root: Path | None = None) -> Path:
-    override_dir = os.environ.get("VIBE3_ASYNC_LOG_DIR", "").strip()
-    if override_dir:
-        path = Path(override_dir).expanduser().resolve() / "orchestra"
+    if repo_root is None:
+        base = logs_root()
     else:
-        from vibe3.utils import find_repo_root
-
-        root = repo_root or find_repo_root()
-        path = root / "temp" / "logs" / "orchestra"
+        override = os.environ.get("VIBE3_ASYNC_LOG_DIR", "").strip()
+        base = Path(override).expanduser().resolve() if override else repo_root
+    path = base / "orchestra"
     path.mkdir(parents=True, exist_ok=True)
     return path
 

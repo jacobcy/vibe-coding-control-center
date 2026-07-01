@@ -25,6 +25,7 @@ from vibe3.models import (
     JobEnvelope,
     JobResult,
 )
+from vibe3.observability import logs_root
 from vibe3.utils import compute_hash_from_loader
 
 if TYPE_CHECKING:
@@ -537,7 +538,7 @@ class JobExecutor:
         env["VIBE3_ASYNC_CHILD"] = "1"
         env["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
         # Force logs to be written to the target project, not the vibe repo
-        env["VIBE3_ASYNC_LOG_DIR"] = str(repo / "temp" / "logs")
+        env["VIBE3_ASYNC_LOG_DIR"] = str(logs_root())
 
         # Build execution request
         request = ExecutionRequest(
