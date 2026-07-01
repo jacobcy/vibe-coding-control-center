@@ -214,8 +214,8 @@ code_limits:
 
       # Shell / 脚本兼容入口
       - path: "scripts/install.sh"
-        limit: 550
-        reason: "全局安装脚本聚合，包含目录同步、supervisor/ 同步、过期文件清理、settings.yaml 迁移、sanity check 等完整安装生命周期；PR #3276 新增 direnv whitelist 自动注册（_add_vibe_dir_to_direnv_whitelist，单段 TOML 合并 + 幂等 grok），扩展安装脚本对 direnv 白名单的聚合管理职责"
+        limit: 580
+        reason: "全局安装脚本聚合，包含目录同步、supervisor/ 同步、过期文件清理、settings.yaml 迁移、sanity check 等完整安装生命周期；PR #3276 新增 direnv whitelist 自动注册（_add_vibe_dir_to_direnv_whitelist + _write_direnv_whitelist tomllib 语义合并 + 无 Python 安全兜底），扩展了安装脚本对 direnv 白名单的聚合管理职责"
       - path: "lib/alias/worktree.sh"
         limit: 500
         reason: "Shell worktree 入口聚合别名与辅助函数，维持单文件更符合使用方式"
