@@ -392,8 +392,8 @@ code_limits:
         limit: 500
         reason: "Services barrel architecture 测试集，新增 2 个 __all__ policy 验证测试（test_root_barrel_all_matches_approved_public_api、test_domain_barrels_all_matches_approved_api），覆盖 AST 解析与 _SYMBOL_MODULES 映射一致性验证，强内聚架构质量门禁"
       - path: "tests/vibe3/exceptions/test_error_tracking.py"
-        limit: 650
-        reason: "Error tracking 测试集，新增 9 个测试（5 个 get_all_errors_status + 4 个 _display_error_tracking），覆盖 severity 分类、threshold 计数、时间窗口逻辑、NULL severity 默认处理、历史 vs 窗口错误显示"
+        limit: 660
+        reason: "Error tracking 测试集。#3277 review 修复简化 ErrorTrackingService 为单注册表后，5 个测试文件中的 legacy _instance 访问改为 ErrorTrackingService._registry[db_path] 或 get_instance(store=...) 双行形式，配合 black 重排导致 +3 行；同时清理了一个未使用的 svc 局部变量。原 9 个 get_all_errors_status/_display_error_tracking 测试 + cleanup/severity/status/record_error 全套测试均保留，强内聚 threshold 行为一致性，拆分会破坏测试场景完整性"
       - path: "tests/vibe3/services/test_task_service_fresh_db.py"
         limit: 430
         reason: "TaskService fresh DB 测试集，覆盖 issue 链接、角色重分类、flow 降级、ref 选择等核心业务逻辑，包含完整的 mock setup 和参数化状态转换测试，拆分会破坏测试场景完整性；更新 FakeGitHub.view_issue 添加 fields 参数支持后略微超标（+4 行）"
