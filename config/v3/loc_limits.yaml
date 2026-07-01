@@ -65,7 +65,7 @@ code_limits:
         limit: 510
         reason: "GitHub Issues 操作聚合，包含 issue CRUD、PR 列表查询、字段验证（issue/PR 双重验证）、链接解析、批量查询等紧密耦合逻辑；Issue #2968 新增 PR 字段验证基础设施（_validate_pr_fields 函数 + GITHUB_KNOWN_PR_FIELDS 常量，+41 行）支持 PR 字段校验与拼写建议；PR #3113 新增智能错误分类（_classify_github_api_error 函数，+50 行）支持 E_API_RATE_LIMIT/E_API_TIMEOUT/E_API_NETWORK 等细粒度错误码推断"
       - path: "src/vibe3/clients/sqlite_flow_state_repo.py"
-        limit: 660
+        limit: 700
         reason: |
           Repo 层职责内聚，包含：
           - 基础 CRUD 操作（10 个 get 方法）
@@ -77,6 +77,7 @@ code_limits:
           - UTC-aware datetime 写入（update_flow_state, add_issue_link）
           - Status 参数验证（get_flows_by_status 增加 VALID_FLOW_STATUSES 校验）
           - Bulk retrieval optimization（get_flow_state_bulk、get_flows_by_issues_bulk）
+          - get_issue_dependents 方法（反向依赖查询，issue_number → dependent branches）
 
           拆分会破坏：
           - 数据访问层完整性
@@ -89,6 +90,7 @@ code_limits:
           PR #2741 新增 get_branch_for_task_issue 方法，优化 get_flow_for_issue 性能（+28 行）
           Issue #3189 新增 get_flows_by_statuses 批量状态查询方法（WHERE flow_status IN (...)，+40 行），减少串行查询次数
           Issue #3238 新增 remove_issue_link 方法支持依赖缓存定向清理（+18 行），限上调至 660
+          Issue #3229 新增 get_issue_dependents 方法支持依赖解决事件处理（+37 行），限上调至 700
 
       - path: "src/vibe3/commands/status.py"
         limit: 490

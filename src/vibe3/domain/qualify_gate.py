@@ -12,6 +12,7 @@ from vibe3.domain.qualify_gate_checks import (
 )
 from vibe3.domain.qualify_gate_support import (
     terminalize_closed_issue,
+    transition_to_review,
 )
 from vibe3.models import CoordinationTruth, IssueInfo, IssueState, OrchestraConfig
 from vibe3.services.flow import (
@@ -24,6 +25,7 @@ from vibe3.services.orchestra import CoordinationResolver
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
     from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
+    from vibe3.models import PRResponse
 
 
 _ORIG_BLOCKED_STATE_SERVICE = BlockedStateService
@@ -133,6 +135,7 @@ class QualifyGateService:
         )
 
         # Advisory notification for downstream dependents (non-blocking)
+        # Dependency closure gate: posts advisory comments when upstream closes
         try:
             from vibe3.services.dispatch import DependencyClosureGate
 

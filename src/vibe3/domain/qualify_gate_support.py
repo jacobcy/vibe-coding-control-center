@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from vibe3.models import PRResponse
 from vibe3.services.flow import FlowCleanupService, FlowStatusService
 
 if TYPE_CHECKING:
@@ -71,4 +72,31 @@ def terminalize_closed_issue(
         include_remote=False,
         terminate_sessions=True,
         keep_flow_record=True,
+    )
+
+
+def transition_to_review(
+    *,
+    branch: str,
+    pr: "PRResponse",
+    store: "SQLiteClient",
+    flow_manager: "FlowManagerProtocol",
+    github: "GitHubClient",
+    flow_status_service_cls: type[Any] = FlowStatusService,
+) -> None:
+    flow_status_service_cls(
+        store=store,
+        git_client=flow_manager.git,
+        github_client=github,
+    ).mark_flow_status(
+        branch,
+        "review",
+        f"PR #{pr.number} is open with running worker",
+        "flow_auto_review",
+        "auto_review_flow",
+    )
+    _append_orchestra_event(
+        "qualify_gate",
+        "Auto-transitioned flow "
+        f"{branch} to review: PR #{pr.number} open with running worker",
     )

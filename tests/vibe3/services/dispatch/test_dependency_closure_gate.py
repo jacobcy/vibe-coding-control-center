@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.services.dispatch.dependency_closure_gate import DependencyClosureGate
+from vibe3.clients import SQLiteClient
+from vibe3.services.dispatch import DependencyClosureGate
 
 
 def test_notify_downstream_no_dependents(temp_store: SQLiteClient) -> None:

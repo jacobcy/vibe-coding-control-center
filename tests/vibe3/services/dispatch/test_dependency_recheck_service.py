@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.clients import SQLiteClient
 from vibe3.models import IssueResolvedDependency, IssueState
-from vibe3.services.dispatch.dependency_recheck_service import (
-    DependencyRecheckService,
-)
+from vibe3.services.dispatch import DependencyRecheckService
 
 
 def test_handle_issue_resolved_no_dependents(temp_store: SQLiteClient) -> None:

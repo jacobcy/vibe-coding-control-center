@@ -14,9 +14,8 @@ from loguru import logger
 from vibe3.models import IssueState
 
 if TYPE_CHECKING:
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.models.domain_events import IssueResolvedDependency
+    from vibe3.clients import GitHubClient, SQLiteClient
+    from vibe3.models import IssueResolvedDependency
     from vibe3.services.flow.blocked_state_service import BlockedStateService
 
 

@@ -266,14 +266,17 @@ async def handle_github_webhook(request: Request) -> dict:
         logger.bind(domain="webhook").info(f"Published webhook event: {event_details}")
 
         # Trigger dependency recheck for closed issues (inline call)
+        # Inline call chosen over EventPublisher subscribe — manager approved
+        # for simpler synchronous handling without event bus overhead
         if isinstance(event, WebhookIssueClosed):
             try:
-                from vibe3.clients.pr_status_checker import has_merged_pr_for_issue
-                from vibe3.clients.sqlite_client import SQLiteClient
-                from vibe3.models import IssueResolvedDependency
-                from vibe3.services.dispatch.dependency_recheck_service import (
-                    DependencyRecheckService,
+                from vibe3.clients import (
+                    GitHubClient,
+                    SQLiteClient,
+                    has_merged_pr_for_issue,
                 )
+                from vibe3.models import IssueResolvedDependency
+                from vibe3.services.dispatch import DependencyRecheckService
 
                 # Check if issue had a merged PR
                 merged = has_merged_pr_for_issue(event.issue_number)
@@ -285,9 +288,9 @@ async def handle_github_webhook(request: Request) -> dict:
                 )
 
                 # Inline call to dependency recheck service
+                # Note: constructing clients per request is acceptable here
+                # as webhook handler is standalone endpoint without injected context
                 store = SQLiteClient()
-                from vibe3.clients import GitHubClient
-
                 github_client = GitHubClient()
                 service = DependencyRecheckService(
                     store=store, github_client=github_client
