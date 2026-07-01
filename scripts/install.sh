@@ -124,6 +124,191 @@ _ensure_uv_cli() {
     return 1
 }
 
+_add_vibe_dir_to_direnv_whitelist() {
+    local DIRENV_CONF_DIR="$HOME/.config/direnv"
+    local DIRENV_CONF="$DIRENV_CONF_DIR/direnv.toml"
+    local WHITELIST_ENTRY="${HOME}/.vibe"
+
+    if ! command -v direnv >/dev/null 2>&1; then
+        log_info "direnv not installed, skip whitelist"
+        return 0
+    fi
+
+    # Idempotency: match both canonical and trailing-slash forms so a pre-
+    # existing "/Users/foo/.vibe/" does not cause a duplicate entry.
+    if [[ -f "$DIRENV_CONF" ]]; then
+        if grep -qF "\"$WHITELIST_ENTRY\"" "$DIRENV_CONF" \
+        || grep -qF "\"${WHITELIST_ENTRY}/\"" "$DIRENV_CONF"; then
+            log_info "direnv whitelist already contains $WHITELIST_ENTRY"
+            return 0
+        fi
+    fi
+
+    # mkdir -p / follow-symlink for ~/.config/direnv: acceptable for our audience
+    # (personal machines). We do not harden against malicious symlink racing.
+    mkdir -p "$DIRENV_CONF_DIR"
+
+    local tmp="$DIRENV_CONF.tmp.$$.whitelist"
+    if [[ -f "$DIRENV_CONF" ]]; then
+        if ! _write_direnv_whitelist "$WHITELIST_ENTRY" "$DIRENV_CONF" "$tmp"; then
+            # No Python >= 3.11 for safe merge. If the existing file already has
+            # a [whitelist] block, we must NOT append a second block: newer direnv
+            # (>= 2.37 with strict TOML) fails to parse duplicate table keys with
+            # "LoadConfig() failed to parse ... Key 'whitelist' has already been
+            # defined". Bail out and let the user add manually.
+            if grep -qE '^[[:space:]]*\[whitelist\][[:space:]]*$' "$DIRENV_CONF" 2>/dev/null; then
+                log_warn "No Python >= 3.11 to merge direnv.toml safely and existing file has [whitelist]; skipped."
+                log_warn "Add this entry to whitelist.prefix manually: $WHITELIST_ENTRY"
+                return 0
+            fi
+            # Existing file has no [whitelist] block; append one safely.
+            log_warn "Python >= 3.11 unavailable; appending a new [whitelist] block"
+            {
+                cat "$DIRENV_CONF"
+                printf '\n[whitelist]\nprefix = ["%s"]\n' "$WHITELIST_ENTRY"
+            } > "$tmp"
+        fi
+    else
+        {
+            printf '# auto-added by scripts/install.sh (vibe)\n'
+            printf '[whitelist]\n'
+            printf 'prefix = ["%s"]\n' "$WHITELIST_ENTRY"
+        } > "$tmp"
+    fi
+    if mv "$tmp" "$DIRENV_CONF"; then
+        log_success "Added $WHITELIST_ENTRY to direnv whitelist ($DIRENV_CONF)"
+    else
+        rm -f "$tmp"
+        log_warn "Failed to update direnv whitelist — please add manually: $WHITELIST_ENTRY"
+        return 0
+    fi
+}
+
+# Write a merged ~/.config/direnv/direnv.toml that adds $1 to whitelist.prefix
+# using Python tomllib. Reasons:
+#   1. tomllib is the parser cited in the rationale (it rejects duplicate
+#      [whitelist] table keys), so the rule and the engine share one source of
+#      truth.
+#   2. Robust against TOML shapes the awk helper silently dropped: non-`prefix`
+#      whitelist keys (`allow`), inline comments after `]`, multi-line arrays,
+#      multiple `[whitelist]` blocks, files with additional top-level sections.
+# Returns 1 if no Python >= 3.11 is available (caller appends a block instead).
+_write_direnv_whitelist() {
+    local entry="$1" in_file="$2" out_file="$3"
+    local runner
+    if command -v python3 >/dev/null 2>&1; then
+        runner=(python3)
+    elif command -v uv >/dev/null 2>&1; then
+        runner=(uv run python3)
+    else
+        return 1
+    fi
+    WL_ENTRY="$entry" WL_INPUT="$in_file" WL_OUTPUT="$out_file" \
+    "${runner[@]}" <<'PY' || return
+import os, sys
+
+if sys.version_info < (3, 11):
+    sys.stderr.write("direnv whitelist merge needs Python >= 3.11 for tomllib\n")
+    sys.exit(2)
+import tomllib
+
+entry = os.environ["WL_ENTRY"]
+in_file = os.environ["WL_INPUT"]
+out_file = os.environ["WL_OUTPUT"]
+
+def toml_literal(v):
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, int):
+        return str(v)
+    if isinstance(v, float):
+        # Preserve float semantics: tomllib reads ints for 1.0 only when dotted.
+        s = str(v)
+        return s if any(c in s for c in ".eE") else s
+    if isinstance(v, str):
+        esc = v.replace("\\", "\\\\").replace('"', '\\"').replace("\t", "\\t").replace("\n", "\\n")
+        return f'"{esc}"'
+    if isinstance(v, list):
+        return "[" + ", ".join(toml_literal(x) for x in v) + "]"
+    sys.stderr.write(f"unsupported TOML type in whitelist merge: {type(v).__name__}: {v!r}\n")
+    sys.exit(3)
+
+def is_array_of_tables(v): return isinstance(v, list) and all(isinstance(x, dict) for x in v)
+
+def emit_section(tname, tval):
+    # Split scalar keys and array-of-tables (e.g. [[policy.steps]]). Every other
+    # shape (including nested dicts that direnv.toml does not actually use) is
+    # unsupported; bail out rather than silently drop it.
+    flat = []
+    aots = []
+    for tk, tv in tval.items():
+        if isinstance(tv, dict):
+            sys.stderr.write(f"unsupported nested dict [{tname}.{tk}] in whitelist merge\n")
+            sys.exit(4)
+        if is_array_of_tables(tv):
+            aots.append((tk, tv))
+        else:
+            flat.append(f"{tk} = {toml_literal(tv)}")
+    pieces = []
+    if flat:
+        pieces.append("\n".join(flat))
+    for aot_name, aot_items in aots:
+        for item in aot_items:
+            items = []
+            for nk, nv in item.items():
+                if isinstance(nv, dict):
+                    sys.stderr.write(f"deeply nested [{tname}.{aot_name}.{nk}] unsupported\n")
+                    sys.exit(4)
+                items.append(f"{nk} = {toml_literal(nv)}")
+            pieces.append("")
+            pieces.append(f"[[{tname}.{aot_name}]]")
+            pieces.append("\n".join(items))
+    return pieces
+
+try:
+    with open(in_file, "rb") as f:
+        data = tomllib.load(f)
+except Exception as exc:
+    sys.stderr.write(f"failed to parse {in_file}: {exc}\n")
+    sys.exit(1)
+
+whitelist = data.setdefault("whitelist", {})
+if not isinstance(whitelist, dict):
+    sys.stderr.write(f"unexpected whitelist type {type(whitelist).__name__}; aborting merge\n")
+    sys.exit(5)
+raw_prefix = whitelist.get("prefix") or []
+if not isinstance(raw_prefix, list):
+    sys.stderr.write(f"whitelist.prefix was {type(raw_prefix).__name__}, expected list; aborting merge\n")
+    sys.exit(5)
+prefix = list(raw_prefix)
+existing = {p.rstrip("/") if isinstance(p, str) else p for p in prefix}
+if entry.rstrip("/") not in existing:
+    prefix.append(entry)
+whitelist["prefix"] = prefix
+
+lines = []
+tables = []
+for k, v in data.items():
+    if isinstance(v, dict):
+        tables.append((k, v))
+    else:
+        lines.append(f"{k} = {toml_literal(v)}")
+
+emit = []
+for idx, (tname, tval) in enumerate(tables):
+    head = "\n" if (idx > 0 or lines) else ""
+    body = emit_section(tname, tval)
+    emit.append(f"{head}[{tname}]")
+    if body:
+        emit.append("\n".join(body))
+if lines:
+    emit.append("\n".join(lines))
+
+with open(out_file, "w") as f:
+    f.write("\n".join(emit) + "\n")
+PY
+}
+
 # --- Pre-flight checks ---
 log_step "Performing pre-flight checks..."
 # 检查写入权限
@@ -340,6 +525,8 @@ _setup_uv_environment() {
             cd "$SOURCE_ROOT" &&
                 direnv allow . >/dev/null 2>&1 || true
         )
+        # Whitelist ~/.vibe so all future vibe-managed worktrees auto-activate .envrc
+        _add_vibe_dir_to_direnv_whitelist || true
     fi
 
     # 安装项目依赖（NOT editable install）
