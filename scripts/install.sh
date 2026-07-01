@@ -151,10 +151,18 @@ _add_vibe_dir_to_direnv_whitelist() {
     local tmp="$DIRENV_CONF.tmp.$$.whitelist"
     if [[ -f "$DIRENV_CONF" ]]; then
         if ! _write_direnv_whitelist "$WHITELIST_ENTRY" "$DIRENV_CONF" "$tmp"; then
-            # Graceful fallback: no Python >= 3.11. Preserve prior content
-            # verbatim and append a second [whitelist] block (legal TOML; direnv
-            # accepts duplicate table keys, only strict parsers like tomllib err).
-            log_warn "Python >= 3.11 unavailable for TOML merge; appending whitelist entry"
+            # No Python >= 3.11 for safe merge. If the existing file already has
+            # a [whitelist] block, we must NOT append a second block: newer direnv
+            # (>= 2.37 with strict TOML) fails to parse duplicate table keys with
+            # "LoadConfig() failed to parse ... Key 'whitelist' has already been
+            # defined". Bail out and let the user add manually.
+            if grep -qE '^[[:space:]]*\[whitelist\][[:space:]]*$' "$DIRENV_CONF" 2>/dev/null; then
+                log_warn "No Python >= 3.11 to merge direnv.toml safely and existing file has [whitelist]; skipped."
+                log_warn "Add this entry to whitelist.prefix manually: $WHITELIST_ENTRY"
+                return 0
+            fi
+            # Existing file has no [whitelist] block; append one safely.
+            log_warn "Python >= 3.11 unavailable; appending a new [whitelist] block"
             {
                 cat "$DIRENV_CONF"
                 printf '\n[whitelist]\nprefix = ["%s"]\n' "$WHITELIST_ENTRY"
