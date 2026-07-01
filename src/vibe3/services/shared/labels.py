@@ -13,13 +13,6 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.clients import (
-    GhIssueLabelPort,
-    TriggerableRoleDefinitionProtocol,
-    has_manager_assignee,
-    normalize_assignees,
-    normalize_labels,
-)
 from vibe3.models import FlowState, OrchestraConfig
 
 if TYPE_CHECKING:

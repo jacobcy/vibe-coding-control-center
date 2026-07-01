@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
-from vibe3.clients import normalize_labels, parse_linked_issues
+from vibe3.clients import parse_linked_issues
 from vibe3.models import FlowState, IssueLink, IssueState
-from vibe3.services.shared.labels import resolve_state_label
+from vibe3.services.shared.labels import normalize_labels, resolve_state_label
 
 
 @dataclass
