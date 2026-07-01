@@ -103,13 +103,16 @@ domain (事件源)
                       └─ 角色具体逻辑（roles/{manager,plan,run,review,supervisor,governance}.py）
 ```
 
-> 关键约束：roles 不直接 import domain/execution（避免循环依赖），通过 `services/flow/factory.py`（`create_flow_manager`）与 `services/shared/events.py`（`emit_issue_failed`）间接调用。
+> 关键约束：roles 不直接 import domain（避免循环依赖）；roles 通过 `vibe3.execution` 公开 API 调用执行层，二者构成强组合关系。roles 通过 `services/flow/factory.py`（`create_flow_manager`）与 `services/shared/events.py`（`emit_issue_failed`）间接消费 domain 事件。
 
 ## services 层依赖
 
-- **domain → services**：`FlowManager` 直接依赖 `services.{flow,pr,issue,orchestra,shared}`；`QualifyGateService` 依赖 `services.{flow,issue,shared,task}`；`FailedGate` 依赖 `services.orchestra.ErrorTrackingService`。
-- **roles → services**：roles 通过 `services/flow/factory.py`（`create_flow_manager`）与 `services/shared/events.py`（`emit_issue_failed`）间接消费 domain；直接依赖 `services.{flow,handoff,pr,task,shared,orchestra,issue}` 用于请求构建。
-- **services 不反向依赖 domain/roles**：services 是 L3 基础层，仅通过 `services/shared/events.py` 发布 `IssueFailed` 事件（`publish` 来自 `vibe3.models`，非 domain 直接 import）。
+execution 模块主要依赖 `services.{flow,orchestra,shared}`：
+- `CapacityService` 依赖 `services.flow.FlowService` 查询活跃 flow 数量用于容量计算
+- `CodeagentExecutionService` 依赖 `services.orchestra.ErrorTrackingService` 记录执行错误
+- 执行结果通过 `services.shared.events` 发布 `IssueFailed` 事件
+
+注：services 层不反向依赖 execution。
 
 ## 依赖关系
 
@@ -211,7 +214,4 @@ Coordinator
 
 ## 与 main 分支差异
 
-当前 worktree 相对 origin/main 落后约 11 个 commits，execution 模块的主要差异：
-
-1. **`actor.py` / `job_monitor_service.py`**：当前 worktree 已包含这两个文件（`find` 已确认），与 main 一致。
-2. **其他演进**：main 分支可能有额外的 refactoring 和 bug fix，建议 rebase 到 origin/main 后确认。
+当前 worktree 相对 origin/main 落后约 11 个 commits，execution 模块无显著差异（`actor.py` / `job_monitor_service.py` 已与 main 一致）。建议 rebase 后确认无额外变更。

@@ -79,13 +79,17 @@ domain (事件源)
                       └─ 角色具体逻辑（roles/{manager,plan,run,review,supervisor,governance}.py）
 ```
 
-> 关键约束：roles 不直接 import domain/execution（避免循环依赖），通过 `services/flow/factory.py`（`create_flow_manager`）与 `services/shared/events.py`（`emit_issue_failed`）间接调用。
+> 关键约束：roles 不直接 import domain（避免循环依赖）；roles 通过 `vibe3.execution` 公开 API 调用执行层，二者构成强组合关系。roles 通过 `services/flow/factory.py`（`create_flow_manager`）与 `services/shared/events.py`（`emit_issue_failed`）间接消费 domain 事件。
 
 ## services 层依赖
 
-- **domain → services**：`FlowManager` 直接依赖 `services.{flow,pr,issue,orchestra,shared}`；`QualifyGateService` 依赖 `services.{flow,issue,shared,task}`；`FailedGate` 依赖 `services.orchestra.ErrorTrackingService`。
-- **roles → services**：roles 通过 `services/flow/factory.py`（`create_flow_manager`）与 `services/shared/events.py`（`emit_issue_failed`）间接消费 domain；直接依赖 `services.{flow,handoff,pr,task,shared,orchestra,issue}` 用于请求构建。
-- **services 不反向依赖 domain/roles**：services 是 L3 基础层，仅通过 `services/shared/events.py` 发布 `IssueFailed` 事件（`publish` 来自 `vibe3.models`，非 domain 直接 import）。
+roles 模块主要依赖 `services.{flow,handoff,pr,task,shared,orchestra,issue}`：
+- 请求构建时查询 `services.flow.FlowService` 获取 flow 状态
+- `services.handoff.HandoffService` 读取/写入交接文件
+- `services.pr.PRService` / `services.task.TaskService` 用于 PR 和 Task 关联
+- 通过 `services/shared/events.py` 发布 `IssueFailed` 事件
+
+注：services 层不反向依赖 roles。
 
 ## 依赖关系
 
@@ -189,7 +193,4 @@ dispatch_supervisor_execution()
 
 ## 与 main 分支差异
 
-当前 worktree 相对 origin/main 落后约 11 个 commits，roles 模块的主要差异：
-
-1. **`scan_service.py` / `governance_factory.py` / `governance_utils.py` / `review_helpers.py` / `run_command.py` / `run_helpers.py` / `run_request.py`**：当前 worktree 已包含这些文件（`find` 已确认），与 main 一致。
-2. **其他演进**：main 分支可能有额外的 refactoring 和 bug fix，建议 rebase 到 origin/main 后确认。
+当前 worktree 相对 origin/main 落后约 11 个 commits，roles 模块无显著差异（`scan_service.py` 等辅助文件已与 main 一致）。建议 rebase 后确认无额外变更。

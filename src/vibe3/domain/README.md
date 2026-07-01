@@ -76,7 +76,7 @@
 
 | 入口 | 角色 | 主要消费者 |
 |------|------|----------|
-| `OrchestrationFacade` | 观察入口：runtime tick / heartbeat → 发布 domain events + 编排 dispatch coordinator | `src/vibe3/server/registry.py`（composition-root 实例），`runtime/heartbeat.py` |
+| `OrchestrationFacade` | 观察入口：runtime tick / heartbeat → 发布 domain events + 编排 dispatch coordinator | `src/vibe3/server/registry.py`（composition-root 实例），`domain/orchestration_facade.py` 内部自引用 |
 | `GlobalDispatchCoordinator` | 容量感知的意图分发（L1/L2/L3 并发协调，上限 `MAX_INTENTS_PER_TICK`） | `OrchestrationFacade._coordinator`（间接实例化） |
 | `FlowManager` | Flow 生命周期状态机入口（依赖 services.flow / services.pr / services.issue / services.orchestra） | `src/vibe3/services/flow/factory.py`（lazy 透传给 roles），`domain/orchestration_facade.py` |
 | `publish / publish_and_wait / subscribe / EventPublisher` | 事件总线（全局单例 via `get_publisher()`） | `handlers/*.py` 订阅；`commands/scan.py` 等触发 |
@@ -108,13 +108,17 @@ domain (事件源)
                       └─ 角色具体逻辑（roles/{manager,plan,run,review,supervisor,governance}.py）
 ```
 
-> 关键约束：roles 不直接 import domain/execution（避免循环依赖），通过 `services/flow/factory.py`（`create_flow_manager`）与 `services/shared/events.py`（`emit_issue_failed`）间接调用。
+> 关键约束：roles 不直接 import domain（避免循环依赖）；roles 通过 `vibe3.execution` 公开 API 调用执行层，二者构成强组合关系。roles 通过 `services/flow/factory.py`（`create_flow_manager`）与 `services/shared/events.py`（`emit_issue_failed`）间接消费 domain 事件。
 
 ## services 层依赖
 
-- **domain → services**：`FlowManager` 直接依赖 `services.{flow,pr,issue,orchestra,shared}`；`QualifyGateService` 依赖 `services.{flow,issue,shared,task}`；`FailedGate` 依赖 `services.orchestra.ErrorTrackingService`。
-- **roles → services**：roles 通过 `services/flow/factory.py`（`create_flow_manager`）与 `services/shared/events.py`（`emit_issue_failed`）间接消费 domain；直接依赖 `services.{flow,handoff,pr,task,shared,orchestra,issue}` 用于请求构建。
-- **services 不反向依赖 domain/roles**：services 是 L3 基础层，仅通过 `services/shared/events.py` 发布 `IssueFailed` 事件（`publish` 来自 `vibe3.models`，非 domain 直接 import）。
+domain 模块主要依赖 `services.{flow,pr,issue,orchestra,shared,task}`：
+- `FlowManager` 直接依赖 `services.flow.FlowService` 和 `services.pr.PRService` 管理 flow 生命周期
+- `QualifyGateService` 依赖 `services.flow`、`services.issue`、`services.task` 执行准入检查
+- `FailedGate` 依赖 `services.orchestra.ErrorTrackingService` 记录失败
+- 执行结果通过 `services.shared.events` 发布 `IssueFailed` 事件
+
+注：services 层不反向依赖 domain（services 是 L3 基础层）。
 
 ## 依赖关系
 
@@ -177,4 +181,4 @@ Issue State Change → Event Publisher → Handlers
    - 新增符号：`DispatchLifecycle`、`DispatchLifecycleConfig`、`DispatchState`
    - 建议：rebase 到 origin/main 后更新 README
 
-2. **已移除的文件**：当前 worktree 仍包含一些 main 分支已清理的历史文件（如 `state_machine.py`），统计已按当前快照处理。
+2. **历史文件清理**：`domain/state_machine.py` 已在更早提交中移除；当前 worktree 与 main 均不再包含该文件。
