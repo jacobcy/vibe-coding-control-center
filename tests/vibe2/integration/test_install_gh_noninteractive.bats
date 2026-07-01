@@ -529,3 +529,133 @@ EOF
   [ -f "$direnv_conf" ]
   [ "$(cat "$direnv_conf")" == "$before_content" ]
 }
+
+@test "install preserves non-prefix keys in [whitelist] block" {
+  local fixture home_dir bin_dir source_root install_script direnv_conf_dir direnv_conf
+
+  fixture="$(mktemp -d)"
+  home_dir="$fixture/home"
+  bin_dir="$fixture/bin"
+  source_root="$fixture/source"
+  install_script="$source_root/scripts/install.sh"
+  direnv_conf_dir="$home_dir/.config/direnv"
+  direnv_conf="$direnv_conf_dir/direnv.toml"
+
+  mkdir -p "$home_dir" "$bin_dir" "$source_root" "$direnv_conf_dir"
+  cp -R "$VIBE_ROOT/bin" "$source_root/bin"
+  cp -R "$VIBE_ROOT/lib" "$source_root/lib"
+  cp -R "$VIBE_ROOT/config" "$source_root/config"
+  cp -R "$VIBE_ROOT/scripts" "$source_root/scripts"
+  cp -R "$VIBE_ROOT/src" "$source_root/src"
+  cp -R "$VIBE_ROOT/supervisor" "$source_root/supervisor"
+  cp -R "$VIBE_ROOT/skills" "$source_root/skills"
+
+  # Pre-create direnv.toml that mixes a prefix array with a sibling allow key.
+  cat > "$direnv_conf" <<'EOF'
+[whitelist]
+prefix = ["/tmp/old"]
+allow = ["/tmp/cache"]
+EOF
+
+  cat > "$bin_dir/gh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+
+  cat > "$bin_dir/direnv" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  hook|allow) exit 0 ;;
+  *) exit 0 ;;
+esac
+EOF
+
+  cat > "$bin_dir/uv" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "venv" ]]; then
+  mkdir -p "$2/bin"
+  touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
+  exit 0
+fi
+exit 0
+EOF
+
+  chmod +x "$bin_dir/gh" "$bin_dir/direnv" "$bin_dir/uv"
+  _write_common_noninteractive_stubs "$bin_dir"
+
+  run env HOME="$home_dir" SHELL="/bin/zsh" PATH="$bin_dir:$PATH" zsh "$install_script"
+
+  [ "$status" -eq 0 ]
+  [ -f "$direnv_conf" ]
+  grep -Fq "/tmp/old" "$direnv_conf"
+  grep -Fq "$home_dir/.vibe" "$direnv_conf"
+  grep -Fq "/tmp/cache" "$direnv_conf"
+}
+
+@test "install whitelist merge with extra top-level sections preserves them" {
+  local fixture home_dir bin_dir source_root install_script direnv_conf_dir direnv_conf
+
+  fixture="$(mktemp -d)"
+  home_dir="$fixture/home"
+  bin_dir="$fixture/bin"
+  source_root="$fixture/source"
+  install_script="$source_root/scripts/install.sh"
+  direnv_conf_dir="$home_dir/.config/direnv"
+  direnv_conf="$direnv_conf_dir/direnv.toml"
+
+  mkdir -p "$home_dir" "$bin_dir" "$source_root" "$direnv_conf_dir"
+  cp -R "$VIBE_ROOT/bin" "$source_root/bin"
+  cp -R "$VIBE_ROOT/lib" "$source_root/lib"
+  cp -R "$VIBE_ROOT/config" "$source_root/config"
+  cp -R "$VIBE_ROOT/scripts" "$source_root/scripts"
+  cp -R "$VIBE_ROOT/src" "$source_root/src"
+  cp -R "$VIBE_ROOT/supervisor" "$source_root/supervisor"
+  cp -R "$VIBE_ROOT/skills" "$source_root/skills"
+
+  # direnv.toml with a top-level table before [whitelist].
+  cat > "$direnv_conf" <<'EOF'
+[foo]
+bar = "baz"
+
+[whitelist]
+prefix = ["/tmp/old"]
+EOF
+
+  cat > "$bin_dir/gh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+
+  cat > "$bin_dir/direnv" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  hook|allow) exit 0 ;;
+  *) exit 0 ;;
+esac
+EOF
+
+  cat > "$bin_dir/uv" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "venv" ]]; then
+  mkdir -p "$2/bin"
+  touch "$2/bin/activate"
+  touch "$2/bin/python"
+  chmod +x "$2/bin/python"
+  exit 0
+fi
+exit 0
+EOF
+
+  chmod +x "$bin_dir/gh" "$bin_dir/direnv" "$bin_dir/uv"
+  _write_common_noninteractive_stubs "$bin_dir"
+
+  run env HOME="$home_dir" SHELL="/bin/zsh" PATH="$bin_dir:$PATH" zsh "$install_script"
+
+  [ "$status" -eq 0 ]
+  [ -f "$direnv_conf" ]
+  grep -Fq "/tmp/old" "$direnv_conf"
+  grep -Fq "$home_dir/.vibe" "$direnv_conf"
+  grep -Fq "bar = \"baz\"" "$direnv_conf"
+}

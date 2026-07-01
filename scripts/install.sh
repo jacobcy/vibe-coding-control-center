@@ -134,113 +134,37 @@ _add_vibe_dir_to_direnv_whitelist() {
         return 0
     fi
 
+    # Idempotency: match both canonical and trailing-slash forms so a pre-
+    # existing "/Users/foo/.vibe/" does not cause a duplicate entry.
     if [[ -f "$DIRENV_CONF" ]]; then
-        # Full-quote match: only consider the entry already registered in a prefix
-        # array (avoids false-positive substring hits on sibling paths).
-        if grep -qF "\"$WHITELIST_ENTRY\"" "$DIRENV_CONF"; then
+        if grep -qF "\"$WHITELIST_ENTRY\"" "$DIRENV_CONF" \
+        || grep -qF "\"${WHITELIST_ENTRY}/\"" "$DIRENV_CONF"; then
             log_info "direnv whitelist already contains $WHITELIST_ENTRY"
             return 0
         fi
     fi
 
+    # mkdir -p / follow-symlink for ~/.config/direnv: acceptable for our audience
+    # (personal machines). We do not harden against malicious symlink racing.
     mkdir -p "$DIRENV_CONF_DIR"
 
     local tmp="$DIRENV_CONF.tmp.$$.whitelist"
     if [[ -f "$DIRENV_CONF" ]]; then
-        # Merge every prefix entry seen under any [whitelist] block into a single
-        # consolidated section. Appending a second [whitelist] block would produce
-        # invalid TOML for strict parsers (e.g. Python tomllib rejects duplicate
-        # table keys), so we collapse all existing entries + the new one into one.
-        # stripqs() trims the first/last double-quote of each entry using
-        # position-based substr: BSD/macOS awk 20200816 drops the $ anchor when
-        # gsub() is called with an alternation like /^["]+|["]+$/ on inputs that
-        # begin with a non-" character (leading whitespace before the opening DQ).
-        local awk_body
-        awk_body="$(cat <<'AWKEOF'
-BEGIN {
-    print "# auto-added by scripts/install.sh (vibe)"
-    in_wl = 0
-    flushed = 0
-    acc = ""
-    seen_count = 0
-    new_already = 0
-}
-function stripqs(s,    first, last, i) {
-    first = 0
-    last = 0
-    for (i = 1; i <= length(s); i++) {
-        if (substr(s, i, 1) == "\"") {
-            if (first == 0) first = i
-            last = i
-        }
-    }
-    if (first == 0) return s
-    if (first == last) {
-        return substr(s, 1, first-1) substr(s, first+1)
-    }
-    return substr(s, 1, first-1) substr(s, first+1, last-first-1) substr(s, last+1)
-}
-function add_entry(p) {
-    p = stripqs(p)
-    sub(/^[[:space:]]+|[[:space:]]+$/, "", p)
-    if (p == "") return
-    seen_count++
-    seen[seen_count] = p
-    if (p == entry) new_already = 1
-}
-function add_entries_from(line,    raw, n, i, part) {
-    raw = line
-    sub(/^[[:space:]]*prefix[[:space:]]*=[[:space:]]*\[?/, "", raw)
-    sub(/\]?[[:space:]]*$/, "", raw)
-    if (raw == "") return
-    n = split(raw, parts, ",")
-    for (i = 1; i <= n; i++) add_entry(parts[i])
-}
-function flush(    i, first) {
-    if (flushed) return
-    flushed = 1
-    printf "[whitelist]\nprefix = ["
-    first = 1
-    for (i = 1; i <= seen_count; i++) {
-        if (!first) printf ", "
-        printf "\"%s\"", seen[i]
-        first = 0
-    }
-    if (!new_already) {
-        if (!first) printf ", "
-        printf "\"%s\"", entry
-    }
-    printf "]\n"
-}
-/^[[:space:]]*\[/ {
-    if (in_wl) { flush(); in_wl = 0 }
-    if ($0 ~ /^[[:space:]]*\[whitelist\][[:space:]]*$/) { in_wl = 1; next }
-    in_wl = 0
-    print
-    next
-}
-in_wl {
-    line = $0
-    gsub(/^[[:space:]]+/, "", line)
-    if (acc != "") acc = acc " " line; else acc = line
-    if (line ~ /\][[:space:]]*$/) {
-        if (acc ~ /prefix[[:space:]]*=/) add_entries_from(acc)
-        acc = ""
-    }
-    next
-}
-{ print }
-END { flush() }
-AWKEOF
-)"
-        if ! awk -v entry="$WHITELIST_ENTRY" "$awk_body" "$DIRENV_CONF" > "$tmp" 2>/dev/null; then
-            cp "$DIRENV_CONF" "$tmp"
+        if ! _write_direnv_whitelist "$WHITELIST_ENTRY" "$DIRENV_CONF" "$tmp"; then
+            # Graceful fallback: no Python >= 3.11. Preserve prior content
+            # verbatim and append a second [whitelist] block (legal TOML; direnv
+            # accepts duplicate table keys, only strict parsers like tomllib err).
+            log_warn "Python >= 3.11 unavailable for TOML merge; appending whitelist entry"
+            {
+                cat "$DIRENV_CONF"
+                printf '\n[whitelist]\nprefix = ["%s"]\n' "$WHITELIST_ENTRY"
+            } > "$tmp"
         fi
     else
         {
-            echo "# auto-added by scripts/install.sh (vibe)"
-            echo "[whitelist]"
-            echo "prefix = [\"$WHITELIST_ENTRY\"]"
+            printf '# auto-added by scripts/install.sh (vibe)\n'
+            printf '[whitelist]\n'
+            printf 'prefix = ["%s"]\n' "$WHITELIST_ENTRY"
         } > "$tmp"
     fi
     if mv "$tmp" "$DIRENV_CONF"; then
@@ -250,6 +174,131 @@ AWKEOF
         log_warn "Failed to update direnv whitelist — please add manually: $WHITELIST_ENTRY"
         return 0
     fi
+}
+
+# Write a merged ~/.config/direnv/direnv.toml that adds $1 to whitelist.prefix
+# using Python tomllib. Reasons:
+#   1. tomllib is the parser cited in the rationale (it rejects duplicate
+#      [whitelist] table keys), so the rule and the engine share one source of
+#      truth.
+#   2. Robust against TOML shapes the awk helper silently dropped: non-`prefix`
+#      whitelist keys (`allow`), inline comments after `]`, multi-line arrays,
+#      multiple `[whitelist]` blocks, files with additional top-level sections.
+# Returns 1 if no Python >= 3.11 is available (caller appends a block instead).
+_write_direnv_whitelist() {
+    local entry="$1" in_file="$2" out_file="$3"
+    local runner
+    if command -v python3 >/dev/null 2>&1; then
+        runner=(python3)
+    elif command -v uv >/dev/null 2>&1; then
+        runner=(uv run python3)
+    else
+        return 1
+    fi
+    WL_ENTRY="$entry" WL_INPUT="$in_file" WL_OUTPUT="$out_file" \
+    "${runner[@]}" <<'PY' || return
+import os, sys
+
+if sys.version_info < (3, 11):
+    sys.stderr.write("direnv whitelist merge needs Python >= 3.11 for tomllib\n")
+    sys.exit(2)
+import tomllib
+
+entry = os.environ["WL_ENTRY"]
+in_file = os.environ["WL_INPUT"]
+out_file = os.environ["WL_OUTPUT"]
+
+def toml_literal(v):
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, int):
+        return str(v)
+    if isinstance(v, float):
+        # Preserve float semantics: tomllib reads ints for 1.0 only when dotted.
+        s = str(v)
+        return s if any(c in s for c in ".eE") else s
+    if isinstance(v, str):
+        esc = v.replace("\\", "\\\\").replace('"', '\\"').replace("\t", "\\t").replace("\n", "\\n")
+        return f'"{esc}"'
+    if isinstance(v, list):
+        return "[" + ", ".join(toml_literal(x) for x in v) + "]"
+    sys.stderr.write(f"unsupported TOML type in whitelist merge: {type(v).__name__}: {v!r}\n")
+    sys.exit(3)
+
+def is_array_of_tables(v): return isinstance(v, list) and all(isinstance(x, dict) for x in v)
+
+def emit_section(tname, tval):
+    # Split scalar keys and array-of-tables (e.g. [[policy.steps]]). Every other
+    # shape (including nested dicts that direnv.toml does not actually use) is
+    # unsupported; bail out rather than silently drop it.
+    flat = []
+    aots = []
+    for tk, tv in tval.items():
+        if isinstance(tv, dict):
+            sys.stderr.write(f"unsupported nested dict [{tname}.{tk}] in whitelist merge\n")
+            sys.exit(4)
+        if is_array_of_tables(tv):
+            aots.append((tk, tv))
+        else:
+            flat.append(f"{tk} = {toml_literal(tv)}")
+    pieces = []
+    if flat:
+        pieces.append("\n".join(flat))
+    for aot_name, aot_items in aots:
+        for item in aot_items:
+            items = []
+            for nk, nv in item.items():
+                if isinstance(nv, dict):
+                    sys.stderr.write(f"deeply nested [{tname}.{aot_name}.{nk}] unsupported\n")
+                    sys.exit(4)
+                items.append(f"{nk} = {toml_literal(nv)}")
+            pieces.append("")
+            pieces.append(f"[[{tname}.{aot_name}]]")
+            pieces.append("\n".join(items))
+    return pieces
+
+try:
+    with open(in_file, "rb") as f:
+        data = tomllib.load(f)
+except Exception as exc:
+    sys.stderr.write(f"failed to parse {in_file}: {exc}\n")
+    sys.exit(1)
+
+whitelist = data.setdefault("whitelist", {})
+if not isinstance(whitelist, dict):
+    sys.stderr.write(f"unexpected whitelist type {type(whitelist).__name__}; aborting merge\n")
+    sys.exit(5)
+raw_prefix = whitelist.get("prefix") or []
+if not isinstance(raw_prefix, list):
+    sys.stderr.write(f"whitelist.prefix was {type(raw_prefix).__name__}, expected list; aborting merge\n")
+    sys.exit(5)
+prefix = list(raw_prefix)
+existing = {p.rstrip("/") if isinstance(p, str) else p for p in prefix}
+if entry.rstrip("/") not in existing:
+    prefix.append(entry)
+whitelist["prefix"] = prefix
+
+lines = []
+tables = []
+for k, v in data.items():
+    if isinstance(v, dict):
+        tables.append((k, v))
+    else:
+        lines.append(f"{k} = {toml_literal(v)}")
+
+emit = []
+for idx, (tname, tval) in enumerate(tables):
+    head = "\n" if (idx > 0 or lines) else ""
+    body = emit_section(tname, tval)
+    emit.append(f"{head}[{tname}]")
+    if body:
+        emit.append("\n".join(body))
+if lines:
+    emit.append("\n".join(lines))
+
+with open(out_file, "w") as f:
+    f.write("\n".join(emit) + "\n")
+PY
 }
 
 # --- Pre-flight checks ---
