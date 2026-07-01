@@ -387,6 +387,9 @@ code_limits:
       - path: "tests/vibe3/services/test_check_service_verify_branch.py"
         limit: 520
         reason: "Check service verify_branch 测试集，覆盖分支状态验证、label 约束、blocked flow reconcile、stale ready rebuild 等紧密耦合场景，共享 CheckContext 和 MockGitHub/MockStore fixture 基础设施"
+      - path: "tests/vibe3/services/test_check_multiple_state_labels.py"
+        limit: 450
+        reason: "Check service 多 state label 测试集，覆盖静态优先级决议（GitHub 顺序不赢、single/no-state/非 list/非 dict/未知前缀/空集 8 个）+ flow-truth 覆盖（pr_ref/plan_ref/report_ref/verdict 5 个）+ dict 行降级容错（空 dict、无引用 dict 2 个），共享 fixture，拆分收益低；issue-3258 双层 state label resolution 新增 2 个 dict 降级测试后 432 行"
 
       - path: "tests/vibe3/test_modularity/test_services_reexport_surface.py"
         limit: 500
