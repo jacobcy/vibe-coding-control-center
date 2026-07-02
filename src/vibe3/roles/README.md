@@ -11,34 +11,85 @@
 
 ## 文件列表
 
-统计时间：2026-05-02
+统计时间：2026-07-01（当前 worktree 快照）
 
 ### 角色定义文件
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| definitions.py | 76 | 角色定义（TriggerableRoleDefinition） |
-| registry.py | 90 | 角色注册表，维护标签到角色的映射 |
+| `__init__.py` | ~130 | 公开 API 导出（lazy import + __all__ 一致性检查） |
+| `definitions.py` | ~80 | 角色类型定义（`TriggerableRoleDefinition`、`IssueRoleSyncSpec`、`RoleDefinition`） |
+| `registry.py` | ~95 | 角色注册表，维护标签到角色的映射（`LABEL_DISPATCH_ROLES`） |
 
 ### 角色实现文件
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| manager.py | 315 | Manager 角色（状态机、协作调度） |
-| plan.py | 376 | Plan 角色（实现方案规划） |
-| run.py | 561 | Run 角色（方案执行） |
-| review.py | 441 | Review 角色（代码审查） |
-| governance.py | 420 | Governance 角色（系统治理建议） |
-| supervisor.py | 299 | Supervisor 角色（异常监控与恢复） |
+| `manager.py` | ~320 | Manager 角色（状态机、协作调度） |
+| `plan.py` | ~400 | Plan 角色（实现方案规划） |
+| `run.py` | ~580 | Run 角色（方案执行） |
+| `review.py` | ~450 | Review 角色（代码审查） |
+| `governance.py` | ~430 | Governance 角色（系统治理建议） |
+| `supervisor.py` | ~310 | Supervisor 角色（异常监控与恢复） |
 
-### 辅助文件
+### 角色辅助文件
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| review_helpers.py | 67 | Review 辅助函数 |
-| __init__.py | 6 | 模块导出 |
+| `governance_factory.py` | ~120 | Governance 角色函数工厂（`build_default_governance_fns`） |
+| `governance_utils.py` | ~90 | Governance 辅助函数（材料目录、查找） |
+| `review_helpers.py` | ~70 | Review 辅助函数（`ReviewRunResult`） |
+| `run_command.py` | ~150 | Run 命令构建 |
+| `run_helpers.py` | ~100 | Run 辅助函数 |
+| `run_request.py` | ~130 | Run 请求构建 |
+| `scan_service.py` | ~250 | 执行层入口（调用 `execution.run_*`） |
 
-**总计**：10 文件，2651 行
+**总计**：16 文件，约 5139 行
+
+## 公开 APIs
+
+核心入口（`vibe3.roles.X` lazy import，引用 `src/vibe3/roles/__init__.py`）：
+
+| 入口 | 角色 | 主要消费者 |
+|------|------|----------|
+| `MANAGER_SYNC_SPEC / PLAN_SYNC_SPEC / RUN_SYNC_SPEC / REVIEW_SYNC_SPEC / SUPERVISOR_CLI_SYNC_SPEC` | `IssueRoleSyncSpec` 实例（角色自有 hooks 集合） | `commands/internal.py`，`roles/scan_service.py`，`execution/issue_role_sync_runner.py` |
+| `build_manager_request / build_manager_sync_request` | Manager 角色请求构建 | `commands/internal.py` |
+| `build_plan_request / build_plan_sync_request / build_plan_prompt / resolve_spec_plan_input / execute_spec_plan_sync / execute_spec_plan_async` | Plan 角色请求构建与执行 | `commands/plan.py` |
+| `build_run_request / build_run_sync_request / dispatch_run_command_async / execute_manual_run / resolve_run_mode / resolve_skill_path / validate_run_prerequisites` | Run 角色请求构建与执行 | `commands/run.py` |
+| `build_base_review_request / build_review_request / build_review_sync_request / execute_manual_review_sync / execute_manual_review_async / validate_review_prerequisites` | Review 角色请求构建与执行 | `commands/review.py` |
+| `build_default_governance_fns / build_governance_request / build_governance_recipe / render_governance_prompt / load_governance_material_catalog` | Governance 角色请求构建 | `commands/scan.py`，`roles/scan_service.py` |
+| `build_supervisor_apply_request / build_supervisor_cli_request / build_supervisor_cli_sync_request / iter_supervisor_identified_events / select_supervisor_events_for_dispatch` | Supervisor 角色请求构建 | `commands/internal.py`，`roles/scan_service.py` |
+| `dispatch_governance_execution / dispatch_supervisor_execution` | 执行层入口（直接调用 `execution.run_governance_sync` / `run_issue_role_*`） | `commands/internal.py` |
+| `fetch_supervisor_candidates / get_available_governance_materials / governance_material_exists / list_governance_materials` | 扫描辅助（GitHub 候选查询 + governance 材料目录） | `commands/scan.py` |
+| `LABEL_DISPATCH_ROLES / build_label_dispatch_event` | 标签 → 角色注册表 | `domain/handlers/issue_state_dispatch.py`、`domain/handlers/manual_dispatch.py` |
+| `TriggerableRoleDefinition / IssueRoleSyncSpec / RoleDefinition / RoleOutputContract / TriggerName` | 角色类型定义 | `definitions.py` 内部，`registry.py` |
+
+## 三层协作关系
+
+```
+domain (事件源)
+  └─ OrchestrationFacade.on_tick() 发布 events
+       ├─ GovernanceScanStarted → governance_scan handler
+       │    └─ execution.run_governance_sync → roles.build_default_governance_fns
+       ├─ SupervisorIssueIdentified → supervisor_scan handler
+       │    └─ execution.run_issue_role_* → roles.SUPERVISOR_CLI_SYNC_SPEC
+       └─ *DispatchIntent / Manual*Intent → dispatch / manual_dispatch handler
+            └─ ExecutionCoordinator.dispatch_execution(request)
+                 └─ CodeagentExecutionService.execute_sync(command)
+                      └─ 角色具体逻辑（roles/{manager,plan,run,review,supervisor,governance}.py）
+```
+
+> 关键约束：roles 不直接 import domain（避免循环依赖）；roles 通过 `vibe3.execution` 公开 API 调用执行层，二者构成强组合关系。roles 通过 `services/flow/factory.py`（`create_flow_manager`）与 `services/shared/events.py`（`emit_issue_failed`）间接消费 domain 事件。
+
+## services 层依赖
+
+roles 模块主要依赖 `services.{flow,handoff,pr,task,shared,orchestra,issue}`：
+- 请求构建时查询 `services.flow.FlowService` 获取 flow 状态
+- `services.handoff.HandoffService` 读取/写入交接文件
+- `services.pr.PRService` / `services.task.TaskService` 用于 PR 和 Task 关联
+- 通过 `services/shared/events.py` 发布 `IssueFailed` 事件
+
+注：services 层不反向依赖 roles。
 
 ## 依赖关系
 
@@ -49,7 +100,7 @@
 - `models`：编排配置、执行请求模型
 - `config`：编排配置加载
 - `domain`：事件发布、状态机
-- `services`：Flow 服务、PR 服务、Task 服务
+- `services`：Flow 服务、PR 服务、Task 服务、Handoff 服务
 - `agents`：Agent 后端
 
 ### 被依赖
@@ -59,16 +110,16 @@
 
 ## 架构说明
 
-### TriggerableRoleDefinition 设计
+### IssueRoleSyncSpec 设计
 
-每个角色通过 `TriggerableRoleDefinition` 定义其触发条件和行为：
+每个角色通过 `IssueRoleSyncSpec` 定义其执行 hooks：
 
 ```python
-TriggerableRoleDefinition(
-    name="plan",
-    trigger_labels=["state/claimed"],  # 触发标签
-    execute_func=execute_plan,         # 执行函数
-    description="规划实现方案"          # 描述
+IssueRoleSyncSpec(
+    role=RoleDefinition(name="plan", ...),
+    pre_hooks=[...],
+    post_hooks=[...],
+    build_request=build_plan_sync_request,
 )
 ```
 
@@ -79,11 +130,13 @@ TriggerableRoleDefinition(
 ```
 Issue Label Change
     ↓
-Registry.lookup(label)
+LABEL_DISPATCH_ROLES.lookup(label)
     ↓
-TriggerableRoleDefinition
+build_label_dispatch_event()
     ↓
-Execute Function
+Domain Event
+    ↓
+Handler → ExecutionCoordinator
 ```
 
 ### 角色分工
@@ -117,6 +170,18 @@ Execute Function
   - 处理异常情况
   - 触发恢复或重试
 
+### scan_service 执行入口
+
+`scan_service.py` 作为 roles 层到 execution 层的桥接：
+
+```
+dispatch_governance_execution()
+  └─ execution.run_governance_sync()
+
+dispatch_supervisor_execution()
+  └─ execution.run_issue_role_*
+```
+
 ### 关键设计
 
 1. **标签驱动**：角色通过标签触发，避免硬编码依赖
@@ -124,3 +189,8 @@ Execute Function
 3. **状态隔离**：每次执行都在独立的 worktree 和 session 中
 4. **可恢复性**：执行失败时保留现场，支持恢复
 5. **协作模式**：Manager 协调多个角色协作完成复杂任务
+6. **Spec 抽象**：`IssueRoleSyncSpec` 统一角色 hooks 定义
+
+## 与 main 分支差异
+
+当前 worktree 相对 origin/main 落后约 11 个 commits，roles 模块无显著差异（`scan_service.py` 等辅助文件已与 main 一致）。建议 rebase 后确认无额外变更。
