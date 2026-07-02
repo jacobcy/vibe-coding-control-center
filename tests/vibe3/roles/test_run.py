@@ -185,6 +185,7 @@ class TestExecutorNoOpGate:
         from vibe3.execution.noop_gate import apply_unified_noop_gate
 
         mock_store = MagicMock()
+        mock_store.record_confirmed_transition.return_value = (1, 1, 1)
 
         with (
             patch(
