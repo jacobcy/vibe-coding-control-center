@@ -51,7 +51,7 @@ class TimelineCommentPolicy(BaseModel):
     # Milestone events - WRITE COMMENTS (important progress markers)
     # NOTE: Must be routed through FlowTimelineService.record_timeline_event()
     milestone_events: list[str] = [
-        "flow_rebuild",  # Flow rebuild milestone (rebuild.py)
+        "scene_rebuilt",  # Scene rebuild milestone (rebuild.py)
         "milestone_recorded",  # Example: Future milestone event (placeholder)
     ]
 
