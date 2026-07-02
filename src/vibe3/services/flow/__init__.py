@@ -44,6 +44,10 @@ if TYPE_CHECKING:
     from vibe3.services.flow.status import FlowStatusService
     from vibe3.services.flow.status_resolver import FlowStatusResolver
     from vibe3.services.flow.timeline import FlowTimelineService
+    from vibe3.services.flow.transition_recorder import (
+        TransitionRecorder,
+        TransitionRecordResult,
+    )
 
 __all__ = [
     "BlockedState",
@@ -69,6 +73,8 @@ __all__ = [
     "FlowStatusResolver",
     "FlowStatusService",
     "FlowTimelineService",
+    "TransitionRecorder",
+    "TransitionRecordResult",
 ]
 
 _SYMBOL_MODULES = {
@@ -95,6 +101,8 @@ _SYMBOL_MODULES = {
     "FlowStatusResolver": "vibe3.services.flow.status_resolver",
     "FlowStatusService": "vibe3.services.flow.status",
     "FlowTimelineService": "vibe3.services.flow.timeline",
+    "TransitionRecorder": "vibe3.services.flow.transition_recorder",
+    "TransitionRecordResult": "vibe3.services.flow.transition_recorder",
 }
 
 

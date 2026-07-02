@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from vibe3.clients import SQLiteClient
 from vibe3.clients.sqlite_schema import init_schema
 from vibe3.clients.sqlite_transition_history_repo import (
     SQLiteTransitionHistoryRepo,
@@ -205,3 +206,87 @@ class TestTransitionHistoryRepo:
 
         assert count_test == 0, "test-branch records should be deleted"
         assert count_other == 1, "other-branch records should remain"
+
+
+class TestConfirmedTransitionTransaction:
+    @pytest.fixture
+    def client(self, tmp_path):
+        client = SQLiteClient(db_path=str(tmp_path / "transitions.db"))
+        client.update_flow_state(
+            "task/issue-42",
+            flow_status="active",
+            transition_count=0,
+        )
+        return client
+
+    def test_record_confirmed_transition_updates_event_count_and_pair(self, client):
+        total, pair, event_id = client.record_confirmed_transition(
+            branch="task/issue-42",
+            from_state="state/review",
+            to_state="state/merge-ready",
+            actor="agent:reviewer",
+            detail="State changed: state/review -> state/merge-ready",
+            refs={"issue": "42"},
+        )
+
+        assert (total, pair) == (1, 1)
+        assert event_id > 0
+        assert client.get_flow_state("task/issue-42")["transition_count"] == 1
+        events = client.get_events(
+            branch="task/issue-42", event_type="state_transitioned"
+        )
+        assert events[0]["id"] == event_id
+        with sqlite3.connect(client.db_path) as conn:
+            assert (
+                client.count_specific_pair(
+                    conn,
+                    "task/issue-42",
+                    "state/review",
+                    "state/merge-ready",
+                )
+                == 1
+            )
+
+    def test_record_confirmed_transition_rolls_back_all_writes(self, client):
+        with sqlite3.connect(client.db_path) as conn:
+            conn.execute(
+                """
+                CREATE TRIGGER reject_transition_history
+                BEFORE INSERT ON transition_history
+                BEGIN
+                    SELECT RAISE(ABORT, 'reject transition history');
+                END
+                """
+            )
+            conn.commit()
+
+        with pytest.raises(sqlite3.IntegrityError, match="reject transition history"):
+            client.record_confirmed_transition(
+                branch="task/issue-42",
+                from_state="state/review",
+                to_state="state/merge-ready",
+                actor="agent:reviewer",
+                detail="State changed: state/review -> state/merge-ready",
+                refs={"issue": "42"},
+            )
+
+        assert client.get_flow_state("task/issue-42")["transition_count"] == 0
+        assert client.get_events(branch="task/issue-42") == []
+        with sqlite3.connect(client.db_path) as conn:
+            assert client.count_transition_pairs(conn, "task/issue-42") == {}
+
+    def test_reset_transition_epoch_clears_count_and_history(self, client):
+        client.record_confirmed_transition(
+            branch="task/issue-42",
+            from_state="state/review",
+            to_state="state/merge-ready",
+            actor="agent:reviewer",
+            detail="State changed: state/review -> state/merge-ready",
+            refs={"issue": "42"},
+        )
+
+        client.reset_transition_epoch("task/issue-42")
+
+        assert client.get_flow_state("task/issue-42")["transition_count"] == 0
+        with sqlite3.connect(client.db_path) as conn:
+            assert client.count_transition_pairs(conn, "task/issue-42") == {}
