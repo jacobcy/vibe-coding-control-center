@@ -471,6 +471,9 @@ code_limits:
       - path: "tests/vibe3/observability/test_orchestra_log.py"
         limit: 510
         reason: "Orchestra log 测试集，覆盖 log dir resolution、persistent handle lifecycle、event appending with level filtering、run separator、governance event dual logging、color parameter behavior、supervisor log functions 等 30 个测试；Issue #3192 新增 4 个 color behavior 测试（+83 行）；Issue #3194 新增 4 个 supervisor log 测试（+81 行）；Issue #3259 新增 2 个 logs_root anchor 测试（+20 行），验证 find_repo_root 锚定主仓库根目录"
+      - path: "tests/vibe3/services/test_orchestra_error_recording.py"
+        limit: 450
+        reason: "Error recording convenience functions 测试集，覆盖 record_error/record_dispatch_failure_if_unexpected 成功/失败路径、异常分类、message format、role routing、mock leak detection 等 19 个紧密耦合场景；Issue #3272 新增 test_dispatch_role_routes_preflight_exception_classified 回归测试验证 role='dispatch' routing（+17 行）"
 
 
   total_file_loc:
