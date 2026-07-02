@@ -7,6 +7,12 @@ import pytest
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.services.flow.blocked_state_types import (
+    AutoResumeDecision,
+    AutoResumeReasonCode,
+    AutoResumeVerdict,
+    ResumeResult,
+)
 
 
 @pytest.fixture
@@ -88,46 +94,48 @@ def test_qualify_blocked_issue_no_branch(
 def test_qualify_blocked_issue_success(
     qualify_gate_service, sample_issue, mock_flow_manager
 ):
-    """Blocked issue should be qualified successfully via reconcile_blocked."""
-    from unittest.mock import patch
-
+    """Blocked issue should be qualified successfully via auto-resume."""
     mock_flow_manager.get_flow_for_issue.return_value = {
         "branch": "task/issue-123-test"
     }
-    with patch(
-        "vibe3.domain.qualify_gate.BlockedStateService.reconcile_blocked",
-        return_value=IssueState.READY,
-    ) as mock_reconcile:
+    decision = AutoResumeDecision(
+        verdict=AutoResumeVerdict.ELIGIBLE,
+        reason_code=AutoResumeReasonCode.ELIGIBLE,
+        issue_number=123,
+        branch="task/issue-123-test",
+        truth_snapshot="ts",
+    )
+    with patch("vibe3.domain.qualify_gate.BlockedStateService") as mock_bss:
+        mock_bss.return_value.evaluate_auto_eligibility.return_value = decision
+        mock_bss.return_value.apply_auto_resume.return_value = ResumeResult(
+            success=True, target_state=IssueState.READY
+        )
         result = qualify_gate_service.qualify_blocked_issue(sample_issue)
 
     assert result == IssueState.READY
-    mock_reconcile.assert_called_once_with(
+    mock_bss.return_value.evaluate_auto_eligibility.assert_called_once_with(
         issue_number=123,
         branch="task/issue-123-test",
-        clear_reason=False,
-        actor="orchestra:dispatcher",
     )
 
 
 def test_qualify_blocked_issue_stays_blocked_when_blocked(
     qualify_gate_service, sample_issue, mock_flow_manager
 ):
-    """qualify_blocked_issue returns None when reconcile_blocked returns None."""
-    from unittest.mock import patch
-
+    """qualify_blocked_issue returns None when auto-resume is not eligible."""
     mock_flow_manager.get_flow_for_issue.return_value = {
         "branch": "task/issue-123-test"
     }
-    with patch(
-        "vibe3.domain.qualify_gate.BlockedStateService.reconcile_blocked",
-        return_value=None,
-    ) as mock_reconcile:
+    decision = AutoResumeDecision(
+        verdict=AutoResumeVerdict.NOT_ELIGIBLE,
+        reason_code=AutoResumeReasonCode.DEPENDENCY_OPEN,
+        issue_number=123,
+        branch="task/issue-123-test",
+        truth_snapshot="ts",
+    )
+    with patch("vibe3.domain.qualify_gate.BlockedStateService") as mock_bss:
+        mock_bss.return_value.evaluate_auto_eligibility.return_value = decision
         result = qualify_gate_service.qualify_blocked_issue(sample_issue)
 
     assert result is None
-    mock_reconcile.assert_called_once_with(
-        issue_number=123,
-        branch="task/issue-123-test",
-        clear_reason=False,
-        actor="orchestra:dispatcher",
-    )
+    mock_bss.return_value.apply_auto_resume.assert_not_called()

@@ -62,8 +62,8 @@ code_limits:
         limit: 520
         reason: "GitHub PR 只读查询聚合，新增 CI 失败分类与检查步骤解析逻辑，包含失败分类、日志解析、状态映射等紧密耦合逻辑"
       - path: "src/vibe3/clients/github_issues_ops.py"
-        limit: 510
-        reason: "GitHub Issues 操作聚合，包含 issue CRUD、PR 列表查询、字段验证（issue/PR 双重验证）、链接解析、批量查询等紧密耦合逻辑；Issue #2968 新增 PR 字段验证基础设施（_validate_pr_fields 函数 + GITHUB_KNOWN_PR_FIELDS 常量，+41 行）支持 PR 字段校验与拼写建议；PR #3113 新增智能错误分类（_classify_github_api_error 函数，+50 行）支持 E_API_RATE_LIMIT/E_API_TIMEOUT/E_API_NETWORK 等细粒度错误码推断"
+        limit: 540
+        reason: "GitHub Issues 操作聚合，包含 issue CRUD、PR 列表查询、字段验证（issue/PR 双重验证）、链接解析、批量查询等紧密耦合逻辑；Issue #2968 新增 PR 字段验证基础设施（_validate_pr_fields 函数 + GITHUB_KNOWN_PR_FIELDS 常量，+41 行）支持 PR 字段校验与拼写建议；PR #3113 新增智能错误分类（_classify_github_api_error 函数，+50 行）支持 E_API_RATE_LIMIT/E_API_TIMEOUT/E_API_NETWORK 等细粒度错误码推断；#3289 新增 issue body blocked section 原子操作与 label 状态追踪（+21 行）"
       - path: "src/vibe3/clients/sqlite_flow_state_repo.py"
         limit: 700
         reason: |
@@ -160,8 +160,8 @@ code_limits:
         limit: 490
         reason: "Flow 现场清理服务，包含 worktree/branch/handoff/flow record 等多步清理编排、live session 终端处理、prune worktree 兜底逻辑等紧密耦合的清理步骤；Issue #3107 新增 _is_cleanup_commit() 和 _has_meaningful_commits() 辅助方法用于检测 cleanup-only 分支（+45 行），防止 init commit 被推送到远程分支；PR #3127 新增设计决策文档注释说明 origin/main 假设和 cleanup 模式限制（+16 行）"
       - path: "src/vibe3/services/flow/blocked_state_service.py"
-        limit: 450
-        reason: "Blocked state 统一管理服务，协调 issue body/database/labels 三个数据源的状态一致性；包含 block_state_only、unblock_state_only、block_flow 等核心方法，以及 consistency checking 和 repair 逻辑；Issue #2839 新增 block_flow 方法支持 FlowBlocked domain event projection（+30 行）"
+        limit: 750
+        reason: "Blocked state 统一管理服务，协调 issue body/database/labels 三个数据源的状态一致性；#3289 重构将 reconcile_blocked 拆为 4 个不可混用的方法（sync_block_state / evaluate_auto_eligibility / apply_auto_resume / manual_resume），实现 manual 授权与 auto 只读资格检查的 authority separation；新增 updatedAt optimistic lock、snapshot-bound decision、truth unreadable→零 mutation 等安全机制（+283 行 net）"
       - path: "src/vibe3/services/check/cleanup.py"
         limit: 610
         reason: "终端 flow 清理 + detached worktree 清理聚合，包含 done/aborted 分类处理、live session 过滤、issue resume、detached worktree 安全清理（worktree root 比较、flow-managed scope 检查）等紧密耦合逻辑；PR #2338 新增 done/aborted 分类追踪和 summary 分段构建（cleaned_done/cleaned_aborted 替代 kept_records）；迁移至 check/ 子包（Issue #2584）"

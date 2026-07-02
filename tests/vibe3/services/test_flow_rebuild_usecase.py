@@ -81,9 +81,9 @@ def test_rebuild_issue_flow_hard_deletes_bootstraps_handoff_and_label_resume(
     )
     timeline.record_timeline_event.assert_called_once_with(
         branch="task/issue-303",
-        event_type="flow_rebuild",
+        event_type="scene_rebuilt",
         actor="vibe3:flow_rebuild",
-        detail="Flow rebuilt: missing worktree",
+        detail="Scene rebuilt: missing worktree",
         issue_number=303,
     )
     store.reset_transition_epoch.assert_called_once_with("task/issue-303")

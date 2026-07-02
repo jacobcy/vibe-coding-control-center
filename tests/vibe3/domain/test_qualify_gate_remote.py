@@ -70,7 +70,7 @@ class TestRemoteBlockedReason:
     def test_qualify_gate_uses_remote_blocked_reason(
         self, qualify_gate_service, sample_issue, mock_store
     ):
-        """Verify reconcile_blocked called with remote blocked_reason."""
+        """Verify evaluate_auto_eligibility called with remote blocked_reason."""
         # Mock CoordinationResolver to return remote blocked_reason
         mock_truth = CoordinationTruth(
             blocked_reason="Remote block from issue body",
@@ -87,7 +87,7 @@ class TestRemoteBlockedReason:
             return_value=mock_truth,
         ):
             mock_bss = Mock()
-            mock_bss.reconcile_blocked.return_value = None
+            mock_bss.evaluate_auto_eligibility.return_value = None
 
             with patch(
                 "vibe3.domain.qualify_gate.BlockedStateService",
@@ -104,7 +104,7 @@ class TestRemoteBlockedReason:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_not_called()
+                mock_bss.evaluate_auto_eligibility.assert_not_called()
 
                 # Verify CoordinationResolver was called
                 qualify_gate_service._coordination_resolver.resolve_coordination.assert_called_once_with(
@@ -114,7 +114,7 @@ class TestRemoteBlockedReason:
     def test_qualify_gate_fallback_to_local_blocked_reason(
         self, qualify_gate_service, sample_issue, mock_store
     ):
-        """Verify reconcile_blocked called with local blocked_reason."""
+        """Verify evaluate_auto_eligibility called with local blocked_reason."""
         # Mock CoordinationResolver to return local blocked_reason (degraded mode)
         mock_truth = CoordinationTruth(
             blocked_reason="Local block from SQLite",
@@ -131,7 +131,7 @@ class TestRemoteBlockedReason:
             return_value=mock_truth,
         ):
             mock_bss = Mock()
-            mock_bss.reconcile_blocked.return_value = None
+            mock_bss.evaluate_auto_eligibility.return_value = None
 
             with patch(
                 "vibe3.domain.qualify_gate.BlockedStateService",
@@ -148,7 +148,7 @@ class TestRemoteBlockedReason:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_not_called()
+                mock_bss.evaluate_auto_eligibility.assert_not_called()
 
 
 class TestRemoteDependencies:
@@ -175,7 +175,7 @@ class TestRemoteDependencies:
         ):
             # Mock store returns None -> blocked code path returns None
             mock_bss = Mock()
-            mock_bss.reconcile_blocked.return_value = None
+            mock_bss.evaluate_auto_eligibility.return_value = None
 
             with patch(
                 "vibe3.domain.qualify_gate.BlockedStateService",
@@ -192,7 +192,7 @@ class TestRemoteDependencies:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_not_called()
+                mock_bss.evaluate_auto_eligibility.assert_not_called()
 
                 # Verify CoordinationResolver was called
                 qualify_gate_service._coordination_resolver.resolve_coordination.assert_called_once_with(
@@ -219,7 +219,7 @@ class TestRemoteDependencies:
             return_value=mock_truth,
         ):
             mock_bss = Mock()
-            mock_bss.reconcile_blocked.return_value = None
+            mock_bss.evaluate_auto_eligibility.return_value = None
 
             with patch(
                 "vibe3.domain.qualify_gate.BlockedStateService",
@@ -236,15 +236,15 @@ class TestRemoteDependencies:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_not_called()
+                mock_bss.evaluate_auto_eligibility.assert_not_called()
 
     def test_qualify_gate_remote_blocked_by_issue(
         self, qualify_gate_service, sample_issue, mock_store
     ):
-        """Body truth blocked_by_issue triggers reconcile_blocked.
+        """Body truth blocked_by_issue triggers evaluate_auto_eligibility.
 
         When remote body truth has blocked_by_issues=[456], blocked_signal
-        triggers reconcile_blocked.
+        triggers evaluate_auto_eligibility.
         """
         mock_truth = CoordinationTruth(
             blocked_reason=None,
@@ -261,7 +261,7 @@ class TestRemoteDependencies:
             return_value=mock_truth,
         ):
             mock_bss = Mock()
-            mock_bss.reconcile_blocked.return_value = None
+            mock_bss.evaluate_auto_eligibility.return_value = None
 
             with patch(
                 "vibe3.domain.qualify_gate.BlockedStateService",
@@ -278,7 +278,7 @@ class TestRemoteDependencies:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_not_called()
+                mock_bss.evaluate_auto_eligibility.assert_not_called()
 
 
 class TestProvenanceTracking:
@@ -334,7 +334,7 @@ class TestProvenanceTracking:
             return_value=mock_truth,
         ):
             mock_bss = Mock()
-            mock_bss.reconcile_blocked.return_value = None
+            mock_bss.evaluate_auto_eligibility.return_value = None
 
             with patch(
                 "vibe3.domain.qualify_gate.BlockedStateService",
@@ -396,7 +396,7 @@ class TestE2EBlockedReconciliation:
             return_value=mock_truth,
         ):
             mock_bss = Mock()
-            mock_bss.reconcile_blocked.return_value = None
+            mock_bss.evaluate_auto_eligibility.return_value = None
 
             with patch(
                 "vibe3.domain.qualify_gate.BlockedStateService",
@@ -411,7 +411,7 @@ class TestE2EBlockedReconciliation:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_not_called()
+                mock_bss.evaluate_auto_eligibility.assert_not_called()
 
     def test_blocked_label_body_active_with_cache(self, mock_store, sample_issue):
         """Blocked label + active body -> reconcile returns target."""
@@ -445,7 +445,7 @@ class TestE2EBlockedReconciliation:
             return_value=mock_truth,
         ):
             mock_bss = Mock()
-            mock_bss.reconcile_blocked.return_value = IssueState.IN_PROGRESS
+            mock_bss.evaluate_auto_eligibility.return_value = IssueState.IN_PROGRESS
 
             with patch(
                 "vibe3.domain.qualify_gate.BlockedStateService",
@@ -460,12 +460,12 @@ class TestE2EBlockedReconciliation:
                 )
 
                 assert result == IssueState.BLOCKED
-                mock_bss.reconcile_blocked.assert_not_called()
+                mock_bss.evaluate_auto_eligibility.assert_not_called()
 
     def test_issue_994_style_drift_alignment(self, mock_store, sample_issue):
         """#994: local flow missing, remote body blocked, label ready.
 
-        Expected: blocked truth wins, not dispatched, reconcile_blocked called.
+        Expected: blocked truth wins, not dispatched, evaluate_auto_eligibility called.
         """
         config = OrchestraConfig(repo="test/repo")
         github = Mock()
@@ -491,7 +491,7 @@ class TestE2EBlockedReconciliation:
             return_value=mock_truth,
         ):
             mock_bss = Mock()
-            mock_bss.reconcile_blocked.return_value = None
+            mock_bss.evaluate_auto_eligibility.return_value = None
 
             with patch(
                 "vibe3.domain.qualify_gate.BlockedStateService",
@@ -506,14 +506,14 @@ class TestE2EBlockedReconciliation:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_not_called()
+                mock_bss.evaluate_auto_eligibility.assert_not_called()
 
 
 class TestConvergedDispatchGate:
     """End-to-end tests for the converged run_qualify_gate -> reconcile path.
 
     Guards against regression where the main dispatch gate bypasses
-    reconcile_blocked or wrongly dispatches when body truth says blocked
+    evaluate_auto_eligibility or wrongly dispatches when body truth says blocked
     with an unresolved dependency.
     """
 

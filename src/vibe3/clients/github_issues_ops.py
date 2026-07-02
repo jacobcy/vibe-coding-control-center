@@ -12,6 +12,7 @@ from vibe3.clients.github_field_constants import (
     GITHUB_DEFAULT_LIST_FIELDS,
     GITHUB_DEFAULT_VIEW_FIELDS,
     GITHUB_FIELDS_BODY,
+    GITHUB_FIELDS_BODY_UPDATED_AT,
     GITHUB_FIELDS_COMMENTS,
     GITHUB_FIELDS_ISSUE_NUMBER_TITLE,
     GITHUB_KNOWN_ISSUE_FIELDS,
@@ -480,6 +481,34 @@ class IssuesMixin(IssueAdminMixin):
         )
         if isinstance(result, dict):
             return cast(str | None, result.get("body", ""))
+        return None
+
+    def get_issue_snapshot(
+        self: Any, issue_number: int, repo: str | None = None
+    ) -> tuple[str | None, str | None] | None:
+        """Get issue body and updatedAt in a single API call.
+
+        Used by auto resume eligibility to bind an optimistic-lock snapshot
+        (issue ``updatedAt``) alongside the body truth, so ``apply_auto_resume``
+        can detect stale decisions when truth changed between evaluate and apply.
+
+        Args:
+            issue_number: Issue number
+            repo: Optional repo override (owner/repo)
+
+        Returns:
+            Tuple of (body, updated_at) on success. ``body`` is the issue body
+            text (or empty string), ``updated_at`` is the ISO timestamp string
+            (or None when GitHub omits it). Returns ``None`` when the issue
+            cannot be read (not found or network error).
+        """
+        result = self.view_issue(
+            issue_number, repo=repo, fields=list(GITHUB_FIELDS_BODY_UPDATED_AT)
+        )
+        if isinstance(result, dict):
+            body = cast(str | None, result.get("body", ""))
+            updated_at = cast(str | None, result.get("updatedAt"))
+            return (body, updated_at)
         return None
 
     def list_issue_comments(

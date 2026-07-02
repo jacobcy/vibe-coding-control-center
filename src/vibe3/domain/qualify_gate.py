@@ -15,6 +15,7 @@ from vibe3.domain.qualify_gate_support import (
 )
 from vibe3.models import CoordinationTruth, IssueInfo, IssueState, OrchestraConfig
 from vibe3.services.flow import (
+    AutoResumeVerdict,
     BlockedStateService,
     FlowCleanupService,  # noqa: F401
     FlowStatusService,  # noqa: F401
@@ -102,16 +103,21 @@ class QualifyGateService:
         if not branch:
             return None
 
-        # Converge entirely onto reconcile_blocked
+        # Read-only auto eligibility check (no authority to clear reason).
+        # Per #3289 the dispatch/qualify path may only observe that the
+        # external truth has changed (reason cleared + deps closed); it must
+        # not clear a human blocked_reason or infer target from local refs.
         service = BlockedStateService(store=self._store, github_client=self._github)
-        target_state = service.reconcile_blocked(
+        decision = service.evaluate_auto_eligibility(
             issue_number=issue.number,
             branch=branch,
-            clear_reason=False,
-            actor="orchestra:dispatcher",
         )
-        if target_state is None:
+        if decision.verdict != AutoResumeVerdict.ELIGIBLE:
             return None
+        result = service.apply_auto_resume(decision)
+        if not result.success or result.target_state is None:
+            return None
+        target_state = result.target_state
         truth = self._coordination_resolver.resolve_coordination(branch, issue.number)
         if not self._check_worktree_health(issue, branch, truth):
             return None

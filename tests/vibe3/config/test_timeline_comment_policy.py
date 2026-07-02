@@ -153,7 +153,7 @@ def test_backward_compatibility() -> None:
     assert default_policy.should_write_comment("handoff_append") is False
 
     # Milestone events - write comments
-    assert default_policy.should_write_comment("flow_rebuild") is True
+    assert default_policy.should_write_comment("scene_rebuilt") is True
     assert default_policy.should_write_comment("milestone_recorded") is True
 
     # Human-readable events - write comments
