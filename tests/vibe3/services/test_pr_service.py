@@ -444,27 +444,23 @@ def test_get_pr_cache_ttl_expiry(pr_service: PRService) -> None:
 class TestBuildPrBody:
     """Tests for build_pr_body utility function."""
 
-    def test_appends_change_summary_when_metadata_has_branch(self) -> None:
-        """Should append change summary when metadata has branch."""
-        from vibe3.models import PRMetadata
+    def test_appends_change_summary_when_change_summary_provided(self) -> None:
+        """Should append change summary when change_summary is provided."""
+        from vibe3.models import CommittedChangeSummary, PRMetadata
         from vibe3.services.pr.utils import build_pr_body
 
         metadata = PRMetadata(branch="feature-branch")
-        mock_diff_summary = MagicMock()
-        mock_diff_summary.files_added = 2
-        mock_diff_summary.files_removed = 1
-        mock_diff_summary.files_modified = 3
-        mock_diff_summary.total_loc_delta = 150
+        change_summary = CommittedChangeSummary(
+            files_changed=5,
+            additions=10,
+            deletions=3,
+        )
 
-        with patch(
-            "vibe3.analysis.git_diff_summary.get_git_diff_summary",
-            return_value=mock_diff_summary,
-        ):
-            result = build_pr_body("Original body", metadata)
+        result = build_pr_body("Original body", metadata, change_summary=change_summary)
 
         assert "## Change Summary" in result
-        assert "| Files |" in result
-        assert "| LOC |" in result
+        assert "| Files | 5 changed |" in result
+        assert "| LOC | +10 / -3 |" in result
         assert "Original body" in result
 
     def test_no_change_summary_when_metadata_is_none(self) -> None:
@@ -476,18 +472,18 @@ class TestBuildPrBody:
         assert "## Change Summary" not in result
         assert result == "Original body"
 
-    def test_no_change_summary_when_metadata_has_no_branch(self) -> None:
-        """Should not append change summary when metadata has no branch."""
+    def test_no_change_summary_when_change_summary_is_none(self) -> None:
+        """Should not append change summary when change_summary is None."""
         from vibe3.models import PRMetadata
         from vibe3.services.pr.utils import build_pr_body
 
-        metadata = PRMetadata(branch=None)
-        result = build_pr_body("Original body", metadata)
+        metadata = PRMetadata(branch="feature-branch")
+        result = build_pr_body("Original body", metadata, change_summary=None)
 
         assert "## Change Summary" not in result
 
-    def test_graceful_degradation_when_diff_summary_fails(self) -> None:
-        """Should not break PR body when diff summary fails."""
+    def test_graceful_degradation_when_change_summary_none(self) -> None:
+        """Should not break PR body when change_summary is None."""
         from vibe3.models import PRMetadata
         from vibe3.services.pr.utils import build_pr_body
 
@@ -500,14 +496,10 @@ class TestBuildPrBody:
             latest=None,
         )
 
-        with patch(
-            "vibe3.analysis.git_diff_summary.get_git_diff_summary",
-            side_effect=Exception("Error"),
-        ):
-            result = build_pr_body("Original body", metadata)
+        result = build_pr_body("Original body", metadata, change_summary=None)
 
         assert "## Change Summary" not in result
-        # Without contributors and diff summary, should return just the body
+        # Without contributors and change_summary, should return just the body
         assert "Original body" in result
 
 
@@ -516,39 +508,36 @@ class TestFormatDiffSummary:
 
     def test_formats_basic_summary(self) -> None:
         """Should format basic summary with files and LOC."""
-        from vibe3.models import DiffSummary
+        from vibe3.models import CommittedChangeSummary
         from vibe3.services.pr.utils import _format_diff_summary
 
-        summary = DiffSummary(
-            files_added=2,
-            files_removed=1,
-            files_modified=3,
-            total_loc_delta=150,
+        summary = CommittedChangeSummary(
+            files_changed=6,
+            additions=10,
+            deletions=4,
         )
 
         result = _format_diff_summary(summary)
 
         assert "## Change Summary" in result
-        assert "+2 added" in result
-        assert "-1 removed" in result
-        assert "~3 modified" in result
-        assert "| LOC | +150 |" in result
+        assert "| Files | 6 changed |" in result
+        assert "| LOC | +10 / -4 |" in result
 
-    def test_git_only_format_omits_functions_and_dependencies(self) -> None:
-        """Git-only format shows files and LOC, not functions/dependencies."""
-        from vibe3.models import DiffSummary
+    def test_includes_binary_files_row(self) -> None:
+        """Should include binary files row when binary_files > 0."""
+        from vibe3.models import CommittedChangeSummary
         from vibe3.services.pr.utils import _format_diff_summary
 
-        summary = DiffSummary(
-            files_added=1,
-            total_loc_delta=100,
+        summary = CommittedChangeSummary(
+            files_changed=3,
+            additions=0,
+            deletions=0,
+            binary_files=2,
         )
 
         result = _format_diff_summary(summary)
 
-        # Git-only format: files and LOC only
-        assert "| Files | +1 added |" in result
-        assert "| LOC | +100 |" in result
-        # Functions and dependencies are NOT shown in git-only format
-        assert "| Functions |" not in result
-        assert "| Dependencies |" not in result
+        assert "## Change Summary" in result
+        assert "| Files | 3 changed |" in result
+        assert "| LOC | 0 |" in result
+        assert "| Binary files | 2 |" in result
