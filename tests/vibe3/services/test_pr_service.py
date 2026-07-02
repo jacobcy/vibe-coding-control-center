@@ -61,6 +61,7 @@ def test_create_pr_success(pr_service: PRService, no_conflict_git: MagicMock) ->
     with patch.object(pr_service, "git_client", no_conflict_git):
         with patch.object(pr_service, "store", mock_store):
             no_conflict_git.get_current_branch.return_value = "feature-branch"
+            no_conflict_git.get_diff_metadata.return_value = ("", "")
             pr = pr_service.create_pr(title="Test PR", body="Test body")
 
             assert pr.number == 123
