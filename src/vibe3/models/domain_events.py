@@ -148,8 +148,11 @@ class WebhookIssueClosed(DomainEvent):
 class IssueResolvedDependency(DomainEvent):
     """Published when a closed issue may resolve dependency blockers.
 
-    Signals that downstream flows blocked by this issue should be
-    re-evaluated via BlockedStateService.reconcile_blocked.
+    Signals that downstream flows blocked by this issue may need
+    re-evaluation. Consumers must use the observer-only auto eligibility
+    API (see #3289 / #3292) and must NOT invoke
+    BlockedStateService.reconcile_blocked or infer a dispatchable target
+    from local refs (plan_ref/pr_ref/report_ref/audit_ref).
     """
 
     issue_number: int

@@ -264,55 +264,6 @@ async def handle_github_webhook(request: Request) -> dict:
         publish(event)
         event_details = _format_event_details(event)
         logger.bind(domain="webhook").info(f"Published webhook event: {event_details}")
-
-        # Trigger dependency recheck for closed issues (inline call)
-        # Inline call chosen over EventPublisher subscribe — manager approved
-        # for simpler synchronous handling without event bus overhead
-        if isinstance(event, WebhookIssueClosed):
-            try:
-                from vibe3.clients import (
-                    GitHubClient,
-                    SQLiteClient,
-                    has_merged_pr_for_issue,
-                )
-                from vibe3.models import IssueResolvedDependency
-                from vibe3.services.dispatch import DependencyRecheckService
-
-                # Check if issue had a merged PR
-                merged = has_merged_pr_for_issue(event.issue_number)
-
-                # Create IssueResolvedDependency event
-                dep_event = IssueResolvedDependency(
-                    issue_number=event.issue_number,
-                    merged=merged,
-                )
-
-                # Inline call to dependency recheck service
-                # Note: constructing clients per request is acceptable here
-                # as webhook handler is standalone endpoint without injected context
-                store = SQLiteClient()
-                github_client = GitHubClient()
-                service = DependencyRecheckService(
-                    store=store, github_client=github_client
-                )
-                result = service.handle_issue_resolved(dep_event)
-
-                logger.bind(
-                    domain="webhook",
-                    action="dependency_recheck",
-                    issue_number=event.issue_number,
-                    merged=merged,
-                    dependents_checked=result.dependents_checked,
-                    unblocked=result.unblocked,
-                ).info("Dependency recheck triggered for closed issue")
-            except Exception as exc:
-                # Non-critical path - don't block webhook response
-                logger.bind(
-                    domain="webhook",
-                    action="dependency_recheck",
-                    issue_number=event.issue_number,
-                    error=str(exc),
-                ).warning(f"Failed to trigger dependency recheck: {exc}")
     except Exception as exc:
         logger.bind(domain="webhook").exception(
             f"Failed to publish webhook event: {exc}"

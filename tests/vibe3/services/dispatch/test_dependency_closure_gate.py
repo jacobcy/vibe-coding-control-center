@@ -101,3 +101,30 @@ def test_notify_downstream_skips_missing_issue_number(
 
     assert result == [101]  # Only branch with issue number is notified
     assert github_client.add_comment.call_count == 1
+
+
+def test_notify_downstream_finds_blocked_dependents(
+    temp_store: SQLiteClient,
+) -> None:
+    """Gate must find blocked dependents, not just active ones.
+
+    A dependent blocked by this issue is ``flow_status='blocked'`` in
+    production (not ``'active'``). Regression guard for the
+    ``get_issue_dependents`` predicate fix (#3229 / #3292): the original
+    ``flow_status = 'active'`` filter missed the exact population the
+    advisory is meant to reach.
+    """
+    temp_store.update_flow_state("task/issue-101", flow_status="blocked")
+    temp_store.add_issue_link("task/issue-101", 9, "dependency")
+    temp_store.add_issue_link("task/issue-101", 101, "task")
+
+    github_client = MagicMock()
+
+    result = DependencyClosureGate.notify_downstream(
+        issue_number=9,
+        store=temp_store,
+        github_client=github_client,
+    )
+
+    assert result == [101]
+    github_client.add_comment.assert_called_once()

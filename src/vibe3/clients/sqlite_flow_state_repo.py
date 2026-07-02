@@ -658,17 +658,20 @@ class SQLiteFlowStateRepo(_HasConnection):
         return dependents
 
     def get_issue_dependents(self, issue_number: int) -> list[str]:
-        """Get active flows that depend on a given issue number.
+        """Get non-deleted flows that depend on a given issue number.
 
         Reverse-dependency lookup from issue_number to all branches
-        having it as a dependency link.
+        having it as a dependency link. Includes both ``active`` and
+        ``blocked`` flows — a dependent is typically ``blocked`` while
+        waiting on this issue, so filtering to ``active`` only would
+        miss the exact population callers need to re-evaluate/notify.
 
         Args:
             issue_number: Issue number to find dependents for.
 
         Returns:
-            List of branch names with active flows having this issue
-            as dependency.
+            List of branch names with non-deleted flows having this
+            issue as dependency.
         """
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -679,7 +682,7 @@ class SQLiteFlowStateRepo(_HasConnection):
             JOIN flow_state fs ON fil.branch = fs.branch
             WHERE fil.issue_number = ?
               AND fil.issue_role = 'dependency'
-              AND fs.flow_status = 'active'
+              AND fs.flow_status IN ('active', 'blocked')
               AND fs.deleted_at IS NULL
             ORDER BY fil.branch
             """,
