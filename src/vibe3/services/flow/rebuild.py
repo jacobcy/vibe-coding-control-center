@@ -1,8 +1,10 @@
 """Explicit flow rebuild usecase.
 
 Rebuild is destructive: delete the old physical scene and flow record, then
-bootstrap a fresh flow/worktree and clear blocked labels through the standard
-label-auto resume path.
+bootstrap a fresh flow/worktree. Per #3289 a manual rebuild does NOT implicitly
+clear the business blocked reason — ``label_resume`` defaults to a no-op so
+the physical scene is repaired without touching blocked truth. Users who want
+to clear the block separately invoke ``vibe3 task resume`` (manual_resume).
 """
 
 from __future__ import annotations
@@ -19,8 +21,17 @@ from vibe3.services.protocols.flow_protocols import FlowBootstrapProtocol
 LabelResume = Callable[..., None]
 
 
+def _noop_label_resume(**_kwargs: Any) -> None:
+    """Default post-rebuild hook: no-op.
+
+    #3289: a rebuild restores the physical scene only; it must not clear the
+    business blocked reason or advance the state label. Callers that need to
+    resume a blocked flow do so explicitly via ``vibe3 task resume``.
+    """
+
+
 class FlowRebuildUsecase:
-    """Hard rebuild a flow scene and restore issue state through label-auto."""
+    """Hard rebuild a flow scene without touching business blocked truth."""
 
     def __init__(
         self,
@@ -54,7 +65,7 @@ class FlowRebuildUsecase:
                     f"Failed to import FlowOrchestratorService: {e}. "
                     "Provide orchestrator parameter explicitly."
                 ) from e
-        self._label_resume = label_resume or self._default_label_resume
+        self._label_resume = label_resume or _noop_label_resume
 
     def rebuild_issue_flow(
         self,
@@ -67,9 +78,13 @@ class FlowRebuildUsecase:
         include_remote: bool = True,
         ensure_worktree: bool = True,
     ) -> dict[str, Any] | None:
-        """Hard-delete the old scene, recreate flow/worktree, append handoff, resume.
+        """Hard-delete the old scene, recreate flow/worktree, append handoff.
 
-        This performs a destructive rebuild of the flow scene.
+        This performs a destructive rebuild of the flow scene. Per #3289 it
+        does NOT clear the business blocked reason — ``label_resume`` defaults
+        to a no-op. Blocked state, reason, dependency projection, and label
+        survive the rebuild; callers that want to resume a blocked flow do so
+        explicitly via ``vibe3 task resume``.
 
         Raises:
             RuntimeError: If cleanup fails (prevents bootstrap on dirty state)
@@ -113,7 +128,7 @@ class FlowRebuildUsecase:
         )
         self.store.reset_transition_epoch(branch)
 
-        # Record flow_rebuild timeline event
+        # Record scene_rebuilt timeline event (must not claim cleared blocked)
         from vibe3.services.flow.timeline import FlowTimelineService
         from vibe3.services.issue.flow import IssueFlowService
 
@@ -124,51 +139,16 @@ class FlowRebuildUsecase:
                 github_client=self.github_client,
             ).record_timeline_event(
                 branch=branch,
-                event_type="flow_rebuild",
+                event_type="scene_rebuilt",
                 actor="vibe3:flow_rebuild",
-                detail=f"Flow rebuilt: {reason}",
+                detail=f"Scene rebuilt: {reason}",
                 issue_number=issue_number,
             )
 
+        # Post-rebuild hook (no-op by default per #3289)
         self._label_resume(
             issue_number=issue.number,
             branch=branch,
             reason=reason,
         )
         return result
-
-    def _default_label_resume(
-        self,
-        *,
-        issue_number: int,
-        branch: str,
-        reason: str,
-    ) -> None:
-        """Clear blocked markers after rebuild.
-
-        Post-rebuild: consistency is guaranteed (we just rebuilt), so we
-        skip the classify step and go straight to clearing blocked state.
-        """
-        from loguru import logger
-
-        from vibe3.services.flow.blocked_state_service import BlockedStateService
-
-        target = BlockedStateService(
-            github_client=self.github_client,
-            store=self.store,
-        ).reconcile_blocked(
-            issue_number=issue_number,
-            branch=branch,
-            clear_reason=True,
-            actor="vibe3:flow_rebuild",
-        )
-
-        if target is None:
-            logger.bind(
-                domain="recovery",
-                branch=branch,
-                issue_number=issue_number,
-            ).error(
-                f"Label not cleared after rebuild for #{issue_number}. "
-                f"Manual fix: gh issue edit {issue_number} --remove-label state/blocked"
-            )
