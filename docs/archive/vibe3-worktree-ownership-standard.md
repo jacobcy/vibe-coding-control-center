@@ -59,7 +59,7 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
 
 ### L2 — Supervisor + Apply
 
-- 职责：`SupervisorHandoffService` 读取 `supervisor+state/handoff` issue，dispatch apply agent 执行治理动作。发布 `SupervisorApplyDispatched` 等事件。
+- 职责：`SupervisorHandoffService` 读取 `supervisor+state/handoff` issue，dispatch apply agent 执行治理动作。
 - Apply agent 能力范围：
   - 更改 issue labels、关闭 issue、写入 comment
   - 在核查后关闭旧 issue 并创建 replacement issue（仅 GitHub 治理动作，不等于代码实现）

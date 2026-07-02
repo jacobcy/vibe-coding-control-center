@@ -76,7 +76,6 @@ L4  Atomic Level (原子工具/协作)         -- 人工协作流程、原子指
 |------|---------|---------|
 | `GovernanceScanStarted` | Tick 扫描开始 | `tick_count` |
 | `GovernanceScanCompleted` | Tick 扫描完成 | `tick_count`, `active_flows`, `suggested_issues` |
-| `GovernanceDecisionRequired` | 需要人工决策 | `issue_number`, `reason`, `suggested_action` |
 | `SupervisorExecutionCompleted` | Supervisor 模式执行完成 | `supervisor_file`, `issue_number`, `success` |
 
 **处理器** (`src/vibe3/domain/handlers/governance.py`):
@@ -101,29 +100,28 @@ L4  Atomic Level (原子工具/协作)         -- 人工协作流程、原子指
 | 事件 | 触发时机 | 关键字段 | 说明 |
 |------|---------|---------|------|
 | `SupervisorIssueIdentified` | 发现治理 issue | `issue_number`, `supervisor_file` | 带 `supervisor+state/handoff` 标签 |
-| `SupervisorPromptRendered` | Prompt 渲染完成 | `prompt_length` | 日志记录用 |
-| `SupervisorApplyDispatched` | Apply agent 分发 | `tmux_session` | 异步执行开始 |
-| `SupervisorApplyStarted` | Apply 执行开始 | `worktree_path` | 在隔离 worktree 中 |
-| `SupervisorApplyCompleted` | Apply 执行完成 | `outcome`, `actions_taken` | 结果记录 |
-| `SupervisorApplyDelegated` | 委托到 L3 | `governance_issue_number`, `new_task_issue_number` | 复杂变更降级 |
 
-**处理器** (`src/vibe3/domain/handlers/supervisor_apply.py`):
+> **注意**: 原有 `SupervisorPromptRendered`、`SupervisorApplyDispatched`、`SupervisorApplyStarted`、
+> `SupervisorApplyCompleted`、`SupervisorApplyDelegated` 事件类为初始架构预留设计，
+> 从未被实际实例化或发布，已于 Issue #3278 中移除。
+> 当前 supervisor apply 执行链路使用 CLI self-invocation 直接进入
+> CodeagentExecutionService，不经过事件驱动 apply lifecycle。
+
+**处理器** (`src/vibe3/domain/handlers/supervisor_scan.py`):
 - 记录 issue 检测与分发状态
-- 为 dispatch/queue 添加评论
-- 记录委托决策并链接 issue
+- 通过 CLI self-invocation 触发 supervisor apply agent
 
 **集成点**:
-- `orchestra/services/supervisor_handoff.py` → 发布所有 L2 事件
-- Apply agent hooks → 发布执行开始/完成事件
+- `roles/supervisor.py` → 发布 `SupervisorIssueIdentified` 事件
+- `domain/handlers/supervisor_scan.py` → 消费事件，触发 apply 分发
 
-**Worktree 语义**: 临时隔离 worktree，由系统自动解析并锁定路径（`cwd=wt_path`）。
+**Worktree 语义**: 临时隔离 worktree，由 SUPERVISOR_APPLY_ROLE 自动管理。
 
 **委托流程**:
 ```
-Apply agent executes
+Supervisor apply agent executes
   → Detects complex changes needed
   → Creates new task issue with spec
-  → publish SupervisorApplyDelegated
   → L3 Manager chain takes over
 ```
 
@@ -193,9 +191,9 @@ Apply agent executes
 
 **阶段完成**: Agent 执行阶段完成时发布事件（如 `PlanCompleted`）。
 
-**决策需求**: 需要人工或系统决策时发布事件（如 `GovernanceDecisionRequired`）。
+**决策需求**: 需要人工或系统决策时发布事件。
 
-**委托降级**: 执行能力不足需要降级时发布事件（如 `SupervisorApplyDelegated`）。
+**委托降级**: 执行能力不足需要降级时通过创建新 task issue 委托到 L3 chain。
 
 ### 4.2 事件构造
 
@@ -369,9 +367,9 @@ src/vibe3/domain/
 │   └── flow_lifecycle.py         # L3 Flow Lifecycle 事件定义
 └── handlers/
     ├── __init__.py               # 注册编排
-    ├── governance.py             # L1 处理器
-    ├── supervisor_apply.py       # L2 处理器
-    ├── manager.py                # L3 Manager 处理器
+    ├── governance_scan.py        # L1 处理器
+    ├── supervisor_scan.py        # L2 处理器
+    ├── dispatch.py               # L3 分发处理器
     └── flow_lifecycle.py         # L3 Flow Lifecycle 处理器
 ```
 
@@ -562,7 +560,6 @@ LabelService().transition(
 
 - `GovernanceScanStarted`
 - `GovernanceScanCompleted`
-- `GovernanceDecisionRequired`
 - `PolicyChanged`
 
 #### Supervisor Apply Events（仅 Serve/运行时观察）
@@ -570,11 +567,6 @@ LabelService().transition(
 这些事件记录 Supervisor 执行过程，**不投影**。
 
 - `SupervisorIssueIdentified`
-- `SupervisorPromptRendered`
-- `SupervisorApplyDispatched`
-- `SupervisorApplyStarted`
-- `SupervisorApplyCompleted`
-- `SupervisorApplyDelegated`
 
 #### External Trigger Events（仅运行时）
 
@@ -607,8 +599,8 @@ LabelService().transition(
 | `IssueFailed` | Yes | `flow_failed` | Flow Timeline | Flow-level error audit |
 | `PRMerged` | Yes | `pr_merged` | Flow Timeline | Flow lifecycle milestone |
 | `*DispatchIntent` (4 events) | No | — | Runtime | Orchestration signals, not timeline |
-| `GovernanceScan*` (3 events) | No | — | Serve/Runtime | Governance observation only |
-| `Supervisor*` (6 events) | No | — | Serve/Runtime | Supervisor execution recording |
+| `GovernanceScan*` (2 events) | No | — | Serve/Runtime | Governance observation only |
+| `Supervisor*` (1 event) | No | — | Serve/Runtime | Supervisor issue identification |
 | `Webhook*` (5 events) | No | — | Serve/Runtime | External trigger signals |
 | `Manual*Intent` (3 events) | No | — | Runtime | CLI user actions |
 | `PolicyChanged` | No | — | Serve/Runtime | Configuration change observation |
@@ -654,7 +646,7 @@ LabelService().transition(
 
 **supervisor/apply**（L2 - Governance Execution Level）
 - 执行治理动作，`WorktreeRequirement.TEMPORARY`，有临时 worktree
-- 事件链：`SupervisorIssueIdentified` → `SupervisorApplyDispatched` / `SupervisorApplyDelegated`
+- 事件链：`SupervisorIssueIdentified` → supervisor_scan handler → CLI self-invocation → CodeagentExecutionService
 - 材料来源：`supervisor/apply.md`
 - **只处理 supervisor issue（带 `supervisor` label），不处理 assignee issue**
 - 执行 label/comment/close/recreate 等动作
@@ -682,6 +674,7 @@ LabelService().transition(
 
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
+| 1.4 | 2026-07-02 | 移除 6 个从未实例化的 dead domain events（SupervisorApplyDispatched/Started/Completed/Delegated, SupervisorPromptRendered, GovernanceDecisionRequired），更新 L2 链为 CLI self-invocation 模式（Issue #3278） |
 | 1.3 | 2026-05-02 | 移除向后兼容别名，统一使用 *DispatchIntent 事件名称 |
 | 1.2 | 2026-04-21 | 补充 governance/apply/runtime 三层概念说明，消除混淆 |
 | 1.1 | 2026-04-21 | 重命名 Dispatch 事件为 *DispatchIntent，明确语义；添加 audit_recorded 事件；补充向后兼容性注册规范 |

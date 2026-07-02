@@ -34,17 +34,3 @@ class GovernanceScanCompleted(DomainEvent):
     suggested_issues: int
     actor: str = "system:governance"
     timestamp: str | None = None
-
-
-@dataclass(frozen=True)
-class GovernanceDecisionRequired(DomainEvent):
-    """Governance decision required event.
-
-    Published when governance scan detects issues requiring manual decision.
-    """
-
-    issue_number: int
-    reason: str
-    suggested_action: str | None = None
-    actor: str = "system:governance"
-    timestamp: str | None = None
