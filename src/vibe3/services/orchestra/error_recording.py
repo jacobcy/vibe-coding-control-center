@@ -72,12 +72,12 @@ def record_dispatch_failure_if_unexpected(
 
     Args:
         result: Execution launch result (optional if exception provided)
-        role: Role name (planner/executor/reviewer/governance/supervisor)
+        role: Role name (planner/executor/reviewer/governance/supervisor/dispatch)
         issue_number: Associated issue number (None for governance-scoped dispatches)
         branch: Associated branch name
         exception: Exception that was raised during dispatch (keyword-only)
         tick_id: Heartbeat tick ID for automatic dispatches (keyword-only)
-        dispatch_source: Source of dispatch - "manual" or "automatic" (keyword-only)
+        dispatch_source: Source of dispatch - "manual", "automatic", or "preflight"
     """
 
     # Preserve None for governance, coerce to 0 for other roles
