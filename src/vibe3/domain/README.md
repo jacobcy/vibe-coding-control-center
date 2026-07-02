@@ -11,24 +11,25 @@
 
 ## 文件列表
 
-统计时间：2026-07-01（当前 worktree 快照）
+统计时间：2026-07-02
 
 ### 顶层文件
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | `__init__.py` | 207 | 公开 API 导出 |
-| `dispatch_coordinator.py` | ~400 | 全局分发协调器（容量感知的意图分发） |
+| `dispatch_coordinator.py` | 682 | 全局分发协调器（容量感知的意图分发） |
 | `dispatch_health.py` | ~150 | 分发健康检查 |
+| `dispatch_lifecycle.py` | ~150 | Dispatch 生命周期 FSM（DispatchLifecycle / DispatchState） |
 | `dispatch_preflight.py` | ~200 | 分发前置检查 |
 | `dispatch_queue_collection.py` | ~300 | 分发队列收集 |
 | `dispatch_queue_maintenance.py` | ~200 | 分发队列维护 |
 | `event_rules.py` | ~180 | 事件规则引擎（声明式规则 → handler 映射） |
 | `failed_gate.py` | ~80 | 失败门控 |
-| `flow_manager.py` | ~350 | Flow 生命周期状态机入口 |
+| `flow_manager.py` | 308 | Flow 生命周期状态机入口 |
 | `handler_registry.py` | ~120 | 处理器注册表 |
-| `orchestration_facade.py` | ~350 | 编排门面（runtime tick/heartbeat → 发布 events） |
-| `publisher.py` | ~90 | 事件发布器（全局单例） |
+| `orchestration_facade.py` | 344 | 编排门面（runtime tick/heartbeat → 发布 events） |
+| `publisher.py` | 23 | 事件发布器（全局单例） |
 | `qualify_gate.py` | ~250 | 资格门控（issue 准入校验） |
 | `qualify_gate_checks.py` | ~180 | 资格门控检查实现 |
 | `qualify_gate_support.py` | ~120 | 资格门控辅助函数 |
@@ -38,24 +39,24 @@
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `__init__.py` | ~150 | 事件类型导出 |
-| `base.py` | ~50 | DomainEvent 基类定义 |
-| `flow_lifecycle.py` | ~180 | Flow 生命周期事件定义 |
-| `governance.py` | ~70 | 治理决策事件定义 |
-| `policy.py` | ~40 | 策略变更事件定义 |
-| `supervisor_apply.py` | ~150 | Supervisor 扫描结果应用事件定义 |
+| `__init__.py` | 12 | 事件类型导出 |
+| `base.py` | 9 | DomainEvent 基类定义 |
+| `flow_lifecycle.py` | 45 | Flow 生命周期事件定义 |
+| `governance.py` | 36 | 治理扫描事件定义（GovernanceScanStarted/Completed） |
+| `policy.py` | 9 | 策略变更事件定义 |
+| `supervisor_apply.py` | 16 | SupervisorIssueIdentified 重导出 |
 
 ### handlers/ 子目录
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `__init__.py` | ~60 | 处理器导出与注册函数 |
-| `dispatch.py` | ~300 | 分发事件处理器（协调三层执行链） |
-| `flow_lifecycle.py` | ~100 | Flow 生命周期事件处理器 |
-| `governance_scan.py` | ~160 | 治理扫描处理器（L1 层） |
-| `issue_state_dispatch.py` | ~200 | Issue 状态转变分发处理器 |
-| `manual_dispatch.py` | ~180 | 手动触发分发处理器 |
-| `supervisor_scan.py` | ~110 | Supervisor 扫描处理器（L2 层） |
+| `__init__.py` | 40 | 处理器导出与注册函数 |
+| `dispatch.py` | 312 | 分发事件处理器（planner/executor/reviewer） |
+| `flow_lifecycle.py` | 11 | Flow 生命周期事件处理器 |
+| `governance_scan.py` | 259 | 治理扫描处理器（L1 层） |
+| `issue_state_dispatch.py` | 255 | Issue 状态转变分发处理器 |
+| `manual_dispatch.py` | 409 | 手动触发分发处理器（plan/run/review CLI 入口） |
+| `supervisor_scan.py` | 153 | Supervisor 扫描处理器（L2 层） |
 
 ### protocols/ 子目录
 
@@ -68,7 +69,7 @@
 | `orchestra_protocols.py` | ~70 | 编排协议定义 |
 | `runtime_protocols.py` | ~60 | 运行时协议定义 |
 
-**总计**：35 文件，约 6294 行
+**总计**：36 文件，约 5808 行
 
 ## 公开 APIs
 
@@ -89,9 +90,11 @@
 事件类型（`vibe3.domain.events.*`，均为 `DomainEvent` 子类，frozen dataclass）：
 
 - **L3 Flow Lifecycle**: `FlowBlocked / FlowCompleted / PRMerged / IssueFailed / ManagerDispatchIntent / PlannerDispatchIntent / ExecutorDispatchIntent / ReviewerDispatchIntent / Manual{Plan,Run,Review}Intent / ControlPlaneEventPublished`
-- **L1 Governance**: `GovernanceScanStarted / GovernanceScanCompleted / GovernanceDecisionRequired`
-- **L2 Supervisor Apply**: `SupervisorIssueIdentified / SupervisorPromptRendered / SupervisorApply{Dispatched,Started,Completed,Delegated}`
+- **L1 Governance**: `GovernanceScanStarted / GovernanceScanCompleted`
+- **L2 Supervisor Apply**: `SupervisorIssueIdentified`
 - **Policy**: `PolicyChanged`
+
+> 注：原事件规范中定义的 `GovernanceDecisionRequired`、`SupervisorPromptRendered`、`SupervisorApply{Dispatched,Started,Completed,Delegated}` 从未被实际实例化或发布，已于 #3278 移除。详见 [docs/standards/v3/event-driven-standard.md](../../docs/standards/v3/event-driven-standard.md)。
 
 ## 三层协作关系
 
@@ -172,13 +175,3 @@ Issue State Change → Event Publisher → Handlers
 3. **状态机驱动**：issue 状态转变自动触发相应事件
 4. **容量控制**：通过 capacity service 控制并发执行数
 5. **双重门控**：QualifyGate（准入）+ FailedGate（失败处理）
-
-## 与 main 分支差异
-
-当前 worktree 相对 origin/main 落后约 11 个 commits（涉及 domain/execution/roles），主要差异：
-
-1. **新增 `dispatch_lifecycle.py`**：main 分支已加入 `DispatchLifecycle` FSM（状态机），管理 dispatch 生命周期。当前 worktree 尚未 rebase，`domain/__init__.py` 中无此导出。
-   - 新增符号：`DispatchLifecycle`、`DispatchLifecycleConfig`、`DispatchState`
-   - 建议：rebase 到 origin/main 后更新 README
-
-2. **历史文件清理**：`domain/state_machine.py` 已在更早提交中移除；当前 worktree 与 main 均不再包含该文件。
