@@ -146,7 +146,7 @@ def rule_aborted_flow_done_reconcile(ctx: CheckContext, svc: Any) -> CheckResult
 
 
 def rule_stale_blocked_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
-    """Auto-resume flow when remote state/blocked label removed."""
+    """Report a blocked-cache/active-label mismatch without inferring state."""
     if not svc._sync_rules.local.stale_blocked_sync.enabled:
         return None
     if not (
@@ -159,30 +159,11 @@ def rule_stale_blocked_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
 
     from vibe3.services.check.service import CheckResult
 
-    try:
-        from vibe3.services.flow import BlockedStateService
-
-        service = BlockedStateService(github_client=svc.github_client, store=svc.store)
-        target = service.reconcile_blocked(
-            issue_number=ctx.task_issue,
-            branch=ctx.branch,
-            clear_reason=False,
-            actor="check:stale_blocked_sync",
-        )
-        if target is not None:
-            logger.info(
-                f"Auto-resumed stale blocked flow to {target}",
-                branch=ctx.branch,
-            )
-        return CheckResult(is_valid=True, branch=ctx.branch, issues=[])
-    except Exception as e:
-        logger.error(
-            "Failed to auto-resume blocked flow",
-            branch=ctx.branch,
-            error=str(e),
-        )
-        ctx.issues.append(f"Blocked flow auto-resume failed: {e}")
-        return None
+    issue = (
+        "Local flow is blocked but the authoritative issue label is not "
+        "state/blocked; refusing state inference"
+    )
+    return CheckResult(is_valid=False, branch=ctx.branch, issues=[issue])
 
 
 def rule_blocked_label_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
@@ -411,7 +392,7 @@ def rule_flow_consistency_recovery(ctx: CheckContext, svc: Any) -> CheckResult |
 def rule_missing_state_label_recovery(
     ctx: CheckContext, svc: Any
 ) -> CheckResult | None:
-    """Recover missing remote state label from local flow."""
+    """Report a missing state label without inferring it from local refs."""
     if not svc._sync_rules.local.missing_state_label_recovery.enabled:
         return None
     if not (
@@ -427,29 +408,8 @@ def rule_missing_state_label_recovery(
 
     from vibe3.services.check.service import CheckResult
 
-    try:
-        result = svc.recovery_svc.recover(
-            branch=ctx.branch,
-            issue_number=ctx.task_issue,
-            reason="Remote state label missing",
-            auto=False,
-            ensure_worktree=True,
-        )
-        logger.info(
-            "Recovered missing remote state label",
-            branch=ctx.branch,
-            action=result.action.value,
-            detail=result.detail,
-        )
-        return CheckResult(is_valid=True, branch=ctx.branch, issues=[])
-    except Exception as e:
-        logger.error(
-            "Failed to recover missing remote state label",
-            branch=ctx.branch,
-            error=str(e),
-        )
-        ctx.issues.append(f"Missing state label auto-recovery failed: {e}")
-        return None
+    issue = "Remote issue has no state/* label; refusing local-ref state inference"
+    return CheckResult(is_valid=False, branch=ctx.branch, issues=[issue])
 
 
 def rule_label_constraint_enforcement(

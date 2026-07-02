@@ -56,10 +56,6 @@ SERVICES_SUBPACKAGES = ["flow", "pr", "issue", "task"]
 # This thin-reexport pattern is accepted as minimal fix for embedded SQL violation.
 KNOWN_SHARED_VIOLATIONS: set[tuple[str, str]] = {
     ("vibe3/services/shared/errors.py", "vibe3.services.orchestra"),
-    # Issue #3275: resolve_state_label() needs FlowState-derived resume
-    # semantics from infer_resume_label.  Thin re-export — does NOT pull
-    # in business logic, purely a resume-target lookup.
-    ("vibe3/services/shared/labels.py", "vibe3.services.flow.resume_resolver"),
 }
 
 # Known bidirectional coupling between sub-packages.

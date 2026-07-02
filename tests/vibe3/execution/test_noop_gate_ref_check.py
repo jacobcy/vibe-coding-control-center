@@ -10,6 +10,7 @@ def _make_mock_store() -> MagicMock:
     """Create a mock SQLiteClient."""
     store = MagicMock()
     store.get_flow_state.return_value = {}
+    store.record_confirmed_transition.return_value = (1, 1, 1)
     return store
 
 
@@ -113,8 +114,7 @@ class TestRefCheck:
             )
 
         mock_block.assert_not_called()
-        store.add_event.assert_called_once()
-        assert store.add_event.call_args[0][1] == "state_transitioned"
+        store.record_confirmed_transition.assert_called_once()
 
     def test_executor_passes_without_report_ref_when_state_changed(self) -> None:
         """Executor has no required_ref; state change alone passes the gate."""
@@ -140,8 +140,7 @@ class TestRefCheck:
             )
 
         mock_block.assert_not_called()
-        store.add_event.assert_called_once()
-        assert store.add_event.call_args[0][1] == "state_transitioned"
+        store.record_confirmed_transition.assert_called_once()
 
     def test_executor_blocks_when_state_unchanged(self) -> None:
         """Gate blocks executor when state is unchanged (even with report_ref)."""
@@ -203,7 +202,7 @@ class TestRefCheck:
             )
 
         mock_block.assert_not_called()
-        assert store.add_event.call_args[0][1] == "state_transitioned"
+        store.record_confirmed_transition.assert_called_once()
 
     def test_reviewer_minor_without_audit_ref_passes(self) -> None:
         """MINOR verdict passes gate without audit_ref (audit_ref not required)."""
@@ -239,7 +238,7 @@ class TestRefCheck:
             )
 
         mock_block.assert_not_called()
-        assert store.add_event.call_args[0][1] == "state_transitioned"
+        store.record_confirmed_transition.assert_called_once()
 
     def test_reviewer_missing_verdict_blocks_even_if_state_changed(self) -> None:
         """Reviewer must persist a verdict before passing the gate."""
@@ -291,5 +290,4 @@ class TestRefCheck:
             )
 
         mock_block.assert_not_called()
-        store.add_event.assert_called_once()
-        assert store.add_event.call_args[0][1] == "state_transitioned"
+        store.record_confirmed_transition.assert_called_once()

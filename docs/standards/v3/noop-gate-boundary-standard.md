@@ -9,7 +9,7 @@ authority:
   - manager-decision-boundary
 author: GPT-5 Codex
 created: 2026-04-17
-last_updated: 2026-04-18
+last_updated: 2026-07-02
 related_docs:
   - ../vibe3-error-severity-and-blocking-standard.md
   - ../../archive/v3/ARCHIVED_vibe3-state-sync-standard.md
@@ -215,6 +215,14 @@ Gate 触发的 block 动作统一通过 `BlockedStateService` 执行，确保“
 - ❌ **错误**: 代码实现自动化的标签处理逻辑
 
 这条原则适用于所有角色（planner / executor / reviewer / manager），不需要区分 agent 角色。系统只做 `gate / block / fail / dispatch`，不替 agent 做业务决策。
+
+### 5.1 强制边界（Issue #3281）
+
+- 所有 L3 角色（包括 manager）都必须离开执行开始时的 state；未改变即由统一 no-op gate 进入 blocked。
+- 唯一允许的代码层正常推进是：执行从 `merge-ready` 开始、开始时没有 open PR，且本次 `vibe run --publish` 新建了一个 open PR，此时推进到 `handoff`。
+- 已有 `pr_ref`、执行前已经存在的 open PR、或非 publish 执行，都不满足该特例。
+- 禁止用 ref、verdict、角色完成状态或缓存推断正常业务 state；禁止生成 synthetic transition 伪装进展。
+- 每个真实 state 变化都进入总数与 pair transition 计数。
 
 ## 6. 明确禁止的反模式
 

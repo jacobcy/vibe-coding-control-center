@@ -7,13 +7,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from vibe3.clients import GitHubClient
-from vibe3.config import get_convention
 from vibe3.domain.qualify_gate_checks import (
     check_worktree_health,
 )
 from vibe3.domain.qualify_gate_support import (
     terminalize_closed_issue,
-    transition_to_review,
 )
 from vibe3.models import CoordinationTruth, IssueInfo, IssueState, OrchestraConfig
 from vibe3.services.flow import (
@@ -26,7 +24,6 @@ from vibe3.services.orchestra import CoordinationResolver
 if TYPE_CHECKING:
     from vibe3.clients import SQLiteClient
     from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
-    from vibe3.models import PRResponse
 
 
 _ORIG_BLOCKED_STATE_SERVICE = BlockedStateService
@@ -58,10 +55,6 @@ class QualifyGateService:
         self._github = github
         self._store = store
         self._flow_manager = flow_manager
-        self._convention = get_convention()
-        self._blocked_label = self._convention.state_label(
-            self._convention.blocked_label
-        )
         self._coordination_resolver = CoordinationResolver(store=store)
 
     def run_qualify_gate(
@@ -77,40 +70,17 @@ class QualifyGateService:
             self._terminalize_closed_issue(issue, branch)
             return None
 
-        if branch and self._should_transition_to_review(branch, flow_state):
-            return None
-
         if truth is None:
             truth = self._coordination_resolver.resolve_coordination(
                 branch, issue.number
             )
 
-        # 收敛：blocked/stale 一律走 reconcile_blocked（body 为真源）。
-        # 触发用便宜信号(body真源 truth.is_blocked, 或 label/cache 的 stale 信号)。
-        blocked_signal = (
-            truth.is_blocked
-            or self._blocked_label in labels
-            or (flow_state is not None and flow_state.get("flow_status") == "blocked")
-        )
-        if branch and blocked_signal:
-            reconcile_result = BlockedStateService(
-                store=self._store, github_client=self._github
-            ).reconcile_blocked(
-                issue.number,
-                branch,
-                clear_reason=False,
-                actor="orchestra:dispatcher",
-            )
-            # R2: reconcile returns None on degraded mode OR still-blocked.
-            # Either way we must NOT dispatch — conservative blocking (§6.4).
-            if reconcile_result is None:
-                return None
-            # reconcile resolved the block: proceed through worktree health check
-            # before dispatching (R4: restore the health check that was bypassed).
-            flow_state = self._store.get_flow_state(branch)
-            if flow_state and not self._check_worktree_health(issue, branch, truth):
-                return None
-            return reconcile_result  # 已解除阻塞 -> 派发重建后的目标状态
+        # Active dispatch may observe authoritative blocked truth and reject
+        # the candidate, but it must not invoke blocked recovery or infer a
+        # normal target state. Alignment and resume belong to the explicit
+        # blocked operation.
+        if truth.is_blocked:
+            return None
 
         if not flow_state:
             return trigger_state if trigger_state.to_label() in labels else None
@@ -159,43 +129,6 @@ class QualifyGateService:
             ),
             flow_cleanup_service_cls=_service_symbol(
                 "FlowCleanupService", _ORIG_FLOW_CLEANUP_SERVICE
-            ),
-        )
-
-    def _should_transition_to_review(
-        self, branch: str, flow_state: dict[str, object] | None
-    ) -> bool:
-        if not flow_state or flow_state.get("flow_status") != "active":
-            return False
-        if not any(
-            flow_state.get(status) == "running"
-            for status in ("planner_status", "executor_status")
-        ):
-            return False
-        pr = self._get_open_pr_for_branch(branch)
-        if not pr:
-            return False
-        self._transition_flow_to_review(branch, pr)
-        return True
-
-    def _get_open_pr_for_branch(self, branch: str) -> "PRResponse | None":
-        from vibe3.models import PRState
-
-        try:
-            prs = self._github.list_prs_for_branch(branch)
-            return next((pr for pr in prs if pr.state == PRState.OPEN), None)
-        except Exception:
-            return None
-
-    def _transition_flow_to_review(self, branch: str, pr: "PRResponse") -> None:
-        transition_to_review(
-            branch=branch,
-            pr=pr,
-            store=self._store,
-            flow_manager=self._flow_manager,
-            github=self._github,
-            flow_status_service_cls=_service_symbol(
-                "FlowStatusService", _ORIG_FLOW_STATUS_SERVICE
             ),
         )
 

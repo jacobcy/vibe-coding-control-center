@@ -132,6 +132,24 @@ def test_count_live_worker_sessions_ignores_done_and_dead_tmux(
     _ = id_live  # used above
 
 
+def test_get_live_sessions_for_issue_includes_recent_starting_without_tmux(
+    store: SQLiteClient, backend: MagicMock
+) -> None:
+    registry = SessionRegistryService(store=store, backend=backend)
+    session_id = store.create_runtime_session(
+        role="executor",
+        target_type="issue",
+        target_id="701",
+        branch="task/issue-701",
+        session_name="vibe3-executor-issue-701",
+        status="starting",
+    )
+
+    live = registry.get_live_sessions_for_issue(701, ["executor"])
+
+    assert [session["id"] for session in live] == [session_id]
+
+
 def test_count_live_worker_sessions_starting_with_no_tmux_counts_as_live(
     store: SQLiteClient, backend: MagicMock
 ) -> None:

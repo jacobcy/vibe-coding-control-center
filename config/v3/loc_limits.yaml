@@ -269,8 +269,8 @@ code_limits:
         limit: 750
         reason: "JobExecutor 聚合服务，包含 command dispatch 路由、sync/async 执行模式、governance dispatch、envelope 解析、adapter resolution、lifecycle 事件记录、actor 生命周期管理（实时监控层，与 ExecutionLifecycleService 持久记录层互补）等紧密耦合的统一调度入口逻辑；#2172 集成 actor supervision（+60 行），#2177 新增版本元数据追踪（adapter_hash/policy_hash/material_hash 计算与持久化，+130 行），作为 aggregation layer 保持内聚性优于拆分"
       - path: "src/vibe3/execution/codeagent_runner.py"
-        limit: 700
-        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑，#2265 follow-up 将 AgentExecutionError metadata 写入 error_log 和 lifecycle refs 后略微超标；Issue #2435 新增 model 输出显示（+4 行）；Issue #3139 新增 noop_gate 的 task/issue- 分支前缀守卫（+7 行），跳过非自动化分支的 label transition 检查；Issue #3099 新增 AUP rejection retry counter 与原子 SQL UPDATE 阈值阻塞逻辑（+50 行），后续 code review 修复新增 record_error 显式写入 error_log（WARNING 可观测）、移除提前 raise 以保留 timeline event、成功执行时重置计数器（+2 行超 680 阈值）"
+        limit: 750
+        reason: "Sync execution runner 聚合，包含 supervisor label cleanup、planner commit detection（cwd-aware GitClient）、context preparation、finalize、retry counter 持久化、before_issue_is_closed 检测（PR closed 阻塞逻辑）等紧密耦合的执行生命周期逻辑；rebase 后新增 tick_id 参数传递和 before_issue_is_closed 检测逻辑，#2265 follow-up 将 AgentExecutionError metadata 写入 error_log 和 lifecycle refs 后略微超标；Issue #2435 新增 model 输出显示（+4 行）；Issue #3139 新增 noop_gate 的 task/issue- 分支前缀守卫（+7 行），跳过非自动化分支的 label transition 检查；Issue #3099 新增 AUP rejection retry counter 与原子 SQL UPDATE 阈值阻塞逻辑（+50 行），后续 code review 修复新增 record_error 显式写入 error_log（WARNING 可观测）、移除提前 raise 以保留 timeline event、成功执行时重置计数器（+2 行超 680 阈值）；Issue #3281 新增 mock atomic transition recording（+11 行），限上调至 750"
       - path: "src/vibe3/services/orchestra/status.py"
         limit: 580
         reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑、IssueState 反序列化类型安全处理、HTTP fetch 集成、live snapshot 解析、pr_number 类型强制转换防御逻辑等紧密耦合逻辑；新增 get_manager_usernames 静态方法提供统一的服务层 API 供 governance.py 和 status.py 使用（#1783）；新增 create() 工厂方法使用动态导入避免循环依赖（#2001），职责单一但方法较多；Issue #2106 Phase 3-2 迁移至 orchestra/status.py"
@@ -319,8 +319,8 @@ code_limits:
         limit: 520
         reason: "Governance snapshot context tests, 11 test methods in TestBuildSnapshotContext; split from original test_governance.py (#1803); TestCommentFormatContract (text content tests) removed as they verify static .md file text rather than logic"
       - path: "tests/vibe3/execution/test_codeagent_runner_gate.py"
-        limit: 530
-        reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性；#2265 follow-up 新增 AgentExecutionError metadata 写入 error_log/lifecycle refs 回归测试后略微超标；#3249 新增 flow_service 回归断言（+1 行）"
+        limit: 600
+        reason: "Gate 集成测试，包含完整的 mock 设置和断言场景，拆分会破坏测试逻辑完整性；#2265 follow-up 新增 AgentExecutionError metadata 写入 error_log/lifecycle refs 回归测试后略微超标；#3249 新增 flow_service 回归断言（+1 行）；#3281 noop-gate 重构新增 transition recording mock 与原子性验证（+45 行），限上调至 600"
       - path: "tests/vibe3/execution/test_job_executor.py"
         limit: 560
         reason: "JobExecutor 核心服务测试集，覆盖 10 个紧密耦合场景（映射正确性、context 构建、success/failure/skip 路径、governance dispatch、equivalence regression、lifecycle 事件、adapter resolution error），共享 mock setup（registry/store/lifecycle），拆分收益低；测试覆盖 JobEnvelope → JobResult 完整执行流程与生命周期事件记录；#2177 新增 TestVersionHashComputation 测试类（6 个测试方法，+152 行）验证版本元数据计算"
@@ -328,8 +328,8 @@ code_limits:
         limit: 480
         reason: "Transition count 测试集，14 个测试围绕 transition_count 功能（全局计数、pair 追踪、事件记录），共享 fixture，拆分收益低"
       - path: "tests/vibe3/execution/test_noop_gate_unit.py"
-        limit: 520
-        reason: "No-op gate 单元测试集，覆盖 verdict-aware ref 检查、transition count 检查、state 验证、retry counter、error/block 分离、before_issue_is_closed 检测、executor publish with existing PR 等紧密耦合场景，新增测试后略微超标"
+        limit: 560
+        reason: "No-op gate 单元测试集，覆盖 verdict-aware ref 检查、transition count 检查、state 验证、retry counter、error/block 分离、before_issue_is_closed 检测、executor publish with existing PR 等紧密耦合场景；#3281 noop-gate 重构新增 authoritative boundary 与 state change 验证测试（+13 行），限上调至 560"
       - path: "tests/vibe3/services/test_check_cleanup_service.py"
         limit: 680
         reason: "Check cleanup 服务测试集，覆盖 aborted flow 清理、issue resume、comment 引导等紧密耦合场景，新增 backend 注入测试后略微超标（PR #2014）"
@@ -382,8 +382,8 @@ code_limits:
         limit: 500
         reason: "Heartbeat server 测试集，覆盖 tick loop、error tracking cleanup、actor registry cleanup、debug max ticks、service registration 等紧密耦合场景，新增 actor cleanup 测试后超标（#2553）"
       - path: "tests/vibe3/services/test_blocked_state_service.py"
-        limit: 620
-        reason: "BlockedStateService 集成测试集，覆盖 set_block/clear_block/reconcile_blocked 三个统一原语的三源一致性（DB/body/label），包含 remove_issue_link、parse_projection_merges_legacy_dependencies、reconcile_blocked blocked/resume 状态转换等紧密耦合场景；PR #3247 新增 3 个测试（test_set_block_fails_closed_on_read_error、test_reconcile_blocked_restores_missing_remote_label、测试类 TrackingLabelService）验证 fail-closed 和 remote label restore 行为（+95 行）"
+        limit: 660
+        reason: "BlockedStateService 集成测试集，覆盖 set_block/clear_block/reconcile_blocked 三个统一原语的三源一致性（DB/body/label），包含 remove_issue_link、parse_projection_merges_legacy_dependencies、reconcile_blocked blocked/resume 状态转换等紧密耦合场景；PR #3247 新增 3 个测试（test_set_block_fails_closed_on_read_error、test_reconcile_blocked_restores_missing_remote_label、测试类 TrackingLabelService）验证 fail-closed 和 remote label restore 行为（+95 行）；#3281 新增 resume normalization 与 recovery-scoped 验证测试（+13 行），限上调至 660"
       - path: "tests/vibe3/services/test_check_service_verify_branch.py"
         limit: 520
         reason: "Check service verify_branch 测试集，覆盖分支状态验证、label 约束、blocked flow reconcile、stale ready rebuild 等紧密耦合场景，共享 CheckContext 和 MockGitHub/MockStore fixture 基础设施"

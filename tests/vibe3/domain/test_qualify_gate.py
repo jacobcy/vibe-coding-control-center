@@ -96,6 +96,39 @@ class TestRunQualifyGate:
         )
         assert result == IssueState.IN_PROGRESS
 
+    @pytest.mark.parametrize(
+        "state",
+        [
+            IssueState.CLAIMED,
+            IssueState.IN_PROGRESS,
+            IssueState.REVIEW,
+            IssueState.MERGE_READY,
+        ],
+    )
+    def test_active_qualify_never_reconciles_or_infers_from_flow_state(
+        self, qualify_gate_service, sample_issue, state
+    ):
+        sample_issue.state = state
+        sample_issue.labels = [state.to_label()]
+        flow_state = {
+            "flow_status": "blocked",
+            "plan_ref": "docs/plan.md",
+            "report_ref": "docs/report.md",
+            "pr_ref": "https://example.test/pull/1",
+        }
+
+        with patch("vibe3.domain.qualify_gate.BlockedStateService") as blocked_cls:
+            result = qualify_gate_service.run_qualify_gate(
+                issue=sample_issue,
+                branch="task/issue-123-test",
+                flow_state=flow_state,
+                labels=sample_issue.labels,
+                trigger_state=state,
+            )
+
+        assert result == state
+        blocked_cls.assert_not_called()
+
     def test_no_flow_state_but_blocked(
         self, qualify_gate_service, sample_issue, mock_config
     ):
@@ -164,12 +197,7 @@ class TestRunQualifyGate:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_called_once_with(
-                    sample_issue.number,
-                    "task/issue-123-test",
-                    clear_reason=False,
-                    actor="orchestra:dispatcher",
-                )
+                mock_bss.reconcile_blocked.assert_not_called()
 
     def test_manual_block_already_has_label(
         self, qualify_gate_service, sample_issue, mock_store
@@ -210,7 +238,7 @@ class TestRunQualifyGate:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_called_once()
+                mock_bss.reconcile_blocked.assert_not_called()
 
     def test_unblock_from_blocked_state(
         self, qualify_gate_service, sample_issue, mock_store
@@ -262,13 +290,8 @@ class TestRunQualifyGate:
                     trigger_state=IssueState.BLOCKED,
                 )
 
-                assert result == IssueState.IN_PROGRESS
-                mock_bss.reconcile_blocked.assert_called_once_with(
-                    123,
-                    "task/issue-123-test",
-                    clear_reason=False,
-                    actor="orchestra:dispatcher",
-                )
+                assert result == IssueState.BLOCKED
+                mock_bss.reconcile_blocked.assert_not_called()
 
     def test_unblock_with_stale_local_cache_without_blocked_label(
         self, qualify_gate_service, sample_issue, mock_store, mock_github
@@ -376,13 +399,7 @@ class TestRunQualifyGate:
                 # Body blocked -> no dispatch
                 assert result is None
 
-                # Converged onto reconcile_blocked with correct args
-                mock_bss.reconcile_blocked.assert_called_once_with(
-                    100,
-                    "task/issue-100",
-                    clear_reason=False,
-                    actor="orchestra:dispatcher",
-                )
+                mock_bss.reconcile_blocked.assert_not_called()
 
 
 class TestQualifyBlockedIssue:

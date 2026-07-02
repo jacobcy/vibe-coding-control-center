@@ -114,8 +114,4 @@ def test_check_worktree_health_blocked_real_flow_checks_path(
 
     assert result is False
     mock_path.assert_called_once_with("/tmp/worktree/task-issue-456")
-    mock_label_service_cls.return_value.replace_issue_state.assert_called_once_with(
-        123,
-        IssueState.READY,
-        actor="orchestra:dispatcher",
-    )
+    mock_label_service_cls.return_value.replace_issue_state.assert_not_called()

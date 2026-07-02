@@ -1,353 +1,101 @@
-"""Tests for open PR detection and flow transition to review (Step 0b).
+"""Qualify gate must not turn PR observation into normal state progression."""
 
-Split from test_qualify_gate.py for size management.
-Related to Issue #2615: migrate open PR detection to qualify_gate layer.
-"""
-
-from unittest.mock import MagicMock, Mock, patch
-
-import pytest
+from unittest.mock import Mock, patch
 
 from vibe3.domain.qualify_gate import QualifyGateService
-from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models import (
+    CoordinationTruth,
+    DataSource,
+    IssueInfo,
+    IssueState,
+    OrchestraConfig,
+)
 
 
-@pytest.fixture
-def mock_github():
-    """Create a mock GitHub client."""
-    return Mock()
-
-
-@pytest.fixture
-def mock_store():
-    """Create a mock SQLite client."""
+def test_open_pr_with_running_worker_does_not_advance_flow_status() -> None:
+    github = Mock()
     store = Mock()
     store.db_path = ":memory:"
-    store.get_flow_state = Mock(return_value=None)
-    store.get_dependency_links = Mock(return_value=[])
-    store.get_issue_links = Mock(return_value=[])
-    store.update_flow_state = Mock()
-    store.add_event = Mock()
-    return store
-
-
-@pytest.fixture
-def mock_flow_manager():
-    """Create a mock FlowManager."""
-    return Mock()
-
-
-@pytest.fixture
-def qualify_gate_service(mock_github, mock_store, mock_flow_manager):
-    """Create a QualifyGateService instance with mocked remote collaboration."""
+    flow_manager = Mock()
     service = QualifyGateService(
         config=OrchestraConfig(repo="test/repo"),
-        github=mock_github,
-        store=mock_store,
-        flow_manager=mock_flow_manager,
+        github=github,
+        store=store,
+        flow_manager=flow_manager,
     )
-    with patch.object(
-        service._coordination_resolver,
-        "_read_remote_collaboration",
-        return_value={
-            "projection_state": "active",
-            "blocked_reason": None,
-            "blocked_by_issue": None,
-            "dependencies": [],
-        },
+    issue = IssueInfo(
+        number=123,
+        title="Test Issue",
+        state=IssueState.IN_PROGRESS,
+        labels=["state/in-progress"],
+        assignees=["alice"],
+    )
+    flow_state = {
+        "flow_status": "active",
+        "planner_status": "running",
+        "pr_ref": "https://example.test/pull/42",
+    }
+    truth = CoordinationTruth(worktree_path=None)
+
+    with (
+        patch.object(
+            service._coordination_resolver,
+            "resolve_coordination",
+            return_value=truth,
+        ),
+        patch("vibe3.services.FlowStatusService") as flow_status_cls,
     ):
-        yield service
-
-
-class TestOpenPRDetection:
-    """Tests for open PR detection and flow transition to review (Step 0b)."""
-
-    def test_open_pr_with_planner_running_transitions_to_review(
-        self, qualify_gate_service, mock_github, mock_store
-    ):
-        """Active flow with open PR and running planner should transition to review."""
-        from vibe3.models.pr import PRResponse, PRState
-
-        # Mock flow state with running planner
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/my-feature",
-            "flow_slug": "my_feature",
-            "flow_status": "active",
-            "planner_status": "running",
-        }
-
-        # Mock open PR
-        open_pr = PRResponse(
-            number=42,
-            title="Test PR",
-            state=PRState.OPEN,
-            head_branch="task/my-feature",
-            base_branch="main",
-            url="https://github.com/test/pr/42",
-            draft=False,
-            is_ready=True,
-            ci_passed=True,
-        )
-        mock_github.list_prs_for_branch.return_value = [open_pr]
-
-        # Mock FlowStatusService
-        with patch("vibe3.services.FlowStatusService") as flow_status_cls:
-            flow_status = MagicMock()
-            flow_status_cls.return_value = flow_status
-
-            with patch("vibe3.observability.append_orchestra_event"):
-                # Call run_qualify_gate with branch
-                result = qualify_gate_service.run_qualify_gate(
-                    issue=IssueInfo(
-                        number=123,
-                        title="Test Issue",
-                        state=IssueState.IN_PROGRESS,
-                        labels=["state/in-progress"],
-                        assignees=["alice"],
-                    ),
-                    branch="task/my-feature",
-                    flow_state=mock_store.get_flow_state.return_value,
-                    labels=["state/in-progress"],
-                    trigger_state=IssueState.IN_PROGRESS,
-                )
-
-                # Should return None (transitioning to review)
-                assert result is None
-                # Should call mark_flow_status with "review"
-                flow_status.mark_flow_status.assert_called_once()
-                call = flow_status.mark_flow_status.call_args
-                assert call[0][0] == "task/my-feature"
-                assert call[0][1] == "review"
-
-    def test_open_pr_with_executor_running_transitions_to_review(
-        self, qualify_gate_service, mock_github, mock_store
-    ):
-        """Active flow with open PR and running executor should transition to review."""
-        from vibe3.models.pr import PRResponse, PRState
-
-        # Mock flow state with running executor
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/my-feature",
-            "flow_slug": "my_feature",
-            "flow_status": "active",
-            "executor_status": "running",
-        }
-
-        # Mock open PR
-        open_pr = PRResponse(
-            number=42,
-            title="Test PR",
-            state=PRState.OPEN,
-            head_branch="task/my-feature",
-            base_branch="main",
-            url="https://github.com/test/pr/42",
-            draft=False,
-            is_ready=True,
-            ci_passed=True,
-        )
-        mock_github.list_prs_for_branch.return_value = [open_pr]
-
-        # Mock FlowStatusService
-        with patch("vibe3.services.FlowStatusService") as flow_status_cls:
-            flow_status = MagicMock()
-            flow_status_cls.return_value = flow_status
-
-            with patch("vibe3.observability.append_orchestra_event"):
-                result = qualify_gate_service.run_qualify_gate(
-                    issue=IssueInfo(
-                        number=123,
-                        title="Test Issue",
-                        state=IssueState.IN_PROGRESS,
-                        labels=["state/in-progress"],
-                        assignees=["alice"],
-                    ),
-                    branch="task/my-feature",
-                    flow_state=mock_store.get_flow_state.return_value,
-                    labels=["state/in-progress"],
-                    trigger_state=IssueState.IN_PROGRESS,
-                )
-
-                assert result is None
-                flow_status.mark_flow_status.assert_called_once()
-                call = flow_status.mark_flow_status.call_args
-                assert call[0][0] == "task/my-feature"
-                assert call[0][1] == "review"
-
-    def test_open_pr_no_worker_running_does_not_transition(
-        self, qualify_gate_service, mock_github, mock_store
-    ):
-        """Active flow with open PR but no running worker should NOT transition."""
-        from vibe3.models.pr import PRResponse, PRState
-
-        # Mock flow state with no workers running
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/my-feature",
-            "flow_slug": "my_feature",
-            "flow_status": "active",
-        }
-
-        # Mock open PR
-        open_pr = PRResponse(
-            number=42,
-            title="Test PR",
-            state=PRState.OPEN,
-            head_branch="task/my-feature",
-            base_branch="main",
-            url="https://github.com/test/pr/42",
-            draft=False,
-            is_ready=True,
-            ci_passed=True,
-        )
-        mock_github.list_prs_for_branch.return_value = [open_pr]
-
-        result = qualify_gate_service.run_qualify_gate(
-            issue=IssueInfo(
-                number=123,
-                title="Test Issue",
-                state=IssueState.IN_PROGRESS,
-                labels=["state/in-progress"],
-                assignees=["alice"],
-            ),
-            branch="task/my-feature",
-            flow_state=mock_store.get_flow_state.return_value,
-            labels=["state/in-progress"],
+        result = service.run_qualify_gate(
+            issue=issue,
+            branch="task/issue-123",
+            flow_state=flow_state,
+            labels=issue.labels,
             trigger_state=IssueState.IN_PROGRESS,
         )
 
-        # Should return trigger state (not transitioning)
-        assert result == IssueState.IN_PROGRESS
+    assert result == IssueState.IN_PROGRESS
+    github.list_prs_for_branch.assert_not_called()
+    flow_status_cls.assert_not_called()
 
-    def test_open_pr_already_review_does_not_transition(
-        self, qualify_gate_service, mock_github, mock_store
+
+def test_authoritative_blocked_truth_rejects_without_resume_inference() -> None:
+    github = Mock()
+    store = Mock()
+    store.db_path = ":memory:"
+    service = QualifyGateService(
+        config=OrchestraConfig(repo="test/repo"),
+        github=github,
+        store=store,
+        flow_manager=Mock(),
+    )
+    issue = IssueInfo(
+        number=124,
+        title="Blocked truth",
+        state=IssueState.READY,
+        labels=["state/ready"],
+    )
+    truth = CoordinationTruth(
+        projection_state="blocked",
+        projection_state_source=DataSource.ISSUE_BODY_FALLBACK,
+        blocked_reason="waiting for dependency",
+        blocked_reason_source=DataSource.ISSUE_BODY_FALLBACK,
+    )
+
+    with (
+        patch.object(
+            service._coordination_resolver,
+            "resolve_coordination",
+            return_value=truth,
+        ),
+        patch("vibe3.domain.qualify_gate.BlockedStateService") as blocked_cls,
     ):
-        """Flow already in review state should NOT transition (idempotent)."""
-        from vibe3.models.pr import PRResponse, PRState
-
-        # Mock flow state already in review
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/my-feature",
-            "flow_slug": "my_feature",
-            "flow_status": "review",
-            "planner_status": "running",
-        }
-
-        # Mock open PR
-        open_pr = PRResponse(
-            number=42,
-            title="Test PR",
-            state=PRState.OPEN,
-            head_branch="task/my-feature",
-            base_branch="main",
-            url="https://github.com/test/pr/42",
-            draft=False,
-            is_ready=True,
-            ci_passed=True,
-        )
-        mock_github.list_prs_for_branch.return_value = [open_pr]
-
-        with patch("vibe3.domain.qualify_gate.FlowStatusService") as flow_status_cls:
-            flow_status = MagicMock()
-            flow_status_cls.return_value = flow_status
-
-            result = qualify_gate_service.run_qualify_gate(
-                issue=IssueInfo(
-                    number=123,
-                    title="Test Issue",
-                    state=IssueState.IN_PROGRESS,
-                    labels=["state/in-progress"],
-                    assignees=["alice"],
-                ),
-                branch="task/my-feature",
-                flow_state=mock_store.get_flow_state.return_value,
-                labels=["state/in-progress"],
-                trigger_state=IssueState.IN_PROGRESS,
-            )
-
-            # Should return trigger state (already in review)
-            assert result == IssueState.IN_PROGRESS
-            # Should NOT call mark_flow_status
-            flow_status.mark_flow_status.assert_not_called()
-
-    def test_open_pr_already_done_does_not_transition(
-        self, qualify_gate_service, mock_github, mock_store
-    ):
-        """Flow already in done state should NOT transition (terminal state)."""
-        from vibe3.models.pr import PRResponse, PRState
-
-        # Mock flow state already done
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/my-feature",
-            "flow_slug": "my_feature",
-            "flow_status": "done",
-            "executor_status": "running",
-        }
-
-        # Mock open PR
-        open_pr = PRResponse(
-            number=42,
-            title="Test PR",
-            state=PRState.OPEN,
-            head_branch="task/my-feature",
-            base_branch="main",
-            url="https://github.com/test/pr/42",
-            draft=False,
-            is_ready=True,
-            ci_passed=True,
-        )
-        mock_github.list_prs_for_branch.return_value = [open_pr]
-
-        with patch("vibe3.domain.qualify_gate.FlowStatusService") as flow_status_cls:
-            flow_status = MagicMock()
-            flow_status_cls.return_value = flow_status
-
-            result = qualify_gate_service.run_qualify_gate(
-                issue=IssueInfo(
-                    number=123,
-                    title="Test Issue",
-                    state=IssueState.IN_PROGRESS,
-                    labels=["state/in-progress"],
-                    assignees=["alice"],
-                ),
-                branch="task/my-feature",
-                flow_state=mock_store.get_flow_state.return_value,
-                labels=["state/in-progress"],
-                trigger_state=IssueState.IN_PROGRESS,
-            )
-
-            # Should return trigger state (terminal state)
-            assert result == IssueState.IN_PROGRESS
-            # Should NOT call mark_flow_status
-            flow_status.mark_flow_status.assert_not_called()
-
-    def test_open_pr_no_pr_does_not_transition(
-        self, qualify_gate_service, mock_github, mock_store
-    ):
-        """Active flow without PR should NOT transition."""
-        # Mock flow state with running planner
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/my-feature",
-            "flow_slug": "my_feature",
-            "flow_status": "active",
-            "planner_status": "running",
-        }
-
-        # Mock no PR
-        mock_github.list_prs_for_branch.return_value = []
-
-        result = qualify_gate_service.run_qualify_gate(
-            issue=IssueInfo(
-                number=123,
-                title="Test Issue",
-                state=IssueState.IN_PROGRESS,
-                labels=["state/in-progress"],
-                assignees=["alice"],
-            ),
-            branch="task/my-feature",
-            flow_state=mock_store.get_flow_state.return_value,
-            labels=["state/in-progress"],
-            trigger_state=IssueState.IN_PROGRESS,
+        result = service.run_qualify_gate(
+            issue=issue,
+            branch="task/issue-124",
+            flow_state=None,
+            labels=issue.labels,
+            trigger_state=IssueState.READY,
         )
 
-        # Should return trigger state (no PR)
-        assert result == IssueState.IN_PROGRESS
+    assert result is None
+    blocked_cls.assert_not_called()

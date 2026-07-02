@@ -11,7 +11,6 @@ Design Principles:
 
 from __future__ import annotations
 
-import sqlite3
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -23,6 +22,7 @@ from vibe3.services.flow.blocked_state_types import (
     BlockedState,
     ConsistencyReport,
 )
+from vibe3.services.flow.transition_recorder import TransitionRecorder
 from vibe3.services.shared.label_service import LabelService
 
 if TYPE_CHECKING:
@@ -50,6 +50,7 @@ class BlockedStateService:
             store=store,
         )
         self.store = store
+        self._transition_recorder = TransitionRecorder(store) if store else None
 
     # ========================================================================
     # Public API: Write Operations
@@ -127,23 +128,9 @@ class BlockedStateService:
             "latest_actor": actor,
         }
         if not is_blocked:
-            # Reset transition counters on unblock (replaces old clear_database_cache)
-            update_kwargs["transition_count"] = 0
             update_kwargs["aup_rejection_count"] = 0
             update_kwargs["last_aup_rejection_at"] = None
         self.store.update_flow_state(branch, **update_kwargs)
-
-        # Clear transition history on unblock to reset per-pair loop detection
-        if not is_blocked:
-            try:
-                with sqlite3.connect(self.store.db_path) as conn:
-                    self.store.clear_transition_history(conn, branch)
-            except Exception as exc:
-                logger.bind(
-                    domain="blocked_state",
-                    action="rebuild_cache",
-                    branch=branch,
-                ).warning(f"Failed to clear transition history: {exc}")
 
         # Update flow_issue_links dependencies list
         current_deps = self.store.get_dependency_links(branch)
@@ -192,15 +179,10 @@ class BlockedStateService:
             # conservatively keep blocking and skip cache rebuild.
             return None
 
-        # 2. Clear Reason if requested (e.g. manual resume)
+        # 2. Clear the in-memory reason if requested. Remote truth is updated
+        # only after the blocked -> target label transition succeeds.
         if clear_reason:
             truth.blocked_reason = None
-            new_proj = FlowStateProjection(
-                state=truth.state,
-                blocked_by=truth.blocked_by,
-                blocked_reason=None,
-            )
-            self._io.write_projection(issue_number, new_proj)
 
         # 3. Check for open dependencies
         open_tasks: list[int] = []
@@ -214,6 +196,7 @@ class BlockedStateService:
 
         # 4. Resolve State & Sync remote state section + labels
         effective_blocked = bool(truth.blocked_reason) or bool(open_tasks)
+        current_state = self._io.read_issue_state(issue_number)
         if effective_blocked:
             target = None
             # R5: Prune closed deps from body so they aren't re-checked each cycle.
@@ -230,8 +213,36 @@ class BlockedStateService:
                 truth = new_proj
             # Always write label to ensure remote state/blocked is present.
             # DB cache cannot confirm remote label state (§7).
-            self._io.write_label_state(issue_number, IssueState.BLOCKED, actor=actor)
+            write_result = self._io.write_label_state(
+                issue_number, IssueState.BLOCKED, actor=actor
+            )
+            if (
+                branch
+                and current_state is not None
+                and current_state != IssueState.BLOCKED
+                and write_result in {"advanced", "normalized"}
+                and self._transition_recorder is not None
+            ):
+                self._transition_recorder.record_confirmed(
+                    branch=branch,
+                    from_state=current_state.to_label(),
+                    to_state=IssueState.BLOCKED.to_label(),
+                    actor=actor,
+                    issue_number=issue_number,
+                )
         else:
+            if current_state != IssueState.BLOCKED:
+                logger.bind(
+                    domain="blocked_state",
+                    action="reconcile_blocked",
+                    issue_number=issue_number,
+                    branch=branch,
+                ).warning(
+                    "Refusing resume inference for issue that is not "
+                    "authoritatively blocked"
+                )
+                return None
+
             # Determine resume target
             target = IssueState.READY
             if branch and self.store:
@@ -246,13 +257,34 @@ class BlockedStateService:
 
             # Normalize the remote signal before publishing the active truth.
             # If label I/O fails, the body and cache must remain blocked.
-            self._io.write_label_state(
+            if (
+                branch
+                and self._transition_recorder is not None
+                and self._transition_recorder.would_exceed(
+                    branch,
+                    IssueState.BLOCKED.to_label(),
+                    target.to_label(),
+                )
+            ):
+                return None
+
+            write_result = self._io.write_label_state(
                 issue_number,
                 target,
                 actor=actor,
                 force=True,
                 normalize=True,
             )
+            if write_result not in {"advanced", "normalized"}:
+                return None
+            if branch and self._transition_recorder is not None:
+                self._transition_recorder.record_confirmed(
+                    branch=branch,
+                    from_state=IssueState.BLOCKED.to_label(),
+                    to_state=target.to_label(),
+                    actor=actor,
+                    issue_number=issue_number,
+                )
             new_proj = FlowStateProjection(
                 state="active",
                 blocked_by=[],

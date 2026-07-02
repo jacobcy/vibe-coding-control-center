@@ -245,10 +245,15 @@ class TestQueueOperations:
             lambda role, issue, tick_id: emit_calls.append((role, issue))
         )
 
-        await coordinator.coordinate()
-        await coordinator.coordinate()
+        await coordinator.coordinate(tick_id=1)
+        await coordinator.coordinate(tick_id=2)
+        await coordinator.coordinate(tick_id=3)
+        await coordinator.coordinate(tick_id=4)
 
         assert len(emit_calls) == 2
+        assert all(
+            entry.waiting_state == "claimed" for entry in coordinator._frozen_queue
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.slow

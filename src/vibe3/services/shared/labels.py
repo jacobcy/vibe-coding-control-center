@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.models import FlowState, OrchestraConfig
+from vibe3.models import OrchestraConfig
 
 if TYPE_CHECKING:
     from vibe3.clients import (
@@ -224,10 +224,7 @@ def get_highest_priority_state(labels: list[str]) -> str | None:
     """Return highest-priority state/* label from labels, or None.
 
     Purely static priority resolution (see ``_STATE_PRIORITY_ORDER``).
-    Used by read paths that have no local flow context available.  When a
-    ``FlowState`` model is in scope, prefer ``resolve_state_label`` so that
-    the local execution artifacts (``pr_ref`` / ``report_ref`` /
-    ``latest_verdict`` etc.) serve as the authority.
+    Used by read paths to resolve duplicate remote state labels.
     """
     state_set = set(get_state_labels(labels))
     for priority_state in _STATE_PRIORITY_ORDER:
@@ -248,44 +245,8 @@ def get_conflicting_states(labels: list[str]) -> list[str]:
 
 def resolve_state_label(
     labels: list[str],
-    *,
-    flow_state: dict[str, object] | FlowState | None = None,
 ) -> str | None:
-    """Resolve which ``state/*`` label should govern for a given issue.
-
-    Two authority layers:
-    1. **Flow truth** - when ``flow_state`` is supplied, derive the label
-       from the local execution artifacts (``infer_resume_label``).  This is
-       the canonical resume signal used by ``vibe3 task resume --label auto``
-       and the blocked reconciliation path, and takes precedence over whatever
-       GitHub API happened to have returned.
-    2. **Static fallback** - when ``flow_state`` is absent (read paths that
-       do not carry flow context) fall back to
-       ``get_highest_priority_state`` (``_STATE_PRIORITY_ORDER``).
-
-    When neither authority yields a parsable state label, returns ``None``.
-
-    Args:
-        labels: Normalised label strings (already run through
-            ``normalize_labels`` by the caller).
-        flow_state: Optional local execution-state model used to infer the
-            resume label.  Either a ``FlowState`` pydantic model or a
-            ``dict`` row (``FlowState.model_validate`` is applied
-            automatically).  When ``None``, the static fallback is used.
-
-    Returns:
-        A single ``state/<name>`` string, or ``None``.
-    """
-    if flow_state is not None:
-        from vibe3.services.flow.resume_resolver import infer_resume_label
-
-        if not isinstance(flow_state, FlowState):
-            try:
-                flow_state = FlowState.model_validate(flow_state)
-            except Exception:
-                flow_state = None
-        if flow_state is not None:
-            return infer_resume_label(flow_state).to_label()
+    """Resolve the governing remote ``state/*`` label without inference."""
     return get_highest_priority_state(labels)
 
 

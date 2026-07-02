@@ -8,7 +8,6 @@ This module handles reading/writing blocked state to individual sources:
 
 from __future__ import annotations
 
-import sqlite3
 from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
@@ -145,38 +144,20 @@ class BlockedStateIO:
     def clear_database_cache(self, branch: str, actor: str) -> None:
         """Clear blocked state from database cache.
 
-        Also resets transition counters to allow flow to continue after
-        being blocked by loop protection or AUP rejection threshold.
+        Transition evidence belongs to the flow epoch and is not reset here.
         """
         if not self.store:
             return
 
-        # Reset transition_count and aup_rejection_count to allow flow
-        # to continue after unblock. Without resetting aup_rejection_count,
-        # the next AUP rejection would immediately re-block the flow since
-        # the counter is already at or above the threshold.
         self.store.update_flow_state(
             branch,
             flow_status="active",
             blocked_reason=None,
             blocked_by_issue=None,
-            transition_count=0,  # Reset loop protection counter
             aup_rejection_count=0,  # Reset AUP rejection counter
             last_aup_rejection_at=None,  # Clear AUP rejection timestamp
             latest_actor=actor,
         )
-
-        # Clear transition history to reset per-pair loop detection
-        try:
-            with sqlite3.connect(self.store.db_path) as conn:
-                self.store.clear_transition_history(conn, branch)
-        except Exception as exc:
-            # Non-critical: log and continue
-            logger.bind(
-                domain="blocked_state",
-                action="clear_database_cache",
-                branch=branch,
-            ).warning(f"Failed to clear transition history: {exc}")
 
     def write_label_state(
         self,
@@ -217,6 +198,14 @@ class BlockedStateIO:
     # ========================================================================
     # Read Operations
     # ========================================================================
+
+    def read_issue_state(self, issue_number: int) -> IssueState | None:
+        """Read the authoritative issue state label."""
+        getter = getattr(self.label_service, "get_state", None)
+        if not callable(getter):
+            return None
+        state = getter(issue_number)
+        return state if isinstance(state, IssueState) else None
 
     def read_body_projection(self, issue_number: int) -> BlockedState:
         """Read blocked state from issue body projection."""

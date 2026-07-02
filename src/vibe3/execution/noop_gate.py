@@ -10,16 +10,13 @@ from loguru import logger
 from vibe3.agents import ExecutionRole
 from vibe3.clients import SQLiteClient
 from vibe3.config import get_role_output_contract
+from vibe3.execution.publish_completion import PublishCompletionService
 from vibe3.models import VerdictRecord, VerdictValue
+from vibe3.services.flow import TransitionRecorder
 from vibe3.services.shared import get_role_block_function
 
 if TYPE_CHECKING:
     from vibe3.services.protocols import FlowQueryProtocol
-
-# Loop prevention constants
-SINGLE_STEP_LIMIT = 3  # Max occurrences of same transition pair
-TRANSITION_LIMIT_SOFT = 10  # Standard flow limit
-TRANSITION_LIMIT_HARD = 20  # Hard limit with tolerance
 
 
 def _extract_latest_verdict(flow_state: dict | None) -> VerdictValue | None:
@@ -58,6 +55,9 @@ def apply_unified_noop_gate(
     tick_id: int = 0,
     before_issue_is_closed: bool = False,
     flow_service: "FlowQueryProtocol | None" = None,
+    publish_mode: bool = False,
+    before_open_pr_numbers: frozenset[int] | None = None,
+    publish_completion: PublishCompletionService | None = None,
 ) -> None:
     """Apply the single hard no-op gate after agent completion.
 
@@ -177,114 +177,39 @@ def apply_unified_noop_gate(
         )
         return
 
-    # --- NEW: Single-step transition limit check ---
-    # Check if this specific (from_state, to_state) pair has occurred >= 3 times
-    if (
-        before_state_label
-        and after_state_label
-        and before_state_label != after_state_label
-        and hasattr(store, "db_path")
-        and hasattr(store, "count_specific_pair")
-    ):
-        import sqlite3
-
-        try:
-            with sqlite3.connect(store.db_path) as conn:
-                pair_count = store.count_specific_pair(
-                    conn=conn,
-                    branch=branch,
-                    from_state=before_state_label,
-                    to_state=after_state_label,
-                )
-
-            # Check single-step limit BEFORE recording this transition
-            if pair_count >= SINGLE_STEP_LIMIT:
-                logger.bind(
-                    domain="codeagent",
-                    role=role,
-                    issue_number=issue_number,
-                    branch=branch,
-                ).warning(
-                    f"No-op gate BLOCK: single-step limit exceeded "
-                    f"({before_state_label} -> {after_state_label} "
-                    f"occurred {pair_count} times, limit is {SINGLE_STEP_LIMIT})"
-                )
-                store.add_event(
-                    branch,
-                    EVENT_TRANSITION_COUNT_EXCEEDED,
-                    actor,
-                    detail=(
-                        f"Single-step limit exceeded: "
-                        f"{before_state_label} -> {after_state_label} "
-                        f"occurred {pair_count} times (limit: {SINGLE_STEP_LIMIT}). "
-                        f"Possible infinite loop on this pair."
-                    ),
-                    refs={
-                        "from_state": str(before_state_label or ""),
-                        "to_state": str(after_state_label or ""),
-                        "pair_count": str(pair_count),
-                        "single_step_limit": str(SINGLE_STEP_LIMIT),
-                        "issue": str(issue_number),
-                    },
-                )
-                _block_fn(
-                    issue_number=issue_number,
-                    repo=repo,
-                    reason=(
-                        f"single-step limit exceeded: "
-                        f"{before_state_label} -> {after_state_label} "
-                        f"({pair_count} times >= {SINGLE_STEP_LIMIT})"
-                    ),
-                    actor=actor,
-                    flow_service=flow_service,
-                )
-                return
-        except sqlite3.Error as e:
-            # Fail-safe: log and skip single-step check on DB errors
-            logger.bind(
-                domain="codeagent",
-                role=role,
-                issue_number=issue_number,
-                branch=branch,
-            ).warning(f"Single-step transition check skipped: database error ({e})")
-
-    # --- NEW: State transition count check ---
-    # Check hard limit BEFORE incrementing
-    if flow_state is not None:
-        current_count = flow_state.get("transition_count", 0)
-        new_count = current_count + 1
-
-        # Check hard limit
-        if new_count >= TRANSITION_LIMIT_HARD:
-            logger.bind(
-                domain="codeagent",
-                role=role,
-                issue_number=issue_number,
-                branch=branch,
-            ).warning(
-                f"No-op gate BLOCK: transition count exceeded hard limit "
-                f"({new_count} >= {TRANSITION_LIMIT_HARD})"
+    record_from_state = before_state_label or get_highest_priority_state(
+        list(effective_before_labels)
+    )
+    if state_set_changed and record_from_state and after_state_label:
+        transition = TransitionRecorder(store).record_confirmed(
+            branch=branch,
+            from_state=record_from_state,
+            to_state=after_state_label,
+            actor=actor,
+            issue_number=issue_number,
+        )
+        if transition.total_limit_reached or transition.pair_limit_reached:
+            reason = (
+                f"transition limit reached: total={transition.total_count}, "
+                f"pair={transition.pair_count}"
             )
             store.add_event(
                 branch,
                 EVENT_TRANSITION_COUNT_EXCEEDED,
                 actor,
-                detail=(
-                    f"Transition count exceeded hard limit: {new_count} >= "
-                    f"{TRANSITION_LIMIT_HARD}. Possible infinite loop."
-                ),
+                detail=reason,
                 refs={
-                    "transition_count": str(new_count),
-                    "limit": str(TRANSITION_LIMIT_HARD),
+                    "from_state": record_from_state,
+                    "to_state": after_state_label,
+                    "transition_count": str(transition.total_count),
+                    "pair_count": str(transition.pair_count),
                     "issue": str(issue_number),
                 },
             )
             _block_fn(
                 issue_number=issue_number,
                 repo=repo,
-                reason=(
-                    f"transition count exceeded: {new_count} >= {TRANSITION_LIMIT_HARD}"
-                ),
+                reason=reason,
                 actor=actor,
                 flow_service=flow_service,
             )
@@ -363,92 +288,30 @@ def apply_unified_noop_gate(
             return
 
     if not state_set_changed:
-        # Special case: executor publish (vibe run --skill publish)
-        # creates a PR without changing the state label. When a PR
-        # already exists on the branch, treat this as a valid pass
-        # and record a synthetic state transition.
-        if (
-            role == "executor"
-            and before_state_label == "state/merge-ready"
-            and flow_state is not None
-            and flow_state.get("pr_ref")
-        ):
-            # pr_ref existence is checked for truthiness only (not
-            # validated against GitHub). This is intentional: the
-            # publish step is idempotent, and stale pr_ref cleanup
-            # is handled by the broader flow lifecycle (PR close
-            # detection, check cleanup). Adding a GitHub API call
-            # here would introduce latency and a retry surface for
-            # a scenario that self-corrects on the next cycle.
-            logger.bind(
-                domain="codeagent",
-                role=role,
-                issue_number=issue_number,
-                branch=branch,
-            ).info(
-                "No-op gate PASS: executor publish with existing PR "
-                f"(state/merge-ready -> state/handoff, pr={flow_state.get('pr_ref')})"
-            )
-            store.add_event(
-                branch,
-                EVENT_STATE_TRANSITIONED,
-                actor,
-                detail=(
-                    "Executor publish succeeded: PR already exists "
-                    f"({flow_state.get('pr_ref')}), "
-                    "state/merge-ready -> state/handoff"
-                ),
-                refs={
-                    "before_state": "state/merge-ready",
-                    "after_state": "state/handoff",
-                    "issue": str(issue_number),
-                    "pr_ref": str(flow_state.get("pr_ref", "")),
-                },
-            )
+        publish_reason: str | None = None
+        if publish_mode:
+            if before_open_pr_numbers is None:
+                publish_reason = "authoritative pre-publish PR snapshot unavailable"
+            else:
+                if publish_completion is None:
+                    from vibe3.clients import GitHubClient
+                    from vibe3.services.shared import LabelService
 
-            # Record this synthetic transition in transition_history
-            # for single-step loop prevention consistency. All state
-            # transitions — including synthetic ones — should be
-            # tracked so that the SINGLE_STEP_LIMIT check can detect
-            # repeated executor publish cycles.
-            if hasattr(store, "db_path") and hasattr(store, "record_transition"):
-                import sqlite3
-
-                try:
-                    with sqlite3.connect(store.db_path) as conn:
-                        cursor = conn.cursor()
-                        row = cursor.execute(
-                            """
-                            SELECT id FROM flow_events
-                            WHERE branch = ? AND event_type = 'state_transitioned'
-                            ORDER BY id DESC LIMIT 1
-                            """,
-                            (branch,),
-                        ).fetchone()
-
-                        event_id = row[0] if row else None
-
-                        store.record_transition(
-                            conn=conn,
-                            branch=branch,
-                            from_state="state/merge-ready",
-                            to_state="state/handoff",
-                            actor=actor,
-                            event_id=event_id,
-                        )
-                        conn.commit()
-                except sqlite3.Error as e:
-                    logger.bind(
-                        domain="codeagent",
-                        role=role,
-                        issue_number=issue_number,
-                        branch=branch,
-                    ).warning(
-                        "Synthetic transition recording skipped: "
-                        f"database error ({e})"
+                    publish_completion = PublishCompletionService(
+                        GitHubClient(),
+                        LabelService(repo=repo),
+                        TransitionRecorder(store),
                     )
-
-            return
+                publish_result = publish_completion.try_complete(
+                    issue_number=issue_number,
+                    branch=branch,
+                    before_state_labels=effective_before_labels,
+                    before_open_pr_numbers=before_open_pr_numbers,
+                    actor=actor,
+                )
+                if publish_result.completed:
+                    return
+                publish_reason = publish_result.reason
 
         state_desc = before_state_label or "(no state)"
         logger.bind(
@@ -463,7 +326,14 @@ def apply_unified_noop_gate(
             branch,
             EVENT_STATE_UNCHANGED,
             actor,
-            detail=f"State unchanged after {role}: still {state_desc}",
+            detail=(
+                f"State unchanged after {role}: still {state_desc}"
+                + (
+                    f"; publish exception rejected: {publish_reason}"
+                    if publish_reason
+                    else ""
+                )
+            ),
             refs={
                 "state": str(before_state_label or ""),
                 "issue": str(issue_number),
@@ -472,7 +342,9 @@ def apply_unified_noop_gate(
         _block_fn(
             issue_number=issue_number,
             repo=repo,
-            reason="state unchanged",
+            reason=(
+                "state unchanged" + (f": {publish_reason}" if publish_reason else "")
+            ),
             actor=actor,
             flow_service=flow_service,
         )
@@ -486,75 +358,3 @@ def apply_unified_noop_gate(
     ).info(
         f"No-op gate PASS: state changed {before_state_label} -> {after_state_label}"
     )
-    store.add_event(
-        branch,
-        EVENT_STATE_TRANSITIONED,
-        actor,
-        detail=f"State changed: {before_state_label} -> {after_state_label}",
-        refs={
-            "before_state": str(before_state_label or ""),
-            "after_state": after_state_label,
-            "issue": str(issue_number),
-        },
-    )
-
-    # Record this transition in transition_history for single-step tracking
-    if (
-        before_state_label
-        and after_state_label
-        and before_state_label != after_state_label
-        and hasattr(store, "db_path")
-        and hasattr(store, "record_transition")
-    ):
-        import sqlite3
-
-        try:
-            with sqlite3.connect(store.db_path) as conn:
-                # Get the event_id of the state_transitioned event we just added
-                cursor = conn.cursor()
-                row = cursor.execute(
-                    """
-                    SELECT id FROM flow_events
-                    WHERE branch = ? AND event_type = 'state_transitioned'
-                    ORDER BY id DESC LIMIT 1
-                    """,
-                    (branch,),
-                ).fetchone()
-
-                event_id = row[0] if row else None
-
-                store.record_transition(
-                    conn=conn,
-                    branch=branch,
-                    from_state=before_state_label,
-                    to_state=after_state_label,
-                    actor=actor,
-                    event_id=event_id,
-                )
-                conn.commit()
-        except sqlite3.Error as e:
-            # Fail-safe: log and skip recording on DB errors
-            logger.bind(
-                domain="codeagent",
-                role=role,
-                issue_number=issue_number,
-                branch=branch,
-            ).warning(f"Transition recording skipped: database error ({e})")
-
-    # Increment transition count AFTER confirming state change
-    if flow_state is not None and isinstance(flow_state, dict):
-        current_count = flow_state.get("transition_count", 0)
-        new_count = current_count + 1
-        flow_state["transition_count"] = new_count
-
-        # Log warning if approaching hard limit (after confirming transition)
-        if new_count >= TRANSITION_LIMIT_SOFT:
-            logger.bind(
-                domain="codeagent",
-                role=role,
-                issue_number=issue_number,
-                branch=branch,
-            ).warning(
-                f"Transition count approaching hard limit: {new_count} "
-                f"(soft: {TRANSITION_LIMIT_SOFT}, hard: {TRANSITION_LIMIT_HARD})"
-            )

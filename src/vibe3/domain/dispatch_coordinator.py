@@ -490,6 +490,15 @@ class GlobalDispatchCoordinator:
 
             entry.collected_state = issue.state.value
 
+            if entry.waiting_state == issue.state.value:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"GlobalDispatchCoordinator: retained #{entry.issue_number} "
+                    f"(in-flight for state={entry.waiting_state})",
+                )
+                index += 1
+                continue
+
             # Per-issue active session gate
             if self._registry is not None:
                 active = self._registry.get_live_sessions_for_issue(

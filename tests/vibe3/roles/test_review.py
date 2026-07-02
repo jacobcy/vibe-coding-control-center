@@ -49,6 +49,7 @@ class TestReviewerNoOpGate:
         from vibe3.models.verdict import VerdictRecord
 
         mock_store = MagicMock()
+        mock_store.record_confirmed_transition.return_value = (1, 1, 1)
         mock_verdict = VerdictRecord(
             verdict="PASS",
             timestamp=datetime.now(),

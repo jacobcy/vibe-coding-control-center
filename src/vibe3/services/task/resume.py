@@ -119,36 +119,6 @@ class TaskResumeOperations:
                 "wait for the active automation run to finish before resume."
             )
 
-    def _resolve_target_state(
-        self,
-        branch: str | None,
-        label_state: str,
-    ) -> IssueState:
-        if not label_state:
-            from vibe3.models import FlowState
-            from vibe3.services.flow import infer_resume_label
-
-            fs_dict = (
-                self._flow_service.store.get_flow_state(branch)
-                if isinstance(branch, str)
-                else None
-            )
-            return (
-                infer_resume_label(FlowState.model_validate(fs_dict))
-                if fs_dict
-                else IssueState.READY
-            )
-
-        valid_states = {
-            "ready": IssueState.READY,
-            "claimed": IssueState.CLAIMED,
-            "in-progress": IssueState.IN_PROGRESS,
-            "handoff": IssueState.HANDOFF,
-            "review": IssueState.REVIEW,
-            "merge-ready": IssueState.MERGE_READY,
-        }
-        return valid_states.get(label_state, IssueState.CLAIMED)
-
 
 class TaskResumeCandidates:
     """Candidate construction for task resume operations."""
@@ -218,10 +188,9 @@ class TaskResumeCandidates:
         # 查找关联的 flow（可能不存在）
         flow = self.find_resume_flow(issue_number, flows, stale_flows)
 
-        if current_state == IssueState.BLOCKED:
-            resume_kind = "blocked"
-        else:
-            resume_kind = "confirm"
+        if current_state != IssueState.BLOCKED:
+            return None
+        resume_kind = "blocked"
 
         return {
             "number": issue_number,
@@ -353,10 +322,8 @@ class TaskResumeCandidates:
             dep_check = self._check_blocked_by_dependency(issue_number, repo)
             if dep_check is not None:
                 return dep_check
-        elif resume_kind == "confirm":
-            dep_check = self._check_blocked_by_dependency(issue_number, repo)
-            if dep_check is not None:
-                return dep_check
+        else:
+            return False, f"Issue #{issue_number} is not blocked"
 
         return True, None
 

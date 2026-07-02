@@ -107,8 +107,9 @@ class StateTransition(BaseModel):
 #   All execution failures now go to BLOCKED with blocked_reason.
 #   Recovery: human resume via yes=True (same as BLOCKED).
 #
-# Key invariants (Issue #303):
-#   1. Code layer NEVER auto-transitions to HANDOFF (no-op gate)
+# Key invariants (Issue #303, #3281):
+#   1. Code layer only auto-transitions MERGE_READY -> HANDOFF when the current
+#      publish execution creates the issue's first open PR
 #   2. BLOCKED has NO automatic exit (requires human resume with yes=True)
 #   3. State decisions belong to: manager AI (normal) or human (override)
 # ============================================================================

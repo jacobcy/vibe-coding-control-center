@@ -9,6 +9,7 @@ from vibe3.exceptions import AgentExecutionError
 from vibe3.execution.codeagent_runner import (
     CodeagentExecutionService,
 )
+from vibe3.models import PRResponse, PRState
 
 
 def _make_mock_store() -> MagicMock:
@@ -85,6 +86,59 @@ class TestExecuteSyncGateIntegration:
         assert call_kwargs["issue_number"] == 42
         assert call_kwargs["role"] == "planner"
         assert "flow_service" in call_kwargs
+
+    def test_publish_gate_receives_authoritative_before_pr_snapshot(self) -> None:
+        agent_result = _make_mock_agent_result()
+        mock_store = _make_mock_store()
+        command = CodeagentCommand(
+            role="executor",
+            context_builder=lambda: "publish prompt",
+            branch="task/issue-42",
+            issue_number=42,
+            publish_mode=True,
+        )
+        existing = PRResponse(
+            number=91,
+            title="Existing PR",
+            state=PRState.OPEN,
+            head_branch="task/issue-42",
+            base_branch="main",
+            url="https://example.test/pull/91",
+        )
+
+        with (
+            patch(
+                "vibe3.execution.codeagent_runner.SQLiteClient",
+                return_value=mock_store,
+            ),
+            patch("vibe3.clients.github_client.GitHubClient") as github_cls,
+            patch("vibe3.agents.backends.codeagent.CodeagentBackend") as backend_cls,
+            patch(
+                "vibe3.execution.codeagent_runner.load_session_id",
+                return_value=None,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.resolve_command_agent_options"
+            ) as options,
+            patch(
+                "vibe3.execution.codeagent_runner.format_agent_actor",
+                return_value="agent:executor",
+            ),
+            patch("vibe3.execution.codeagent_runner.apply_unified_noop_gate") as gate,
+        ):
+            github_cls.return_value.view_issue.return_value = (
+                _make_github_issue_payload("state/merge-ready")
+            )
+            github_cls.return_value.list_prs_for_branch.return_value = [existing]
+            backend_cls.return_value.run.return_value = agent_result
+            options.return_value = MagicMock()
+
+            result = CodeagentExecutionService().execute_sync(command)
+
+        assert result.success
+        gate.assert_called_once()
+        assert gate.call_args.kwargs["publish_mode"] is True
+        assert gate.call_args.kwargs["before_open_pr_numbers"] == frozenset({91})
 
     @pytest.mark.slow
     def test_gate_skipped_without_issue_number_or_branch(self) -> None:
@@ -347,8 +401,8 @@ class TestTransitionCountFlow:
         gate_kwargs = mock_gate.call_args[1]
         assert gate_kwargs["flow_state"]["transition_count"] == 5
 
-    def test_transition_count_persisted_after_gate_pass(self) -> None:
-        """Executor persists transition_count after gate passes."""
+    def test_transition_count_not_rewritten_after_gate(self) -> None:
+        """The atomic recorder remains the only transition-count writer."""
         mock_store = _make_mock_store()
         mock_store.get_flow_state.return_value = {"transition_count": 0}
         agent_result = _make_mock_agent_result()
@@ -396,13 +450,11 @@ class TestTransitionCountFlow:
 
         assert result.success
         mock_gate.assert_called_once()
-        # Verify persistence call
-        mock_store.update_flow_state.assert_called()
+        # The gate's recorder persists transition_count atomically. Rewriting the
+        # caller snapshot here could clobber a concurrent confirmed transition.
         update_calls = mock_store.update_flow_state.call_args_list
-        # Find the call with transition_count
         transition_call = [c for c in update_calls if "transition_count" in c[1]]
-        assert len(transition_call) > 0
-        assert transition_call[0][1]["transition_count"] == 1
+        assert transition_call == []
 
 
 class TestSeverityAwareErrorHandling:
