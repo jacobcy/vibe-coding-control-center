@@ -45,8 +45,8 @@ class PublishCompletionResult:
     reason: str = ""
 
 
-class PublishCompletionService:
-    """Apply the one normal transition explicitly owned by code."""
+class PublishPRRefCompensationService:
+    """One-time pr_ref compensation for merge-ready → handoff transition."""
 
     def __init__(
         self,
@@ -65,12 +65,18 @@ class PublishCompletionService:
         branch: str,
         before_state_labels: frozenset[str],
         before_open_pr_numbers: frozenset[int],
+        before_pr_ref: str | None = None,
         actor: str,
     ) -> PublishCompletionResult:
         if before_state_labels != frozenset({"state/merge-ready"}):
             return PublishCompletionResult(
                 False,
                 reason="publish did not start in state/merge-ready",
+            )
+        if before_pr_ref is not None:
+            return PublishCompletionResult(
+                False,
+                reason="pr_ref already exists, refusing to compensate",
             )
         if before_open_pr_numbers:
             return PublishCompletionResult(
@@ -79,13 +85,21 @@ class PublishCompletionService:
             )
 
         after_prs = self._github.list_prs_for_branch(branch, state="open")
-        new_numbers = {
-            pr.number for pr in after_prs if pr.number not in before_open_pr_numbers
-        }
-        if len(new_numbers) != 1:
+        new_prs = [pr for pr in after_prs if pr.number not in before_open_pr_numbers]
+        if len(new_prs) != 1:
             return PublishCompletionResult(
                 False,
                 reason="publish did not create exactly one open PR",
+            )
+
+        new_pr = new_prs[0]
+        if new_pr.head_branch != branch:
+            return PublishCompletionResult(
+                False,
+                reason=(
+                    f"new PR head_branch '{new_pr.head_branch}' "
+                    f"does not match current branch '{branch}'"
+                ),
             )
 
         from_state = "state/merge-ready"
@@ -108,7 +122,6 @@ class PublishCompletionService:
                 reason=f"handoff transition not applied: {write_result}",
             )
 
-        pr_number = next(iter(new_numbers))
         self._recorder.record_confirmed(
             branch=branch,
             from_state=from_state,
@@ -116,4 +129,4 @@ class PublishCompletionService:
             actor=actor,
             issue_number=issue_number,
         )
-        return PublishCompletionResult(True, pr_number=pr_number)
+        return PublishCompletionResult(True, pr_number=new_pr.number)

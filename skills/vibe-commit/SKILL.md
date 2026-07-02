@@ -192,6 +192,46 @@ Human-driven publication uses `vibe3 pr create --yes`. Both create draft PRs.
 If publication fails because upstream is wrongly bound, fix the upstream and
 retry; use `gh pr create` only as an explicit recovery path and record why.
 
+## Publish Strategy
+
+**Agent 是发布业务的 owner，负责完整判断 PR/CI/LOC/review/merge 现场。**
+
+### 无 `pr_ref` 场景（首次发布）
+
+1. 完成 LOC gate、两步提交纪律、push
+2. 调用 `vibe3 pr create --agent` 创建 PR
+3. 记录 PR 事实（`vibe3 handoff append`）
+4. **显式给出业务结论**：
+   - 若 PR 创建成功 → 写 handoff 说明，等待 CI/review
+   - 若 PR 创建失败 → 写 blocked + reason，等待人类介入
+
+### 已有 `pr_ref` 场景（follow-up publish）
+
+1. 读取 CI/review/merge 现场
+2. **不重复创建 PR**
+3. 根据现场决定：
+   - CI 失败 → 修复问题、push、写 handoff 说明
+   - Review 有反馈 → 处理反馈、push、写 handoff 说明
+   - Review 通过但未合并 → 写 handoff 说明，等待 merge
+   - 已合并 → 进入 `/vibe-done` 流程
+
+### 显式状态转换规则
+
+Agent 每轮执行完成后，**必须**显式改变状态或给出业务结论：
+
+- **交给 manager 复核** → 显式写 `state/handoff`
+- **需要人类判断** → 显式写 `state/blocked` 并说明 durable reason
+- **不得把"PR 存在"描述为"发布工作全部完成"**
+
+### 禁止事项
+
+- ❌ 仅因 PR OPEN 就认为发布完成
+- ❌ 不检查 CI/review 状态就进入下一步
+- ❌ 不显式写状态转换，依赖系统隐式推进
+- ❌ 创建重复 PR
+
+### Step 10: 记录完成状态
+
 ### 8. Record Durable Trace
 
 After publication:
@@ -227,3 +267,61 @@ Report:
 - commit SHAs and PR URL;
 - remaining CI/review blockers;
 - next action: `vibe-integrate`.
+
+**留痕内容应包含**：
+- PR 编号
+- Issue 编号（如有）
+- Branch 名称
+- 提交策略（single/parallel/stacked）
+- 下一步建议
+
+**显式状态转换**：
+
+PR 创建成功后，**必须**显式更新状态：
+
+```bash
+# 更新为 handoff 状态，等待 manager 复核
+gh issue edit <issue-number> --add-label "state/handoff" --remove-label "state/merge-ready"
+```
+
+若遇到阻塞情况（如 CI 失败、权限问题），**必须**显式写 blocked：
+
+```bash
+# 记录阻塞原因
+vibe3 handoff append "[vibe-commit] Blocked: <具体原因>" --actor vibe-commit --kind blocker
+
+# 更新为 blocked 状态
+gh issue edit <issue-number> --add-label "state/blocked" --remove-label "state/merge-ready"
+```
+
+若用户问"下一步是什么"，回答：
+> 运行 `/vibe-integrate` 检查 CI 状态和 review，确认合并条件后推进。
+
+**注意事项**：
+- 允许：进入 `/vibe-integrate` 检查 review、CI、merge 阻塞
+- 不允许：直接进入 `/vibe-done`
+- 不允许：把当前 task 当作下一个新目标继续开发
+
+## Restrictions
+
+- **Pre-commit 硬规定**：
+  - 不得使用 `git commit --no-verify` 跳过 pre-commit 检查
+  - 不得在有 pre-commit 错误（如 mypy、shellcheck、LOC 超限）的情况下继续提交
+  - 必须在组织 commit 分组前完成 pre-commit 验证
+  - 格式化流程：对所有改动统一格式化 → 提交临时 commit → 软重置（检查是否为临时 commit）→ 分组提交
+  - 不得保留单独的格式化 commit，格式化修改必须分散到各功能 commit 中
+- **LOC 强制检查**：
+  - 发 PR 前必须通过 LOC 检查（`ENFORCE_LOC_LIMITS=true`）
+  - 超限文件必须修复或申请 exception，不允许跳过
+  - 此检查与 CI 保持一致，确保本地和远程行为相同
+- **主分支同步**：
+  - 提交前必须检查 `origin/main` 是否有新提交
+  - 冲突未解决前禁止提交
+- **提交必要性检查**：
+  - 若改动已不需要提交，必须用 `handoff append` 说明理由
+  - 必须更新 issue 标签为 `state/handoff`，等待 manager 决定
+- 不得在用户确认前静默执行 `git commit`
+- 不得把"是否拆多个 PR"的判断偷换成"先发一个再说"
+- 不得把 `stash` 当垃圾桶
+- 不得把 `discard` 当默认处理方式
+- 若发现当前 task 已有 PR 事实且用户要开始新目标，应停止并切换 task，而不是继续堆在原 task

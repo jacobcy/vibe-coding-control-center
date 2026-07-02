@@ -59,11 +59,9 @@ def build_run_request(
             "run",
             "--branch",
             target_branch,
-            "--skill",
-            "vibe-commit",
+            "--publish",
             "--no-async",
         ]
-        refs["commit_mode"] = "true"
     elif plan_ref:
         command_args = [
             "run",

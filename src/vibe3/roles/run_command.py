@@ -8,8 +8,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
-from loguru import logger
-
 if TYPE_CHECKING:
     from vibe3.config import ConventionResolver
 
@@ -254,32 +252,8 @@ def execute_manual_run(
             )
 
         # Check if this is a publish path execution
-        # Two entry points:
-        # 1. Manual: --publish flag (publish=True)
-        # 2. Automatic: commit_mode from flow_state
-        is_publish_path = False
-
-        # Manual channel: explicit --publish flag
-        if publish:
-            is_publish_path = True
-        # Automatic channel: commit_mode detection from flow_state
-        elif branch:
-            try:
-                flow_state = SQLiteClient().get_flow_state(branch)
-                if flow_state:
-                    commit_mode = flow_state.get("commit_mode")
-                    # Validate commit_mode is boolean to prevent type coercion issues
-                    is_publish_path = (
-                        bool(commit_mode) if isinstance(commit_mode, bool) else False
-                    )
-            except Exception as e:
-                # Log unexpected errors but don't fail execution - graceful degradation
-                # Falls back to skill builder, which noop gate will catch if wrong
-                logger.warning(
-                    f"Unexpected error checking flow_state for publish path: {e}. "
-                    "Defaulting to skill builder. Noop gate will catch if "
-                    "wrong recipe used."
-                )
+        # Only one entry point: explicit --publish flag
+        is_publish_path = publish
 
         # Use publish-specific context builder for commit_mode execution
         context_builder = (
