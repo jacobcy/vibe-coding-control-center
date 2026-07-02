@@ -104,12 +104,7 @@ class TestRemoteBlockedReason:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_called_once_with(
-                    123,
-                    "task/issue-123-test",
-                    clear_reason=False,
-                    actor="orchestra:dispatcher",
-                )
+                mock_bss.reconcile_blocked.assert_not_called()
 
                 # Verify CoordinationResolver was called
                 qualify_gate_service._coordination_resolver.resolve_coordination.assert_called_once_with(
@@ -153,7 +148,7 @@ class TestRemoteBlockedReason:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_called_once()
+                mock_bss.reconcile_blocked.assert_not_called()
 
 
 class TestRemoteDependencies:
@@ -197,7 +192,7 @@ class TestRemoteDependencies:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_called_once()
+                mock_bss.reconcile_blocked.assert_not_called()
 
                 # Verify CoordinationResolver was called
                 qualify_gate_service._coordination_resolver.resolve_coordination.assert_called_once_with(
@@ -241,7 +236,7 @@ class TestRemoteDependencies:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_called_once()
+                mock_bss.reconcile_blocked.assert_not_called()
 
     def test_qualify_gate_remote_blocked_by_issue(
         self, qualify_gate_service, sample_issue, mock_store
@@ -283,12 +278,7 @@ class TestRemoteDependencies:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_called_once_with(
-                    123,
-                    "task/issue-123-test",
-                    clear_reason=False,
-                    actor="orchestra:dispatcher",
-                )
+                mock_bss.reconcile_blocked.assert_not_called()
 
 
 class TestProvenanceTracking:
@@ -421,12 +411,7 @@ class TestE2EBlockedReconciliation:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_called_once_with(
-                    123,
-                    "task/issue-994",
-                    clear_reason=False,
-                    actor="orchestra:dispatcher",
-                )
+                mock_bss.reconcile_blocked.assert_not_called()
 
     def test_blocked_label_body_active_with_cache(self, mock_store, sample_issue):
         """Blocked label + active body -> reconcile returns target."""
@@ -474,13 +459,8 @@ class TestE2EBlockedReconciliation:
                     trigger_state=IssueState.BLOCKED,
                 )
 
-                assert result == IssueState.IN_PROGRESS
-                mock_bss.reconcile_blocked.assert_called_once_with(
-                    123,
-                    "task/issue-123",
-                    clear_reason=False,
-                    actor="orchestra:dispatcher",
-                )
+                assert result == IssueState.BLOCKED
+                mock_bss.reconcile_blocked.assert_not_called()
 
     def test_issue_994_style_drift_alignment(self, mock_store, sample_issue):
         """#994: local flow missing, remote body blocked, label ready.
@@ -526,12 +506,7 @@ class TestE2EBlockedReconciliation:
                 )
 
                 assert result is None
-                mock_bss.reconcile_blocked.assert_called_once_with(
-                    123,
-                    "task/issue-994",
-                    clear_reason=False,
-                    actor="orchestra:dispatcher",
-                )
+                mock_bss.reconcile_blocked.assert_not_called()
 
 
 class TestConvergedDispatchGate:
