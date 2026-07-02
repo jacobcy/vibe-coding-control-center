@@ -23,6 +23,9 @@ class StubGitHubClient:
 
 
 class FailingNormalizeLabelService:
+    def get_state(self, issue_number: int) -> IssueState:
+        return IssueState.BLOCKED
+
     def replace_issue_state(
         self,
         issue_number: int,

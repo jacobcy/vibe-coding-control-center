@@ -465,6 +465,27 @@ def test_reconcile_blocked_resume_state(tmp_path: Path) -> None:
     assert store.get_flow_state("test-branch").get("flow_status") == "active"
 
 
+def test_reconcile_does_not_infer_for_active_issue(tmp_path: Path) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state(
+        "test-branch",
+        flow_slug="test",
+        plan_ref="plan.md",
+        report_ref="report.md",
+    )
+    github = StubGitHubClient(issue_body="")
+    label_service = TrackingLabelService()
+    label_service.current_state = IssueState.REVIEW
+
+    svc = BlockedStateService(
+        store=store, github_client=github, label_service=label_service
+    )
+
+    assert svc.reconcile_blocked(123, "test-branch") is None
+    assert label_service.current_state == IssueState.REVIEW
+    assert label_service.confirm_calls == []
+
+
 def test_reconcile_blocked_dependency_resolved(tmp_path: Path) -> None:
     """When a dependency is resolved, reconcile_blocked unblocks the flow."""
     from unittest.mock import patch

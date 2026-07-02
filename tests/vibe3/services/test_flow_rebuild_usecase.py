@@ -86,6 +86,7 @@ def test_rebuild_issue_flow_hard_deletes_bootstraps_handoff_and_label_resume(
         detail="Flow rebuilt: missing worktree",
         issue_number=303,
     )
+    store.reset_transition_epoch.assert_called_once_with("task/issue-303")
     label_resume.assert_called_once_with(
         issue_number=303,
         branch="task/issue-303",

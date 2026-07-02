@@ -1,22 +1,20 @@
-"""End-to-end test: flow resume should reset transition counters.
+"""End-to-end tests: blocked resume preserves transition evidence.
 
 This test verifies the fix for issue #1880:
 - Flow gets blocked by single-step limit (3 occurrences)
-- task resume clears blocked_reason AND resets counters
-- Flow can continue without immediate re-blocking
+- task resume clears blocked_reason and records blocked -> inferred state
+- existing transition evidence remains in the current epoch
 """
 
 import sqlite3
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from vibe3.clients import SQLiteClient
-from vibe3.execution.noop_gate import apply_unified_noop_gate
 from vibe3.models import IssueState
 from vibe3.services.flow import BlockedStateService
 
 
-def test_resume_resets_single_step_limit_counter(tmp_path):
-    """Flow blocked by single-step limit should resume successfully."""
+def test_resume_preserves_history_and_records_recovery(tmp_path):
     db = SQLiteClient(db_path=str(tmp_path / "test.db"))
 
     branch = "test-branch"
@@ -53,7 +51,8 @@ def test_resume_resets_single_step_limit_counter(tmp_path):
 
     # Mock label service
     label_service = MagicMock()
-    label_service.confirm_issue_state.return_value = "advanced"
+    label_service.get_state.return_value = IssueState.BLOCKED
+    label_service.replace_issue_state.return_value = "normalized"
 
     # Resume: clear blocked state
     service = BlockedStateService(
@@ -71,47 +70,22 @@ def test_resume_resets_single_step_limit_counter(tmp_path):
     assert result is not None, "Should return target state (unblocked)"
     assert result == IssueState.READY, "Should return READY as target state"
 
-    # Verify transition_count reset
+    # Existing evidence remains and the real blocked -> ready transition is added.
     flow = db.get_flow_state(branch)
     assert flow is not None
-    assert flow.get("transition_count") == 0, "transition_count should be reset"
+    assert flow.get("transition_count") == 6
 
     # Verify transition_history cleared
     with sqlite3.connect(db.db_path) as conn:
         count_after = db.count_specific_pair(
             conn, branch, "state/claimed", "state/handoff"
         )
-    assert count_after == 0, "transition_history should be cleared"
-
-    # Verify flow can transition again without blocking
-    # (Simulate one more transition - should not block)
-    mock_block_fn = MagicMock()
-    with patch(
-        "vibe3.execution.noop_gate.get_role_block_function",
-        return_value=mock_block_fn,
-    ):
-        with patch(
-            "vibe3.execution.state_verification.StateVerificationService.get_issue_state_labels"
-        ) as mock_state:
-            mock_state.return_value = (frozenset({"state/handoff"}), False)
-
-            apply_unified_noop_gate(
-                store=db,
-                issue_number=issue_number,
-                branch=branch,
-                actor="test",
-                role="executor",
-                before_state_label="state/claimed",
-                repo="test/repo",
-                flow_state=flow,
-            )
-
-    # Should NOT have called block function (no re-blocking)
-    mock_block_fn.assert_not_called()
+    assert count_after == 3
+    with sqlite3.connect(db.db_path) as conn:
+        assert db.count_specific_pair(conn, branch, "state/blocked", "state/ready") == 1
 
 
-def test_resume_resets_hard_limit_counter(tmp_path):
-    """Flow blocked by hard limit (20 transitions) should resume successfully."""
+def test_resume_retains_block_when_transition_budget_is_exhausted(tmp_path):
     db = SQLiteClient(db_path=str(tmp_path / "test.db"))
 
     branch = "test-branch"
@@ -146,7 +120,7 @@ def test_resume_resets_hard_limit_counter(tmp_path):
 
     # Mock label service
     label_service = MagicMock()
-    label_service.confirm_issue_state.return_value = "advanced"
+    label_service.get_state.return_value = IssueState.BLOCKED
 
     # Resume
     service = BlockedStateService(
@@ -161,42 +135,17 @@ def test_resume_resets_hard_limit_counter(tmp_path):
         actor="human:resume",
     )
 
-    assert result is not None, "Should return target state (unblocked)"
+    assert result is None
 
-    # Verify counter reset
+    # The failed recovery attempt does not erase evidence or mutate the label.
     flow = db.get_flow_state(branch)
-    assert flow.get("transition_count") == 0, "Hard limit counter should be reset"
-    assert flow.get("blocked_reason") is None
-    assert flow.get("flow_status") == "active"
+    assert flow.get("transition_count") == 20
+    assert flow.get("flow_status") == "blocked"
+    label_service.replace_issue_state.assert_not_called()
 
     # Verify transition_history cleared
     with sqlite3.connect(db.db_path) as conn:
         count_after = db.count_specific_pair(
             conn, branch, "state/claimed", "state/handoff"
         )
-    assert count_after == 0, "transition_history should be cleared"
-
-    # Verify flow can transition again without blocking
-    mock_block_fn = MagicMock()
-    with patch(
-        "vibe3.execution.noop_gate.get_role_block_function",
-        return_value=mock_block_fn,
-    ):
-        with patch(
-            "vibe3.execution.state_verification.StateVerificationService.get_issue_state_labels"
-        ) as mock_state:
-            mock_state.return_value = (frozenset({"state/handoff"}), False)
-
-            apply_unified_noop_gate(
-                store=db,
-                issue_number=issue_number,
-                branch=branch,
-                actor="test",
-                role="executor",
-                before_state_label="state/claimed",
-                repo="test/repo",
-                flow_state=flow,
-            )
-
-    # Should NOT have called block function (no re-blocking)
-    mock_block_fn.assert_not_called()
+    assert count_after == 3

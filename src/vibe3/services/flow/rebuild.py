@@ -111,6 +111,7 @@ class FlowRebuildUsecase:
             git_client=self.git_client,
             store=self.store,
         )
+        self.store.reset_transition_epoch(branch)
 
         # Record flow_rebuild timeline event
         from vibe3.services.flow.timeline import FlowTimelineService
