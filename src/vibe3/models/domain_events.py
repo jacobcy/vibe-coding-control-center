@@ -150,9 +150,9 @@ class IssueResolvedDependency(DomainEvent):
 
     Signals that downstream flows blocked by this issue may need
     re-evaluation. Consumers must use the observer-only auto eligibility
-    API (see #3289 / #3292) and must NOT invoke
-    BlockedStateService.reconcile_blocked or infer a dispatchable target
-    from local refs (plan_ref/pr_ref/report_ref/audit_ref).
+    API (``evaluate_auto_eligibility`` + ``apply_auto_resume``, see #3289 /
+    #3292) and must NOT clear a human blocked_reason or infer a dispatchable
+    target from local refs (plan_ref/pr_ref/report_ref/audit_ref).
     """
 
     issue_number: int

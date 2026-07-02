@@ -130,7 +130,7 @@ class TestCheckServiceSyncRules:
 
         Regression test: when the remote issue carries state/blocked but the
         local flow_status is not "blocked", rule_blocked_label_sync must sync
-        local flow_status to "blocked" via reconcile_blocked (authoritative
+        local flow_status to "blocked" via sync_block_state (authoritative
         truth reconciliation: body, labels, and cache).
         """
         issue_number = 9998
@@ -158,7 +158,7 @@ class TestCheckServiceSyncRules:
             ),
             "labels": [{"name": "state/blocked"}],
         }
-        # reconcile_blocked reads issue body to determine authoritative truth
+        # sync_block_state reads issue body to determine authoritative truth
         github_client.get_issue_body.return_value = (
             "Description\n"
             "<!-- vibe3-flow-state-start -->\n"
@@ -189,7 +189,7 @@ class TestCheckServiceSyncRules:
         service._sync_rules = config
 
         # Patch write_label_state to avoid real GitHub label API calls
-        # during reconcile_blocked's label sync step.
+        # during sync_block_state's label sync step.
         with (
             patch.object(
                 BlockedStateIO, "read_issue_state", return_value=IssueState.BLOCKED

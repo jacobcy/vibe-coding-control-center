@@ -85,7 +85,7 @@ class TaskResumeOperations:
 
         emit_progress("checking consistency and recovering")
 
-        # Delegate to unified recovery service (manual path: auto=False)
+        # Delegate to unified recovery service (manual path: authorized resume)
         from vibe3.services.flow import FlowRecoveryService
 
         recovery = FlowRecoveryService(
@@ -93,11 +93,11 @@ class TaskResumeOperations:
             git_client=self.git_client,
             github_client=self.github_client,
         )
-        recovery.recover(
+        recovery.recover_manual(
             branch=branch or "",
             issue_number=issue_number,
             reason=f"Resumed from {resume_kind}: {reason}",
-            auto=False,
+            actor="human:resume",
         )
         emit_progress("recovery complete", status="done")
 

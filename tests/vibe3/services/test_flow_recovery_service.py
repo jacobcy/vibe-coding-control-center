@@ -83,69 +83,100 @@ class TestClassifyRecovery:
 
 
 class TestRecover:
-    def test_resume_only_clears_blocked_state(self):
-        """When scene is healthy, recover() just clears blocked markers."""
+    def test_manual_resume_clears_blocked_state(self):
+        """When scene is healthy, recover_manual() invokes manual_resume."""
         svc = _make_service(
             worktree_path=Path("/wt/task/issue-1"),
             flow_state={"worktree_path": "/wt/task/issue-1"},
         )
-        with patch.object(svc, "_do_resume") as mock_resume:
-            result = svc.recover(
+        with patch(
+            "vibe3.services.flow.blocked_state_service.BlockedStateService"
+        ) as mock_cls:
+            mock_cls.return_value.manual_resume.return_value = MagicMock(success=True)
+            result = svc.recover_manual(
                 branch="task/issue-1",
                 issue_number=1,
                 reason="manual resume",
-                auto=False,
             )
-        assert result.action == RecoveryAction.RESUME_ONLY
         assert result.success
-        mock_resume.assert_called_once()
+        mock_cls.return_value.manual_resume.assert_called_once()
 
-    def test_fix_and_resume_backfills_then_clears(self):
+    def test_auto_fix_and_resume_backfills_then_evaluates(self):
+        """Auto path: apply cheap fix, then evaluate auto eligibility."""
         svc = _make_service(
             worktree_path=Path("/wt/task/issue-1"),
             flow_state={},
         )
-        with patch.object(svc, "_do_resume") as mock_resume:
-            result = svc.recover(
+        with patch(
+            "vibe3.services.flow.blocked_state_service.BlockedStateService"
+        ) as mock_cls:
+            from vibe3.services.flow.blocked_state_types import (
+                AutoResumeDecision,
+                AutoResumeReasonCode,
+                AutoResumeVerdict,
+            )
+
+            mock_cls.return_value.evaluate_auto_eligibility.return_value = (
+                AutoResumeDecision(
+                    verdict=AutoResumeVerdict.NOT_ELIGIBLE,
+                    reason_code=AutoResumeReasonCode.HUMAN_REASON_PRESENT,
+                    issue_number=1,
+                    branch="task/issue-1",
+                    truth_snapshot=None,
+                )
+            )
+            result = svc.recover_auto(
                 branch="task/issue-1",
                 issue_number=1,
                 reason="auto recover",
-                auto=True,
             )
         assert result.action == RecoveryAction.FIX_AND_RESUME
         assert result.success
-        # Verify backfill happened
         svc.store.update_flow_state.assert_any_call(
             "task/issue-1", worktree_path=str(Path("/wt/task/issue-1"))
         )
-        mock_resume.assert_called_once()
+        mock_cls.return_value.evaluate_auto_eligibility.assert_called_once()
 
-    def test_rebuild_auto_does_full_rebuild_then_resume(self):
+    def test_rebuild_auto_does_full_rebuild_then_evaluates(self):
         svc = _make_service(worktree_path=None, flow_state={})
         with (
             patch.object(svc, "_do_rebuild") as mock_rebuild,
-            patch.object(svc, "_do_resume") as mock_resume,
+            patch(
+                "vibe3.services.flow.blocked_state_service.BlockedStateService"
+            ) as mock_cls,
         ):
-            result = svc.recover(
+            from vibe3.services.flow.blocked_state_types import (
+                AutoResumeDecision,
+                AutoResumeReasonCode,
+                AutoResumeVerdict,
+            )
+
+            decision = AutoResumeDecision(
+                verdict=AutoResumeVerdict.NOT_ELIGIBLE,
+                reason_code=AutoResumeReasonCode.DEPENDENCY_OPEN,
+                issue_number=1,
+                branch="task/issue-1",
+                truth_snapshot=None,
+            )
+            mock_cls.return_value.evaluate_auto_eligibility.return_value = decision
+            result = svc.recover_auto(
                 branch="task/issue-1",
                 issue_number=1,
                 reason="health check",
-                auto=True,
             )
         assert result.action == RecoveryAction.REBUILD
         assert result.success
         mock_rebuild.assert_called_once()
-        mock_resume.assert_called_once()
+        mock_cls.return_value.evaluate_auto_eligibility.assert_called_once()
 
     def test_rebuild_manual_raises_for_user_guidance(self):
         """Manual path (task resume) should NOT auto-rebuild; guide user."""
-        svc = _make_service(worktree_path=None, flow_state={})
+        svc = _make_service(worktree_path=None, flow_state=None)
         with pytest.raises(Exception, match="flow rebuild"):
-            svc.recover(
+            svc.recover_manual(
                 branch="task/issue-1",
                 issue_number=1,
                 reason="manual",
-                auto=False,
             )
 
     def test_missing_artifact_manual_raises_to_guide_rebind(self):

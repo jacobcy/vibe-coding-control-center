@@ -19,7 +19,15 @@ if TYPE_CHECKING:
         BlockedStateIO,
     )
     from vibe3.services.flow.blocked_state_service import BlockedStateService
-    from vibe3.services.flow.blocked_state_types import BlockedState
+    from vibe3.services.flow.blocked_state_types import (
+        AutoResumeDecision,
+        AutoResumeReasonCode,
+        AutoResumeVerdict,
+        BlockedState,
+        ConsistencyReport,
+        ResumeResult,
+        ResumeSource,
+    )
     from vibe3.services.flow.branch_resolution import (
         resolve_branch_and_issue,
         resolve_branch_arg,
@@ -50,9 +58,13 @@ if TYPE_CHECKING:
     )
 
 __all__ = [
+    "AutoResumeDecision",
+    "AutoResumeReasonCode",
+    "AutoResumeVerdict",
     "BlockedState",
     "BlockedStateIO",
     "BlockedStateService",
+    "ConsistencyReport",
     "FlowCategory",
     "FlowState",
     "classify_flow",
@@ -73,14 +85,20 @@ __all__ = [
     "FlowStatusResolver",
     "FlowStatusService",
     "FlowTimelineService",
+    "ResumeResult",
+    "ResumeSource",
     "TransitionRecorder",
     "TransitionRecordResult",
 ]
 
 _SYMBOL_MODULES = {
+    "AutoResumeDecision": "vibe3.services.flow.blocked_state_types",
+    "AutoResumeReasonCode": "vibe3.services.flow.blocked_state_types",
+    "AutoResumeVerdict": "vibe3.services.flow.blocked_state_types",
     "BlockedState": "vibe3.services.flow.blocked_state_types",
     "BlockedStateIO": "vibe3.services.flow.blocked_state_io",
     "BlockedStateService": "vibe3.services.flow.blocked_state_service",
+    "ConsistencyReport": "vibe3.services.flow.blocked_state_types",
     "FlowCategory": "vibe3.services.flow.classifier",
     "FlowState": "vibe3.services.flow.classifier",
     "classify_flow": "vibe3.services.flow.classifier",
@@ -101,6 +119,8 @@ _SYMBOL_MODULES = {
     "FlowStatusResolver": "vibe3.services.flow.status_resolver",
     "FlowStatusService": "vibe3.services.flow.status",
     "FlowTimelineService": "vibe3.services.flow.timeline",
+    "ResumeResult": "vibe3.services.flow.blocked_state_types",
+    "ResumeSource": "vibe3.services.flow.blocked_state_types",
     "TransitionRecorder": "vibe3.services.flow.transition_recorder",
     "TransitionRecordResult": "vibe3.services.flow.transition_recorder",
 }

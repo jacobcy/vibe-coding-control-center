@@ -47,7 +47,7 @@ def test_reset_issue_to_ready_label_auto_keeps_worktree() -> None:
                 label_state="",
             )
 
-            mock_service.reconcile_blocked.assert_called_once()
+            mock_service.manual_resume.assert_called_once()
             mock_cleanup_cls.assert_not_called()
 
 

@@ -6,6 +6,12 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.qualify_gate import QualifyGateService
 from vibe3.models import CoordinationTruth, IssueInfo, IssueState, OrchestraConfig
 from vibe3.models.data_source import DataSource
+from vibe3.services.flow.blocked_state_types import (
+    AutoResumeDecision,
+    AutoResumeReasonCode,
+    AutoResumeVerdict,
+    ResumeResult,
+)
 
 
 def test_multi_dep_all_satisfied_unblocks():
@@ -39,28 +45,37 @@ def test_multi_dep_all_satisfied_unblocks():
     # Mock flow_manager to return a branch
     flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-300"}
 
+    decision = AutoResumeDecision(
+        verdict=AutoResumeVerdict.ELIGIBLE,
+        reason_code=AutoResumeReasonCode.ELIGIBLE,
+        issue_number=300,
+        branch="task/issue-300",
+        truth_snapshot="ts",
+    )
+
     # Mock coordination resolver
     with patch.object(
         service._coordination_resolver, "resolve_coordination", return_value=truth
     ):
-        # Mock reconcile_blocked to simulate full unblock
+        # Mock BlockedStateService to simulate full unblock
         with patch(
             "vibe3.domain.qualify_gate.BlockedStateService"
         ) as mock_blocked_service:
-            mock_instance = MagicMock()
-            mock_instance.reconcile_blocked.return_value = IssueState.IN_PROGRESS
-            mock_blocked_service.return_value = mock_instance
+            mock_blocked_service.return_value.evaluate_auto_eligibility.return_value = (
+                decision
+            )
+            mock_blocked_service.return_value.apply_auto_resume.return_value = (
+                ResumeResult(success=True, target_state=IssueState.IN_PROGRESS)
+            )
 
             result = service.qualify_blocked_issue(issue)
 
             # Should unblock because all dependencies are satisfied
             assert result is not None
             assert result != IssueState.BLOCKED
-            mock_instance.reconcile_blocked.assert_called_once_with(
+            mock_blocked_service.return_value.evaluate_auto_eligibility.assert_called_once_with(
                 issue_number=300,
                 branch="task/issue-300",
-                clear_reason=False,
-                actor="orchestra:dispatcher",
             )
 
 
@@ -94,28 +109,31 @@ def test_multi_dep_partial_satisfaction_remains_blocked():
         blocked_by_issue_source=DataSource.ISSUE_BODY_FALLBACK,
     )
 
+    decision = AutoResumeDecision(
+        verdict=AutoResumeVerdict.NOT_ELIGIBLE,
+        reason_code=AutoResumeReasonCode.DEPENDENCY_OPEN,
+        issue_number=300,
+        branch="task/issue-300",
+        truth_snapshot="ts",
+    )
+
     # Mock coordination resolver to return our truth
     with patch.object(
         service._coordination_resolver, "resolve_coordination", return_value=truth
     ):
-        # Mock reconcile_blocked to simulate still blocked (returns None)
+        # Mock BlockedStateService to simulate still blocked
         with patch(
             "vibe3.domain.qualify_gate.BlockedStateService"
         ) as mock_blocked_service:
-            mock_instance = MagicMock()
-            mock_instance.reconcile_blocked.return_value = None
-            mock_blocked_service.return_value = mock_instance
+            mock_blocked_service.return_value.evaluate_auto_eligibility.return_value = (
+                decision
+            )
 
             result = service.qualify_blocked_issue(issue)
 
-            # Should remain blocked (reconcile_blocked returned None)
+            # Should remain blocked (not eligible)
             assert result is None
-            mock_instance.reconcile_blocked.assert_called_once_with(
-                issue_number=300,
-                branch="task/issue-300",
-                clear_reason=False,
-                actor="orchestra:dispatcher",
-            )
+            mock_blocked_service.return_value.apply_auto_resume.assert_not_called()
 
 
 def test_single_dep_satisfied_unblocks_backward_compat():
@@ -149,28 +167,37 @@ def test_single_dep_satisfied_unblocks_backward_compat():
     # Mock flow_manager to return a branch
     flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-300"}
 
+    decision = AutoResumeDecision(
+        verdict=AutoResumeVerdict.ELIGIBLE,
+        reason_code=AutoResumeReasonCode.ELIGIBLE,
+        issue_number=300,
+        branch="task/issue-300",
+        truth_snapshot="ts",
+    )
+
     # Mock coordination resolver
     with patch.object(
         service._coordination_resolver, "resolve_coordination", return_value=truth
     ):
-        # Mock reconcile_blocked to simulate unblock
+        # Mock BlockedStateService to simulate unblock
         with patch(
             "vibe3.domain.qualify_gate.BlockedStateService"
         ) as mock_blocked_service:
-            mock_instance = MagicMock()
-            mock_instance.reconcile_blocked.return_value = IssueState.IN_PROGRESS
-            mock_blocked_service.return_value = mock_instance
+            mock_blocked_service.return_value.evaluate_auto_eligibility.return_value = (
+                decision
+            )
+            mock_blocked_service.return_value.apply_auto_resume.return_value = (
+                ResumeResult(success=True, target_state=IssueState.IN_PROGRESS)
+            )
 
             result = service.qualify_blocked_issue(issue)
 
             # Should unblock (single dependency regression test)
             assert result is not None
             assert result != IssueState.BLOCKED
-            mock_instance.reconcile_blocked.assert_called_once_with(
+            mock_blocked_service.return_value.evaluate_auto_eligibility.assert_called_once_with(
                 issue_number=300,
                 branch="task/issue-300",
-                clear_reason=False,
-                actor="orchestra:dispatcher",
             )
 
 
