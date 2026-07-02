@@ -1,11 +1,4 @@
-"""Regression tests for the dispatch safety gap fix (issue #3220 C2).
-
-Before C2, in-progress entries (``waiting_state`` set) short-circuited via an
-early ``continue`` in ``_dispatch_loop``, bypassing ``should_skip_from_queue``,
-the active-session-gate, and preflight. After C2 they flow through like any
-other entry so remote intervention is detected and finished flows can be
-re-dispatched to their next phase.
-"""
+"""Regression tests for observation without in-flight redispatch."""
 
 from __future__ import annotations
 
@@ -13,7 +6,6 @@ from collections.abc import Callable
 from unittest.mock import MagicMock
 
 from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
-from vibe3.domain.dispatch_preflight import DispatchPreflightDecision
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.queue_entry import QueueEntry
 
@@ -54,23 +46,21 @@ def test_inprogress_entry_kicked_on_non_manager_assignee(
     coordinator._emit_dispatch_intent.assert_not_called()
 
 
-def test_inprogress_entry_reaches_preflight_when_no_session(
+def test_inprogress_entry_waits_for_state_change_when_no_session(
     make_coordinator: Callable[..., GlobalDispatchCoordinator],
 ) -> None:
-    """In-progress entry with no live session must reach preflight (not
-    short-circuited by waiting_state). A failing preflight pops it."""
+    """An unchanged in-flight entry stays retained without redispatch."""
     coordinator = make_coordinator("manager")
     coordinator._frozen_queue = [_review_entry()]
     coordinator._load_issue = lambda n: _review_issue(["manager-bot"])
-    coordinator._run_dispatch_preflight = lambda issue: DispatchPreflightDecision(
-        allowed=False, target_state=None, reason="test-fail"
-    )
+    coordinator._run_dispatch_preflight = MagicMock()
     coordinator._emit_dispatch_intent = MagicMock()
 
     dispatched = coordinator._dispatch_loop(tick_id=1)
 
     assert dispatched == 0
-    assert coordinator._frozen_queue == []
+    assert coordinator._frozen_queue == [_review_entry()]
+    coordinator._run_dispatch_preflight.assert_not_called()
     coordinator._emit_dispatch_intent.assert_not_called()
 
 

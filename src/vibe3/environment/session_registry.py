@@ -166,7 +166,7 @@ class SessionRegistryService:
             )
         sessions = self._store.list_live_runtime_sessions(role=role)
         count = 0
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(datetime.UTC)
 
         for session in sessions:
             session_role = session.get("role", "")
@@ -347,13 +347,17 @@ class SessionRegistryService:
             List of session dicts that are truly live and match the issue number.
         """
         result: list[dict[str, Any]] = []
+        now = datetime.datetime.now(datetime.UTC)
         for role in roles:
             sessions = self._store.list_live_runtime_sessions(role=role)
             for session in sessions:
                 if str(session.get("target_id", "")) != str(issue_number):
                     continue
                 tmux = session.get("tmux_session")
-                if tmux and self._has_tmux_session(tmux):
+                if tmux:
+                    if self._has_tmux_session(tmux):
+                        result.append(session)
+                elif not self._handle_stale_starting_session(session, now):
                     result.append(session)
         return result
 
