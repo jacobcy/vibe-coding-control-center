@@ -43,18 +43,12 @@ if TYPE_CHECKING:
         ReviewerDispatchIntent,
     )
     from vibe3.domain.events.governance import (
-        GovernanceDecisionRequired,
         GovernanceScanCompleted,
         GovernanceScanStarted,
     )
     from vibe3.domain.events.policy import PolicyChanged
     from vibe3.domain.events.supervisor_apply import (
-        SupervisorApplyCompleted,
-        SupervisorApplyDelegated,
-        SupervisorApplyDispatched,
-        SupervisorApplyStarted,
         SupervisorIssueIdentified,
-        SupervisorPromptRendered,
     )
     from vibe3.domain.failed_gate import FailedGate, GateResult, GateStatus
     from vibe3.domain.flow_manager import FlowManager
@@ -97,16 +91,10 @@ _LAZY_IMPORTS: dict[str, str] = {
     # Events - governance
     "GovernanceScanStarted": "vibe3.domain.events.governance",
     "GovernanceScanCompleted": "vibe3.domain.events.governance",
-    "GovernanceDecisionRequired": "vibe3.domain.events.governance",
     # Events - policy
     "PolicyChanged": "vibe3.domain.events.policy",
     # Events - supervisor apply
-    "SupervisorApplyCompleted": "vibe3.domain.events.supervisor_apply",
-    "SupervisorApplyDelegated": "vibe3.domain.events.supervisor_apply",
-    "SupervisorApplyDispatched": "vibe3.domain.events.supervisor_apply",
-    "SupervisorApplyStarted": "vibe3.domain.events.supervisor_apply",
     "SupervisorIssueIdentified": "vibe3.domain.events.supervisor_apply",
-    "SupervisorPromptRendered": "vibe3.domain.events.supervisor_apply",
     # Orchestration
     "FlowManager": "vibe3.domain.flow_manager",
     "GlobalDispatchCoordinator": "vibe3.domain.dispatch_coordinator",
@@ -178,16 +166,10 @@ __all__ = [
     # L1 Governance Events
     "GovernanceScanStarted",
     "GovernanceScanCompleted",
-    "GovernanceDecisionRequired",
     # Policy Events
     "PolicyChanged",
     # L2 Supervisor Apply Events
     "SupervisorIssueIdentified",
-    "SupervisorPromptRendered",
-    "SupervisorApplyDispatched",
-    "SupervisorApplyStarted",
-    "SupervisorApplyCompleted",
-    "SupervisorApplyDelegated",
     # Orchestration
     "FlowManager",
     "GlobalDispatchCoordinator",
