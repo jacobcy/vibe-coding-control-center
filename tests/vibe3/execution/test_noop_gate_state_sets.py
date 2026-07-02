@@ -8,6 +8,7 @@ from vibe3.execution.noop_gate import apply_unified_noop_gate
 def test_added_state_label_passes_when_stale_label_remains() -> None:
     store = MagicMock()
     store.get_flow_state.return_value = {}
+    store.record_confirmed_transition.return_value = (1, 1, 1)
 
     with (
         patch("vibe3.clients.github_client.GitHubClient") as mock_github,
@@ -31,6 +32,5 @@ def test_added_state_label_passes_when_stale_label_remains() -> None:
         )
 
     mock_block.assert_not_called()
-    event_args = store.add_event.call_args
-    assert event_args[0][1] == "state_transitioned"
-    assert event_args[1]["refs"]["after_state"] == "state/handoff"
+    record_kwargs = store.record_confirmed_transition.call_args.kwargs
+    assert record_kwargs["to_state"] == "state/handoff"

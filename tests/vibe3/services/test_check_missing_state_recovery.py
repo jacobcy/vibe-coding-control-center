@@ -4,14 +4,13 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from vibe3.clients import SQLiteClient
-from vibe3.models.orchestration import IssueState
 from vibe3.services.check.service import CheckService
 
 
-def test_verify_branch_recovers_missing_state_label_from_flow_refs(
+def test_verify_branch_does_not_infer_missing_state_label_from_flow_refs(
     tmp_path: Path,
 ) -> None:
-    """Missing remote state label is restored through resume auto inference."""
+    """Missing remote state is reported, never inferred from local refs."""
     store = SQLiteClient(db_path=tmp_path / "test.db")
     branch = "task/issue-501"
     worktree_path = tmp_path / "worktree-501"
@@ -55,12 +54,11 @@ def test_verify_branch_recovers_missing_state_label_from_flow_refs(
         service._initialize_pr_cache()
         result = service.verify_branch(branch)
 
-        assert result.is_valid is True
-        mock_label_service.replace_issue_state.assert_called_once_with(
-            501,
-            IssueState.IN_PROGRESS,
-            actor="recovery:resume",
+        assert result.is_valid is False
+        assert any(
+            "refusing local-ref state inference" in issue for issue in result.issues
         )
+        mock_label_service.replace_issue_state.assert_not_called()
 
 
 def test_verify_branch_does_not_recover_missing_state_for_blocked_flow(

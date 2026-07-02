@@ -11,6 +11,7 @@ from vibe3.clients import (
 )
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.models import IssueState
 from vibe3.services.check.service import CheckService
 from vibe3.services.flow.blocked_state_io import BlockedStateIO
 from vibe3.utils.git_helpers import get_branch_handoff_dir
@@ -189,8 +190,11 @@ class TestCheckServiceSyncRules:
 
         # Patch write_label_state to avoid real GitHub label API calls
         # during reconcile_blocked's label sync step.
-        with patch.object(
-            BlockedStateIO, "write_label_state", return_value="confirmed"
+        with (
+            patch.object(
+                BlockedStateIO, "read_issue_state", return_value=IssueState.BLOCKED
+            ),
+            patch.object(BlockedStateIO, "write_label_state", return_value="confirmed"),
         ):
             result = service.verify_current_flow()
 

@@ -201,7 +201,11 @@ class BlockedStateIO:
 
     def read_issue_state(self, issue_number: int) -> IssueState | None:
         """Read the authoritative issue state label."""
-        return self.label_service.get_state(issue_number)
+        getter = getattr(self.label_service, "get_state", None)
+        if not callable(getter):
+            return None
+        state = getter(issue_number)
+        return state if isinstance(state, IssueState) else None
 
     def read_body_projection(self, issue_number: int) -> BlockedState:
         """Read blocked state from issue body projection."""

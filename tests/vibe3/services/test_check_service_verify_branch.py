@@ -359,8 +359,8 @@ def test_verify_branch_closed_issue_without_pr_aborts_flow(tmp_path: Path) -> No
     assert flow["flow_status"] == "aborted"
 
 
-def test_verify_branch_unblocks_stale_blocked_flow(tmp_path: Path) -> None:
-    """When flow is locally blocked but remote state/blocked was removed, unblock it."""
+def test_verify_branch_does_not_infer_stale_blocked_flow_target(tmp_path: Path) -> None:
+    """A non-blocked remote label cannot trigger inferred blocked recovery."""
     store = SQLiteClient(db_path=tmp_path / "test.db")
     branch = "task/issue-500"
 
@@ -409,14 +409,15 @@ def test_verify_branch_unblocks_stale_blocked_flow(tmp_path: Path) -> None:
         service._initialize_pr_cache()
         result = service.verify_branch(branch)
 
-        assert result.is_valid is True
+        assert result.is_valid is False
+        assert any("refusing state inference" in issue for issue in result.issues)
 
-        # DB blocked state must be cleared
+        # DB blocked evidence remains until an authoritative blocked recovery.
         flow = store.get_flow_state(branch)
         assert flow is not None
-        assert flow.get("flow_status") == "active"
-        assert flow.get("blocked_by_issue") is None
-        assert flow.get("blocked_reason") is None
+        assert flow.get("flow_status") == "blocked"
+        assert flow.get("blocked_by_issue") == 100
+        assert flow.get("blocked_reason") == "waiting for PR #100"
 
 
 def test_dependency_check_reports_unresolved_warnings(tmp_path: Path) -> None:
@@ -483,7 +484,7 @@ def test_dependency_check_reports_unresolved_warnings(tmp_path: Path) -> None:
                     "state": "OPEN",
                     "title": "Task Issue",
                     "body": "",
-                    "labels": [],
+                    "labels": [{"name": "state/in-progress"}],
                 }
             elif issue_num == 200:
                 return {

@@ -9,7 +9,7 @@ authority:
   - cleanup-orchestration
 author: Claude Sonnet 4.6
 created: 2026-04-28
-last_updated: 2026-06-05
+last_updated: 2026-07-02
 related_docs:
   - docs/standards/label-semantics.md
   - docs/standards/glossary.md
@@ -46,6 +46,18 @@ related_docs:
 - ❌ Check 不参与业务判断
 
 ## 2. Flow 状态流转
+
+### 2.0 Issue state 写入权边界
+
+| 写入者 | 允许的 state 行为 |
+|--------|------------------|
+| agent / human | 正常业务推进 |
+| no-op / failure / dependency gate | 任意非终态进入 `blocked` |
+| blocked reconciliation | 仅 authoritative `blocked` issue 在阻塞解除后推断并恢复 |
+| publish completion | 仅本次 publish 从无 open PR 到新建 PR 时 `merge-ready → handoff` |
+| terminal lifecycle | 显式完成、关闭、清理语义 |
+
+除此以外，基础设施、dispatch、check、ref 缓存和 manager completion 状态都不得决定或强写正常 issue state。所有确认的真实变化统一计入 transition loop evidence；普通 unblock 保留证据，只有显式 `flow rebuild` 开启新 epoch 并重置。
 
 ### 2.1 状态机
 
