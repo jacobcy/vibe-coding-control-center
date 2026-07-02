@@ -184,10 +184,9 @@ def rule_blocked_label_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
         from vibe3.services.flow import BlockedStateService
 
         service = BlockedStateService(github_client=svc.github_client, store=svc.store)
-        service.reconcile_blocked(
+        service.sync_blocked_state(
             issue_number=ctx.task_issue,
             branch=ctx.branch,
-            clear_reason=False,
             actor="check:blocked_label_sync",
         )
         return CheckResult(is_valid=True, branch=ctx.branch, issues=[])
@@ -220,19 +219,41 @@ def rule_blocked_flow_reconcile(ctx: CheckContext, svc: Any) -> CheckResult | No
 
     try:
         from vibe3.services.flow import BlockedStateService
+        from vibe3.services.flow.resume_api import (
+            apply_auto_resume,
+            evaluate_auto_resume,
+        )
 
-        service = BlockedStateService(github_client=svc.github_client, store=svc.store)
-        target = service.reconcile_blocked(
+        # Evaluate eligibility for auto-resume
+        decision = evaluate_auto_resume(
             issue_number=ctx.task_issue,
             branch=ctx.branch,
-            clear_reason=False,
-            actor="check:blocked_flow_reconcile",
+            github_client=svc.github_client,
         )
-        if target is not None:
-            logger.info(
-                f"Recovered blocked flow to {target}",
-                branch=ctx.branch,
+
+        if decision.eligible:
+            # Apply auto-resume
+            result = apply_auto_resume(
+                decision,
+                github_client=svc.github_client,
+                store=svc.store,
             )
+            if result.success and result.target_state:
+                logger.info(
+                    f"Auto-resumed blocked flow to {result.target_state}",
+                    branch=ctx.branch,
+                )
+        else:
+            # Not eligible - just sync state
+            service = BlockedStateService(
+                github_client=svc.github_client, store=svc.store
+            )
+            service.sync_blocked_state(
+                issue_number=ctx.task_issue,
+                branch=ctx.branch,
+                actor="check:blocked_flow_reconcile",
+            )
+
         return CheckResult(is_valid=True, branch=ctx.branch, issues=[])
     except Exception as e:
         logger.error(
@@ -365,7 +386,6 @@ def rule_flow_consistency_recovery(ctx: CheckContext, svc: Any) -> CheckResult |
             branch=ctx.branch,
             issue_number=ctx.task_issue or 0,
             reason="Health check auto-recover",
-            auto=True,
             ensure_worktree=True,
         )
         logger.info(

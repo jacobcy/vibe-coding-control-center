@@ -299,6 +299,358 @@ class BlockedStateService:
 
         return target
 
+    def sync_blocked_state(
+        self,
+        issue_number: int,
+        branch: str,
+        *,
+        actor: str = "system",
+    ) -> IssueState | None:
+        """Synchronize blocked state across body, labels, and cache.
+
+        This is a subset of reconcile_blocked that ONLY syncs,
+        never infers target state.
+        When no deps open + no reason: return None
+        (stay blocked, don't unblock).
+        Use for rule_blocked_label_sync which needs label/cache sync,
+        not state inference.
+        """
+        from vibe3.observability import DegradedModeReason, get_degraded_manager
+        from vibe3.services.issue.body import parse_projection
+        from vibe3.services.shared import DependencyResolutionService
+
+        # 1. Read Remote Truth
+        try:
+            body = self._io.github.get_issue_body(issue_number)
+            if body is None:
+                raise RuntimeError(f"Issue #{issue_number} body is None")
+            truth = parse_projection(body)
+            get_degraded_manager().exit_degraded_mode()
+        except Exception as exc:
+            get_degraded_manager().enter_degraded_mode(
+                DegradedModeReason.GITHUB_API_ERROR
+            )
+            logger.bind(
+                domain="blocked_state",
+                action="sync_blocked_state",
+                issue_number=issue_number,
+                error=str(exc),
+            ).warning("GitHub read failed; falling back to DB cache")
+            return None
+
+        # 2. Check for open dependencies
+        open_tasks: list[int] = []
+        for task in truth.blocked_by:
+            res = DependencyResolutionService.is_dependency_resolved(
+                task,
+                github_client=self._io.github,
+            )
+            if not res.resolved:
+                open_tasks.append(task)
+
+        # 3. Determine if effectively blocked
+        effective_blocked = bool(truth.blocked_reason) or bool(open_tasks)
+        current_state = self._io.read_issue_state(issue_number)
+
+        if effective_blocked:
+            # Sync to blocked state
+            body_needs_update = truth.state != "blocked" or set(open_tasks) != set(
+                truth.blocked_by
+            )
+            if body_needs_update:
+                new_proj = FlowStateProjection(
+                    state="blocked",
+                    blocked_by=sorted(open_tasks),
+                    blocked_reason=truth.blocked_reason,
+                )
+                self._io.write_projection(issue_number, new_proj)
+                truth = new_proj
+
+            write_result = self._io.write_label_state(
+                issue_number, IssueState.BLOCKED, actor=actor
+            )
+            if (
+                branch
+                and current_state is not None
+                and current_state != IssueState.BLOCKED
+                and write_result in {"advanced", "normalized"}
+                and self._transition_recorder is not None
+            ):
+                self._transition_recorder.record_confirmed(
+                    branch=branch,
+                    from_state=current_state.to_label(),
+                    to_state=IssueState.BLOCKED.to_label(),
+                    actor=actor,
+                    issue_number=issue_number,
+                )
+        else:
+            # No deps open + no reason, but we DON'T infer target state
+            # Just sync to blocked and return None
+            logger.bind(
+                domain="blocked_state",
+                action="sync_blocked_state",
+                issue_number=issue_number,
+                branch=branch,
+            ).info("No blockers found but not inferring target state")
+
+            if truth.state != "blocked":
+                new_proj = FlowStateProjection(
+                    state="blocked",
+                    blocked_by=[],
+                    blocked_reason=None,
+                )
+                self._io.write_projection(issue_number, new_proj)
+                truth = new_proj
+
+            write_result = self._io.write_label_state(
+                issue_number, IssueState.BLOCKED, actor=actor
+            )
+            if (
+                branch
+                and current_state is not None
+                and current_state != IssueState.BLOCKED
+                and write_result in {"advanced", "normalized"}
+                and self._transition_recorder is not None
+            ):
+                self._transition_recorder.record_confirmed(
+                    branch=branch,
+                    from_state=current_state.to_label(),
+                    to_state=IssueState.BLOCKED.to_label(),
+                    actor=actor,
+                    issue_number=issue_number,
+                )
+
+        # 4. Rebuild Cache
+        if branch:
+            self.rebuild_cache_from_truth(branch, truth, open_tasks, actor=actor)
+
+        return None  # Never infer target state
+
+    def manual_resume_clear(
+        self,
+        issue_number: int,
+        branch: str,
+        target_state: IssueState,
+        actor: str,
+        reason: str,
+    ) -> bool:
+        """Clear blocked_reason and transition to target state.
+
+        This method is ONLY callable from manual_resume() API.
+        Returns True if successful, False otherwise.
+        """
+        from vibe3.observability import DegradedModeReason, get_degraded_manager
+
+        # 1. Read current truth
+        try:
+            body = self._io.github.get_issue_body(issue_number)
+            if body is None:
+                raise RuntimeError(f"Issue #{issue_number} body is None")
+            # Verify truth is readable
+            get_degraded_manager().exit_degraded_mode()
+        except Exception as exc:
+            get_degraded_manager().enter_degraded_mode(
+                DegradedModeReason.GITHUB_API_ERROR
+            )
+            logger.bind(
+                domain="blocked_state",
+                action="manual_resume_clear",
+                issue_number=issue_number,
+                error=str(exc),
+            ).error("Failed to read GitHub truth")
+            return False
+
+        # 2. Check if currently blocked
+        current_state = self._io.read_issue_state(issue_number)
+        if current_state != IssueState.BLOCKED:
+            logger.bind(
+                domain="blocked_state",
+                action="manual_resume_clear",
+                issue_number=issue_number,
+            ).warning(f"Issue is not blocked (current state: {current_state})")
+            return False
+
+        # 3. Check transition budget
+        if (
+            branch
+            and self._transition_recorder is not None
+            and self._transition_recorder.would_exceed(
+                branch,
+                IssueState.BLOCKED.to_label(),
+                target_state.to_label(),
+            )
+        ):
+            logger.bind(
+                domain="blocked_state",
+                action="manual_resume_clear",
+                issue_number=issue_number,
+                branch=branch,
+            ).warning("Transition budget exceeded")
+            return False
+
+        # 4. Clear blocked_reason and write projection
+        new_proj = FlowStateProjection(
+            state="active",
+            blocked_by=[],
+            blocked_reason=None,
+        )
+        self._io.write_projection(issue_number, new_proj)
+
+        # 5. Write target label
+        write_result = self._io.write_label_state(
+            issue_number,
+            target_state,
+            actor=actor,
+            force=True,
+            normalize=True,
+        )
+
+        if write_result not in {"advanced", "normalized"}:
+            logger.bind(
+                domain="blocked_state",
+                action="manual_resume_clear",
+                issue_number=issue_number,
+            ).error(f"Label write failed: {write_result}")
+            return False
+
+        # 6. Record transition
+        if branch and self._transition_recorder is not None:
+            self._transition_recorder.record_confirmed(
+                branch=branch,
+                from_state=IssueState.BLOCKED.to_label(),
+                to_state=target_state.to_label(),
+                actor=actor,
+                issue_number=issue_number,
+            )
+
+        # 7. Rebuild cache
+        if branch:
+            self.rebuild_cache_from_truth(branch, new_proj, [], actor=actor)
+
+        logger.bind(
+            domain="blocked_state",
+            action="manual_resume_clear",
+            issue_number=issue_number,
+            branch=branch,
+            target_state=target_state.value,
+            actor=actor,
+        ).info("Manual resume clear completed")
+
+        return True
+
+    def auto_resolve_state(
+        self,
+        issue_number: int,
+        branch: str,
+        closed_dependency_ids: list[int],
+        target_state: IssueState,
+        actor: str,
+    ) -> bool:
+        """Write projection with active state and empty blocked_by.
+
+        This is the auto-resume path that transitions to active state
+        after eligibility check confirms all deps are closed and no human reason.
+        Returns True if successful, False otherwise.
+        """
+        from vibe3.observability import DegradedModeReason, get_degraded_manager
+
+        # 1. Read current truth
+        try:
+            body = self._io.github.get_issue_body(issue_number)
+            if body is None:
+                raise RuntimeError(f"Issue #{issue_number} body is None")
+            # Verify truth is readable
+            get_degraded_manager().exit_degraded_mode()
+        except Exception as exc:
+            get_degraded_manager().enter_degraded_mode(
+                DegradedModeReason.GITHUB_API_ERROR
+            )
+            logger.bind(
+                domain="blocked_state",
+                action="auto_resolve_state",
+                issue_number=issue_number,
+                error=str(exc),
+            ).error("Failed to read GitHub truth")
+            return False
+
+        # 2. Check if currently blocked
+        current_state = self._io.read_issue_state(issue_number)
+        if current_state != IssueState.BLOCKED:
+            logger.bind(
+                domain="blocked_state",
+                action="auto_resolve_state",
+                issue_number=issue_number,
+            ).warning(f"Issue is not blocked (current state: {current_state})")
+            return False
+
+        # 3. Check transition budget
+        if (
+            branch
+            and self._transition_recorder is not None
+            and self._transition_recorder.would_exceed(
+                branch,
+                IssueState.BLOCKED.to_label(),
+                target_state.to_label(),
+            )
+        ):
+            logger.bind(
+                domain="blocked_state",
+                action="auto_resolve_state",
+                issue_number=issue_number,
+                branch=branch,
+            ).warning("Transition budget exceeded")
+            return False
+
+        # 4. Write projection with active state
+        new_proj = FlowStateProjection(
+            state="active",
+            blocked_by=[],
+            blocked_reason=None,  # Should already be None per eligibility
+        )
+        self._io.write_projection(issue_number, new_proj)
+
+        # 5. Write target label
+        write_result = self._io.write_label_state(
+            issue_number,
+            target_state,
+            actor=actor,
+            force=True,
+            normalize=True,
+        )
+
+        if write_result not in {"advanced", "normalized"}:
+            logger.bind(
+                domain="blocked_state",
+                action="auto_resolve_state",
+                issue_number=issue_number,
+            ).error(f"Label write failed: {write_result}")
+            return False
+
+        # 6. Record transition
+        if branch and self._transition_recorder is not None:
+            self._transition_recorder.record_confirmed(
+                branch=branch,
+                from_state=IssueState.BLOCKED.to_label(),
+                to_state=target_state.to_label(),
+                actor=actor,
+                issue_number=issue_number,
+            )
+
+        # 7. Rebuild cache
+        if branch:
+            self.rebuild_cache_from_truth(branch, new_proj, [], actor=actor)
+
+        logger.bind(
+            domain="blocked_state",
+            action="auto_resolve_state",
+            issue_number=issue_number,
+            branch=branch,
+            target_state=target_state.value,
+            closed_deps=closed_dependency_ids,
+        ).info("Auto resolve state completed")
+
+        return True
+
     # ========================================================================
     # Public API: Query Operations
     # ========================================================================

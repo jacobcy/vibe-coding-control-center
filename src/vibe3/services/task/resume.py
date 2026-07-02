@@ -85,20 +85,23 @@ class TaskResumeOperations:
 
         emit_progress("checking consistency and recovering")
 
-        # Delegate to unified recovery service (manual path: auto=False)
-        from vibe3.services.flow import FlowRecoveryService
+        # Delegate to manual_resume API (human-authorized clearance)
+        from vibe3.services.flow.resume_api import manual_resume
 
-        recovery = FlowRecoveryService(
-            store=self._flow_service.store,
-            git_client=self.git_client,
-            github_client=self.github_client,
-        )
-        recovery.recover(
-            branch=branch or "",
+        result = manual_resume(
             issue_number=issue_number,
+            branch=branch or "",
+            target_state=IssueState.READY,
+            actor="cli:task-resume",
             reason=f"Resumed from {resume_kind}: {reason}",
-            auto=False,
+            github_client=self.github_client,
+            label_service=self.label_service,
+            store=self._flow_service.store,
         )
+
+        if not result.success:
+            raise UserError(f"Resume failed: {result.detail}")
+
         emit_progress("recovery complete", status="done")
 
     def _guard_no_live_sessions(self, branch: str) -> None:

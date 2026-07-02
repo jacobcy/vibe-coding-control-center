@@ -7,7 +7,7 @@ label-auto resume path.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any
 
 from vibe3.clients import GitClient, GitHubClient, SQLiteClient
 from vibe3.config import load_orchestra_config
@@ -15,8 +15,6 @@ from vibe3.models import IssueInfo
 from vibe3.services.flow.cleanup import FlowCleanupService
 from vibe3.services.flow.rebuild_postconditions import assert_rebuild_postconditions
 from vibe3.services.protocols.flow_protocols import FlowBootstrapProtocol
-
-LabelResume = Callable[..., None]
 
 
 class FlowRebuildUsecase:
@@ -29,7 +27,6 @@ class FlowRebuildUsecase:
         git_client: GitClient | None = None,
         github_client: GitHubClient | None = None,
         orchestrator: FlowBootstrapProtocol | None = None,
-        label_resume: LabelResume | None = None,
     ) -> None:
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
@@ -54,7 +51,6 @@ class FlowRebuildUsecase:
                     f"Failed to import FlowOrchestratorService: {e}. "
                     "Provide orchestrator parameter explicitly."
                 ) from e
-        self._label_resume = label_resume or self._default_label_resume
 
     def rebuild_issue_flow(
         self,
@@ -130,45 +126,4 @@ class FlowRebuildUsecase:
                 issue_number=issue_number,
             )
 
-        self._label_resume(
-            issue_number=issue.number,
-            branch=branch,
-            reason=reason,
-        )
         return result
-
-    def _default_label_resume(
-        self,
-        *,
-        issue_number: int,
-        branch: str,
-        reason: str,
-    ) -> None:
-        """Clear blocked markers after rebuild.
-
-        Post-rebuild: consistency is guaranteed (we just rebuilt), so we
-        skip the classify step and go straight to clearing blocked state.
-        """
-        from loguru import logger
-
-        from vibe3.services.flow.blocked_state_service import BlockedStateService
-
-        target = BlockedStateService(
-            github_client=self.github_client,
-            store=self.store,
-        ).reconcile_blocked(
-            issue_number=issue_number,
-            branch=branch,
-            clear_reason=True,
-            actor="vibe3:flow_rebuild",
-        )
-
-        if target is None:
-            logger.bind(
-                domain="recovery",
-                branch=branch,
-                issue_number=issue_number,
-            ).error(
-                f"Label not cleared after rebuild for #{issue_number}. "
-                f"Manual fix: gh issue edit {issue_number} --remove-label state/blocked"
-            )

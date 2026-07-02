@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.exceptions import UserError
 from vibe3.services.flow.consistency import (
     FlowConsistencyCode,
     FlowConsistencyResult,
@@ -104,7 +103,6 @@ class FlowRecoveryService:
         branch: str,
         issue_number: int,
         reason: str,
-        auto: bool,
         ensure_worktree: bool = True,
         include_remote: bool = False,
     ) -> RecoveryResult:
@@ -114,29 +112,22 @@ class FlowRecoveryService:
             branch: Flow branch name (empty string if no flow)
             issue_number: GitHub issue number
             reason: Human-readable reason for recovery
-            auto: True for orchestra/health-check paths (auto-rebuild);
-                  False for manual paths (guide user instead of rebuilding)
             ensure_worktree: Whether rebuild should create worktree
             include_remote: Whether rebuild should delete remote branch
         """
         # Special case: no branch (issue with no flow) -> just clear label
         if not branch:
-            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
+            self._do_resume(branch, issue_number, reason)
             return RecoveryResult(
                 action=RecoveryAction.RESUME_ONLY,
                 success=True,
-                detail="No flow branch; cleared blocked markers",
+                detail="No flow branch; synced blocked state",
             )
 
         flow_state = self.store.get_flow_state(branch)
 
         # Short-circuit: no flow record -> rebuild (consistent with classify())
         if flow_state is None:
-            if not auto:
-                raise UserError(
-                    f"No flow record found for branch '{branch}'. "
-                    f"Run: vibe3 flow rebuild {issue_number} --yes"
-                )
             self._do_rebuild(
                 branch,
                 issue_number,
@@ -144,11 +135,11 @@ class FlowRecoveryService:
                 ensure_worktree=ensure_worktree,
                 include_remote=include_remote,
             )
-            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
+            self._do_resume(branch, issue_number, reason)
             return RecoveryResult(
                 action=RecoveryAction.REBUILD,
                 success=True,
-                detail="No flow record; rebuilt scene and cleared blocked markers",
+                detail="No flow record; rebuilt scene and synced blocked state",
             )
 
         consistency = check_flow_consistency(
@@ -157,11 +148,11 @@ class FlowRecoveryService:
 
         # --- Classify ---
         if consistency.code == FlowConsistencyCode.OK:
-            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
+            self._do_resume(branch, issue_number, reason)
             return RecoveryResult(
                 action=RecoveryAction.RESUME_ONLY,
                 success=True,
-                detail="Scene consistent; cleared blocked markers",
+                detail="Scene consistent; synced blocked state",
             )
 
         if consistency.fix_action:
@@ -170,45 +161,29 @@ class FlowRecoveryService:
                 logger.bind(
                     domain="recovery", branch=branch, fix=consistency.fix_action
                 ).info("Applied cheap consistency fix")
-            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
+            self._do_resume(branch, issue_number, reason)
             return RecoveryResult(
                 action=RecoveryAction.FIX_AND_RESUME,
                 success=True,
                 detail=(
-                    f"Applied fix ({consistency.fix_action}); "
-                    "cleared blocked markers"
+                    f"Applied fix ({consistency.fix_action}); " "synced blocked state"
                 ),
             )
 
         if consistency.needs_rebuild:
-            if not auto:
-                raise UserError(
-                    f"{consistency.reason}. "
-                    f"Run: vibe3 flow rebuild {issue_number} --yes"
-                )
-            self._do_rebuild(
-                branch,
-                issue_number,
-                reason,
-                ensure_worktree=ensure_worktree,
-                include_remote=include_remote,
-            )
-            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
-            return RecoveryResult(
-                action=RecoveryAction.REBUILD,
-                success=True,
-                detail=(
-                    f"Rebuilt scene and cleared blocked markers: "
-                    f"{consistency.reason}"
-                ),
+            from vibe3.exceptions import UserError
+
+            raise UserError(
+                f"{consistency.reason}. "
+                f"Run: vibe3 flow rebuild {issue_number} --yes"
             )
 
         # Should not reach here
-        self._do_resume(branch, issue_number, reason, clear_reason=not auto)
+        self._do_resume(branch, issue_number, reason)
         return RecoveryResult(
             action=RecoveryAction.RESUME_ONLY,
             success=True,
-            detail="Fallback: cleared blocked markers",
+            detail="Fallback: synced blocked state",
         )
 
     def _do_resume(
@@ -216,34 +191,19 @@ class FlowRecoveryService:
         branch: str,
         issue_number: int,
         reason: str,
-        clear_reason: bool = False,
     ) -> None:
-        """Clear blocked markers via reconcile_blocked."""
+        """Sync blocked state via sync_blocked_state (no state inference)."""
         from vibe3.services.flow.blocked_state_service import BlockedStateService
 
         service = BlockedStateService(
             github_client=self.github_client,
             store=self.store,
         )
-        target_state = service.reconcile_blocked(
+        service.sync_blocked_state(
             issue_number=issue_number,
             branch=branch,
-            clear_reason=clear_reason,
             actor="recovery:resume",
         )
-        if target_state is None and clear_reason:
-            # None means either open dependencies remain or GitHub is unreachable
-            # (degraded mode).  Either way we must NOT raise — keeping the flow
-            # blocked is the correct conservative outcome (§6.2 / §6.4).
-            logger.bind(
-                domain="recovery",
-                action="_do_resume",
-                issue_number=issue_number,
-                branch=branch,
-            ).warning(
-                "reconcile_blocked returned None after clear_reason; "
-                "flow remains blocked (open deps or GitHub degraded)"
-            )
 
     def _do_rebuild(
         self,
@@ -278,7 +238,6 @@ class FlowRecoveryService:
             store=self.store,
             git_client=self.git_client,
             github_client=self.github_client,
-            label_resume=lambda **_: None,
         ).rebuild_issue_flow(
             issue=issue_info,
             branch=branch,

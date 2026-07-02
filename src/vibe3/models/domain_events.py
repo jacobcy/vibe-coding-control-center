@@ -279,3 +279,56 @@ class ControlPlaneEventPublished(DomainEvent):
     idempotency_key: str = ""
     detail: str = ""
     timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class ManualResumeRequested(DomainEvent):
+    """Published when a manual resume is requested for a blocked flow."""
+
+    issue_number: int
+    branch: str
+    target_state: str
+    actor: str
+    reason: str
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class ManualBlockedReasonCleared(DomainEvent):
+    """Published when blocked_reason is manually cleared."""
+
+    issue_number: int
+    actor: str
+    reason: str
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class AutoResumeEligible(DomainEvent):
+    """Published when a blocked flow becomes eligible for auto-resume."""
+
+    issue_number: int
+    branch: str
+    closed_dependency_ids: tuple[int, ...]
+    target_state: str
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class AutoResumeRejected(DomainEvent):
+    """Published when auto-resume eligibility check rejects a flow."""
+
+    issue_number: int
+    reason_code: str
+    reason_detail: str
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class SceneRebuilt(DomainEvent):
+    """Published when a flow scene is rebuilt."""
+
+    branch: str
+    issue_number: int
+    detail: str
+    timestamp: str | None = None

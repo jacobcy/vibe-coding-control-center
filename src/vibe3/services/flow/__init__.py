@@ -8,6 +8,8 @@ Public API Contract:
 - FlowProjection, FlowProjectionService: Flow projections
 - FlowRebuildUsecase, FlowStatusService, FlowStatusResolver: Core utilities
 - create_flow_manager, infer_resume_label: Factory and utilities
+- resume_api: Manual and auto resume APIs
+  (manual_resume, evaluate_auto_resume, apply_auto_resume)
 
 All other symbols are internal to the flow package and should be imported directly.
 """
@@ -39,6 +41,15 @@ if TYPE_CHECKING:
     from vibe3.services.flow.projection import FlowProjection, FlowProjectionService
     from vibe3.services.flow.rebuild import FlowRebuildUsecase
     from vibe3.services.flow.recovery import FlowRecoveryService
+    from vibe3.services.flow.resume_api import (
+        AutoResumeDecision,
+        AutoResumeRejectedCode,
+        ResumeResult,
+        ResumeSource,
+        apply_auto_resume,
+        evaluate_auto_resume,
+        manual_resume,
+    )
     from vibe3.services.flow.resume_resolver import infer_resume_label
     from vibe3.services.flow.service import FlowService, resolve_flow_ref
     from vibe3.services.flow.status import FlowStatusService
@@ -75,6 +86,14 @@ __all__ = [
     "FlowTimelineService",
     "TransitionRecorder",
     "TransitionRecordResult",
+    # Resume API
+    "ResumeSource",
+    "AutoResumeRejectedCode",
+    "AutoResumeDecision",
+    "ResumeResult",
+    "manual_resume",
+    "evaluate_auto_resume",
+    "apply_auto_resume",
 ]
 
 _SYMBOL_MODULES = {
@@ -103,6 +122,14 @@ _SYMBOL_MODULES = {
     "FlowTimelineService": "vibe3.services.flow.timeline",
     "TransitionRecorder": "vibe3.services.flow.transition_recorder",
     "TransitionRecordResult": "vibe3.services.flow.transition_recorder",
+    # Resume API
+    "ResumeSource": "vibe3.services.flow.resume_api",
+    "AutoResumeRejectedCode": "vibe3.services.flow.resume_api",
+    "AutoResumeDecision": "vibe3.services.flow.resume_api",
+    "ResumeResult": "vibe3.services.flow.resume_api",
+    "manual_resume": "vibe3.services.flow.resume_api",
+    "evaluate_auto_resume": "vibe3.services.flow.resume_api",
+    "apply_auto_resume": "vibe3.services.flow.resume_api",
 }
 
 

@@ -102,20 +102,34 @@ class QualifyGateService:
         if not branch:
             return None
 
-        # Converge entirely onto reconcile_blocked
-        service = BlockedStateService(store=self._store, github_client=self._github)
-        target_state = service.reconcile_blocked(
+        # Use observer-only auto-resume eligibility API
+        from vibe3.services.flow.resume_api import (
+            apply_auto_resume,
+            evaluate_auto_resume,
+        )
+
+        decision = evaluate_auto_resume(
             issue_number=issue.number,
             branch=branch,
-            clear_reason=False,
-            actor="orchestra:dispatcher",
+            github_client=self._github,
         )
-        if target_state is None:
+
+        if not decision.eligible:
             return None
+
+        result = apply_auto_resume(
+            decision,
+            github_client=self._github,
+            store=self._store,
+        )
+
+        if not result.success or not result.target_state:
+            return None
+
         truth = self._coordination_resolver.resolve_coordination(branch, issue.number)
         if not self._check_worktree_health(issue, branch, truth):
             return None
-        return target_state
+        return result.target_state
 
     def _terminalize_closed_issue(self, issue: IssueInfo, branch: str) -> None:
         terminalize_closed_issue(
