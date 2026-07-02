@@ -211,6 +211,7 @@ git commit -m "fix(dispatch): restore in-flight queue idempotency"
 **Files:**
 - Modify: `src/vibe3/orchestra/queue_operations.py:14-173`
 - Modify: `src/vibe3/domain/qualify_gate.py:58-132`
+- Modify: `src/vibe3/domain/qualify_gate_support.py:78-102`
 - Modify: `src/vibe3/domain/dispatch_preflight.py:65-142`
 - Delete: `tests/vibe3/orchestra/test_auto_resume_no_flow.py`
 - Delete: `tests/vibe3/orchestra/test_auto_resume_cooldown.py`
@@ -300,7 +301,12 @@ Delete the two test files that exist solely to require this forbidden mutation.
 
 - [ ] **Step 5: Restrict active qualification to observed state**
 
-Remove `blocked_signal` and `reconcile_blocked()` from `run_qualify_gate()`. Preserve closed-issue terminalization, active PR-to-review observation if it does not write a guessed state, and worktree health checks. End the active path with:
+Remove `blocked_signal` and `reconcile_blocked()` from `run_qualify_gate()`.
+Also delete `_should_transition_to_review()`, `_get_open_pr_for_branch()`,
+`_transition_flow_to_review()`, and the `transition_to_review()` support helper:
+detecting an open PR must not make qualify gate decide that normal flow status
+is now review. Preserve closed-issue terminalization and worktree health checks.
+End the active path with:
 
 ```python
 if not flow_state:
@@ -331,6 +337,7 @@ Expected: PASS and no test expects an active/orphan issue to be force-written to
 ```bash
 git add -A src/vibe3/orchestra/queue_operations.py \
   src/vibe3/domain/qualify_gate.py \
+  src/vibe3/domain/qualify_gate_support.py \
   src/vibe3/domain/dispatch_preflight.py \
   tests/vibe3/orchestra/test_auto_resume_no_flow.py \
   tests/vibe3/orchestra/test_auto_resume_cooldown.py \
