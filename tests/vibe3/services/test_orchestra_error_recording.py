@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import ANY, MagicMock, patch
 
+import pytest
+
 from vibe3.models import ExecutionLaunchResult
 from vibe3.services.orchestra.error_recording import (
     record_dispatch_failure_if_unexpected,
@@ -374,3 +376,32 @@ class TestRecordDispatchFailureIfUnexpected:
 
         # SHOULD record error - it's a real ValueError, not a mock leak
         mock_record_error.assert_called_once()
+
+    @pytest.mark.regression("issue-3272")
+    def test_dispatch_role_routes_preflight_exception_classified(self) -> None:
+        """Verify role='dispatch' routes preflight exception with classified code."""
+        mock_store = MagicMock()
+
+        with (
+            patch(
+                "vibe3.services.orchestra.error_recording.record_error"
+            ) as mock_record_error,
+            patch(
+                "vibe3.clients.SQLiteClient",
+                return_value=mock_store,
+            ),
+        ):
+            record_dispatch_failure_if_unexpected(
+                role="dispatch",
+                issue_number=555,
+                exception=ConnectionError("transient network"),
+                dispatch_source="preflight",
+            )
+
+        # Verify inner record_error received classified code
+        mock_record_error.assert_called_once()
+        call_args = mock_record_error.call_args[1]
+        assert call_args["error_code"] == "E_API_NETWORK"
+        assert call_args["issue_number"] == 555
+        # dispatch_source embedded in message string
+        assert "preflight dispatch dispatch failed" in call_args["error_message"]

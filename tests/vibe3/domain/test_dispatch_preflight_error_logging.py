@@ -1,10 +1,15 @@
-"""Tests for dispatch_preflight error logging to error_log table."""
+"""Tests for dispatch_preflight error logging.
+
+Verifies that qualify-gate exceptions are routed through
+record_dispatch_failure_if_unexpected with classified error codes.
+"""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from vibe3.domain.dispatch_preflight import DispatchPreflightService
+from vibe3.exceptions import AgentPresetNotFoundError
 from vibe3.models import IssueInfo, IssueState
 
 
@@ -31,7 +36,7 @@ def mock_structural_check():
 def test_qualify_blocked_records_error_on_exception(
     mock_qualify_gate, mock_flow_context, mock_structural_check
 ):
-    """Verify qualify_blocked exception triggers record_error."""
+    """Verify qualify_blocked exception triggers helper with classified code."""
     issue = IssueInfo(
         number=123,
         title="Test blocked issue",
@@ -41,6 +46,7 @@ def test_qualify_blocked_records_error_on_exception(
     )
 
     # Mock qualify_gate to raise exception
+    # RuntimeError -> E_EXEC_UNKNOWN (unclassified, not promoted)
     mock_qualify_gate.qualify_blocked_issue.side_effect = RuntimeError(
         "no such column: aup_rejection_count"
     )
@@ -51,26 +57,33 @@ def test_qualify_blocked_records_error_on_exception(
         structural_check=mock_structural_check,
     )
 
-    with patch("vibe3.domain.dispatch_preflight.record_error") as mock_record_error:
+    mock_store = MagicMock()
+    # Patch the underlying record_error (called by the helper)
+    with (
+        patch(
+            "vibe3.services.orchestra.error_recording.record_error"
+        ) as mock_record_error,
+        patch("vibe3.clients.SQLiteClient", return_value=mock_store),
+    ):
         result = service._qualify_blocked(issue)
 
     # Verify behavior preserved: returns None
     assert result is None
 
-    # Verify record_error was called with correct parameters
+    # Verify inner record_error received classified code
     mock_record_error.assert_called_once()
     call_args = mock_record_error.call_args[1]
-    assert call_args["error_code"] == "E_DISPATCH_FAILURE"
+    # RuntimeError is not a permanent code error → stays E_EXEC_UNKNOWN
+    assert call_args["error_code"] == "E_EXEC_UNKNOWN"
     assert call_args["issue_number"] == 123
-    assert "no such column: aup_rejection_count" in call_args["error_message"]
-    assert "blocked qualify gate failed" in call_args["error_message"]
+    assert "preflight dispatch dispatch failed" in call_args["error_message"]
 
 
 @pytest.mark.regression("issue-3250")
 def test_qualify_active_records_error_on_exception(
     mock_qualify_gate, mock_flow_context, mock_structural_check
 ):
-    """Verify qualify_active exception triggers record_error."""
+    """Verify qualify_active exception triggers helper with classified code."""
     issue = IssueInfo(
         number=456,
         title="Test active issue",
@@ -80,6 +93,7 @@ def test_qualify_active_records_error_on_exception(
     )
 
     # Mock run_qualify_gate to raise exception
+    # RuntimeError -> E_EXEC_UNKNOWN (unclassified, not promoted)
     mock_qualify_gate.run_qualify_gate.side_effect = RuntimeError(
         "qualify gate internal error"
     )
@@ -90,26 +104,33 @@ def test_qualify_active_records_error_on_exception(
         structural_check=mock_structural_check,
     )
 
-    with patch("vibe3.domain.dispatch_preflight.record_error") as mock_record_error:
+    mock_store = MagicMock()
+    # Patch the underlying record_error (called by the helper)
+    with (
+        patch(
+            "vibe3.services.orchestra.error_recording.record_error"
+        ) as mock_record_error,
+        patch("vibe3.clients.SQLiteClient", return_value=mock_store),
+    ):
         result = service._qualify_active(issue)
 
     # Verify behavior preserved: returns None
     assert result is None
 
-    # Verify record_error was called with correct parameters
+    # Verify inner record_error received classified code
     mock_record_error.assert_called_once()
     call_args = mock_record_error.call_args[1]
-    assert call_args["error_code"] == "E_DISPATCH_FAILURE"
+    # RuntimeError is not a permanent code error → stays E_EXEC_UNKNOWN
+    assert call_args["error_code"] == "E_EXEC_UNKNOWN"
     assert call_args["issue_number"] == 456
-    assert "qualify gate internal error" in call_args["error_message"]
-    assert "active qualify gate failed" in call_args["error_message"]
+    assert "preflight dispatch dispatch failed" in call_args["error_message"]
 
 
 @pytest.mark.regression("issue-3250")
 def test_qualify_blocked_survives_when_record_error_fails(
     mock_qualify_gate, mock_flow_context, mock_structural_check
 ):
-    """Verify preflight decision preserved when record_error itself fails."""
+    """Verify preflight decision preserved when helper itself fails."""
     issue = IssueInfo(
         number=789,
         title="Test blocked issue",
@@ -129,19 +150,21 @@ def test_qualify_blocked_survives_when_record_error_fails(
         structural_check=mock_structural_check,
     )
 
-    # Mock record_error to also fail
-    with patch(
-        "vibe3.domain.dispatch_preflight.record_error",
-        side_effect=Exception("DB write failed"),
-    ) as mock_record_error:
-        with patch("vibe3.domain.dispatch_preflight.logger") as mock_logger:
-            result = service._qualify_blocked(issue)
+    # Mock helper to also fail
+    with (
+        patch(
+            "vibe3.domain.dispatch_preflight.record_dispatch_failure_if_unexpected",
+            side_effect=Exception("DB write failed"),
+        ) as mock_helper,
+        patch("vibe3.domain.dispatch_preflight.logger") as mock_logger,
+    ):
+        result = service._qualify_blocked(issue)
 
     # Verify behavior preserved: still returns None (not raising)
     assert result is None
 
-    # Verify record_error was attempted
-    mock_record_error.assert_called_once()
+    # Verify helper was attempted
+    mock_helper.assert_called_once()
 
     # Verify fallback logger warning was emitted
     bound_logger = mock_logger.bind.return_value
@@ -150,3 +173,43 @@ def test_qualify_blocked_survives_when_record_error_fails(
     assert any(
         "Failed to record dispatch_preflight error" in call for call in warning_calls
     )
+
+
+@pytest.mark.regression("issue-3272")
+@pytest.mark.parametrize(
+    "exception,expected_code",
+    [
+        (ConnectionError("transient network"), "E_API_NETWORK"),
+        (AgentPresetNotFoundError("preset not found"), "E_MODEL_CONFIG"),
+        (ValueError("invalid value"), "E_DISPATCH_CODE_ERROR"),
+        (RuntimeError("unknown error"), "E_EXEC_UNKNOWN"),
+    ],
+)
+def test_dispatch_preflight_classified_exception(exception, expected_code):
+    """Verify preflight routing surfaces classified code, not E_DISPATCH_FAILURE."""
+    mock_store = MagicMock()
+
+    with (
+        patch(
+            "vibe3.services.orchestra.error_recording.record_error"
+        ) as mock_record_error,
+        patch("vibe3.clients.SQLiteClient", return_value=mock_store),
+    ):
+        from vibe3.services.orchestra.error_recording import (
+            record_dispatch_failure_if_unexpected,
+        )
+
+        record_dispatch_failure_if_unexpected(
+            role="dispatch",
+            issue_number=555,
+            exception=exception,
+            dispatch_source="preflight",
+        )
+
+    # Verify inner record_error received classified code
+    mock_record_error.assert_called_once()
+    call_args = mock_record_error.call_args[1]
+    assert call_args["error_code"] == expected_code
+    assert call_args["issue_number"] == 555
+    # dispatch_source embedded in message string, not a separate kwarg
+    assert "preflight dispatch dispatch failed" in call_args["error_message"]
