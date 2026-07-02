@@ -145,6 +145,24 @@ class WebhookIssueClosed(DomainEvent):
 
 
 @dataclass(frozen=True)
+class IssueResolvedDependency(DomainEvent):
+    """Published when a closed issue may resolve dependency blockers.
+
+    Signals that downstream flows blocked by this issue may need
+    re-evaluation. Consumers must use the observer-only auto eligibility
+    API (see #3289 / #3292) and must NOT invoke
+    BlockedStateService.reconcile_blocked or infer a dispatchable target
+    from local refs (plan_ref/pr_ref/report_ref/audit_ref).
+    """
+
+    issue_number: int
+    merged: bool
+    pr_number: int | None = None
+    actor: str = "system:dispatch"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
 class ManualPlanIntent(DomainEvent):
     """Published when CLI plan command is invoked."""
 

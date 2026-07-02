@@ -656,3 +656,43 @@ class SQLiteFlowStateRepo(_HasConnection):
             dependents_count=len(dependents),
         ).debug("Retrieved flow dependents")
         return dependents
+
+    def get_issue_dependents(self, issue_number: int) -> list[str]:
+        """Get non-deleted flows that depend on a given issue number.
+
+        Reverse-dependency lookup from issue_number to all branches
+        having it as a dependency link. Includes both ``active`` and
+        ``blocked`` flows — a dependent is typically ``blocked`` while
+        waiting on this issue, so filtering to ``active`` only would
+        miss the exact population callers need to re-evaluate/notify.
+
+        Args:
+            issue_number: Issue number to find dependents for.
+
+        Returns:
+            List of branch names with non-deleted flows having this
+            issue as dependency.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT DISTINCT fil.branch
+            FROM flow_issue_links fil
+            JOIN flow_state fs ON fil.branch = fs.branch
+            WHERE fil.issue_number = ?
+              AND fil.issue_role = 'dependency'
+              AND fs.flow_status IN ('active', 'blocked')
+              AND fs.deleted_at IS NULL
+            ORDER BY fil.branch
+            """,
+            (issue_number,),
+        )
+        dependents = [row[0] for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite",
+            operation="get_issue_dependents",
+            issue_number=issue_number,
+            dependents_count=len(dependents),
+        ).debug("Retrieved issue dependents")
+        return dependents

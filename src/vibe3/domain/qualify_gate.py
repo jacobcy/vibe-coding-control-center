@@ -132,6 +132,27 @@ class QualifyGateService:
             ),
         )
 
+        # Advisory notification for downstream dependents (non-blocking)
+        # Dependency closure gate: posts advisory comments when upstream closes
+        try:
+            from vibe3.services.dispatch import DependencyClosureGate
+
+            DependencyClosureGate.notify_downstream(
+                issue_number=issue.number,
+                store=self._store,
+                github_client=self._github,
+            )
+        except Exception as exc:
+            # Non-critical advisory - don't block terminalization
+            from loguru import logger
+
+            logger.bind(
+                domain="dispatch",
+                action="terminalize_closed_issue",
+                issue_number=issue.number,
+                error=str(exc),
+            ).warning(f"Failed to notify downstream dependents: {exc}")
+
     def _check_worktree_health(
         self,
         issue: IssueInfo,
