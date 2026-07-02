@@ -289,3 +289,308 @@ def test_multi_dependency_preserved_through_service_layer(tmp_path: Path) -> Non
     state = BlockedStateIO(github_client=github).read_body_projection(123)
     assert state.is_blocked is True
     assert state.blocked_by == [456, 789]
+
+
+# ============================================================================
+# Truth Table Validation Tests (Required by Issue #3289)
+# ============================================================================
+
+
+class TestAutoResumeTruthTable:
+    """Tests for mandatory truth table from issue #3289.
+
+    Truth table validation:
+    | human reason | dependency truth | caller | Result |
+    |---|---|---|---|
+    | present | none/closed | auto | remain blocked; zero mutation |
+    | present | open | auto | remain blocked; zero mutation |
+    | absent | any open | auto | remain blocked; zero mutation |
+    | absent | unreadable | auto | remain blocked; degraded/fail closed |
+    | absent | all closed | auto, existing flow | handoff + audited dependency resolution |
+    | present | all closed | manual | clear reason, then handoff/explicit target |
+    | any | any open | manual without force | remain blocked and report open deps |
+    """
+
+    def test_auto_path_human_reason_present_no_mutation(self) -> None:
+        """Auto path with human reason present → remain blocked; zero mutation."""
+        from unittest.mock import MagicMock
+
+        from vibe3.services.flow.resume_api import evaluate_auto_resume
+
+        with patch("vibe3.services.flow.resume_api.BlockedStateIO") as mock_io_class:
+            mock_io = MagicMock()
+            mock_io_class.return_value = mock_io
+
+            mock_io.github.get_issue_body.return_value = """<!-- vibe3-flow-state-start -->
+
+**Vibe3 Flow State**
+
+- **State**: blocked
+- **Blocked reason**: Manual review required
+
+<!-- vibe3-flow-state-end -->
+"""
+            mock_io.read_issue_state.return_value = IssueState.BLOCKED
+
+            decision = evaluate_auto_resume(
+                issue_number=123,
+                branch="task/issue-123",
+                github_client=MagicMock(),
+            )
+
+            assert not decision.eligible
+            # Verify no mutations were made
+            assert not mock_io.write_projection.called
+            assert not mock_io.write_label_state.called
+
+    def test_auto_path_open_dependency_no_mutation(self) -> None:
+        """Auto path with open dependency → remain blocked; zero mutation."""
+        from unittest.mock import MagicMock
+
+        from vibe3.services.flow.resume_api import evaluate_auto_resume
+
+        with patch("vibe3.services.flow.resume_api.BlockedStateIO") as mock_io_class:
+            mock_io = MagicMock()
+            mock_io_class.return_value = mock_io
+
+            mock_io.github.get_issue_body.return_value = """<!-- vibe3-flow-state-start -->
+
+**Vibe3 Flow State**
+
+- **State**: blocked
+- **Blocked by**: #456
+
+<!-- vibe3-flow-state-end -->
+"""
+            mock_io.read_issue_state.return_value = IssueState.BLOCKED
+
+            with patch(
+                "vibe3.services.flow.resume_api.DependencyResolutionService.is_dependency_resolved"
+            ) as mock_resolved:
+                mock_resolved.return_value = MagicMock(resolved=False)
+
+                decision = evaluate_auto_resume(
+                    issue_number=123,
+                    branch="task/issue-123",
+                    github_client=MagicMock(),
+                )
+
+                assert not decision.eligible
+                # Verify no mutations were made
+                assert not mock_io.write_projection.called
+                assert not mock_io.write_label_state.called
+
+    def test_auto_path_all_closed_existing_flow_routes_to_handoff(self) -> None:
+        """Auto path with all deps closed + existing flow → handoff."""
+        from unittest.mock import MagicMock
+
+        from vibe3.services.flow.resume_api import (
+            apply_auto_resume,
+            evaluate_auto_resume,
+        )
+
+        with patch("vibe3.services.flow.resume_api.BlockedStateIO") as mock_io_class:
+            mock_io = MagicMock()
+            mock_io_class.return_value = mock_io
+
+            body = """<!-- vibe3-flow-state-start -->
+
+**Vibe3 Flow State**
+
+- **State**: blocked
+- **Blocked by**: #456
+
+<!-- vibe3-flow-state-end -->
+"""
+            mock_io.github.get_issue_body.return_value = body
+            mock_io.read_issue_state.return_value = IssueState.BLOCKED
+            mock_io.write_label_state.return_value = "advanced"
+
+            with patch(
+                "vibe3.services.flow.resume_api.DependencyResolutionService.is_dependency_resolved"
+            ) as mock_resolved:
+                mock_resolved.return_value = MagicMock(resolved=True)
+
+                # Evaluate
+                decision = evaluate_auto_resume(
+                    issue_number=123,
+                    branch="task/issue-123",
+                    github_client=MagicMock(),
+                )
+
+                assert decision.eligible
+
+                # Mock existing flow with db_path and count_specific_pair
+                mock_store = MagicMock()
+                mock_store.get_flow_state.return_value = {"branch": "task/issue-123"}
+                mock_store.db_path = ":memory:"
+                mock_store.count_specific_pair.return_value = 0
+                mock_store.record_confirmed_transition.return_value = (1, 1, 1)
+
+                # Apply
+                result = apply_auto_resume(
+                    decision,
+                    github_client=MagicMock(),
+                    store=mock_store,
+                )
+
+                assert result.success
+                assert result.target_state == IssueState.HANDOFF
+
+    def test_manual_path_clears_reason_after_explicit_authorization(self) -> None:
+        """Manual path with all closed deps clears reason after explicit authorization."""
+        from unittest.mock import MagicMock
+
+        from vibe3.services.flow.resume_api import manual_resume
+
+        with patch("vibe3.services.flow.resume_api.BlockedStateIO") as mock_io_class:
+            mock_io = MagicMock()
+            mock_io_class.return_value = mock_io
+
+            mock_io.github.get_issue_body.return_value = """<!-- vibe3-flow-state-start -->
+
+**Vibe3 Flow State**
+
+- **State**: blocked
+- **Blocked reason**: Manual review needed
+
+<!-- vibe3-flow-state-end -->
+"""
+            mock_io.read_issue_state.return_value = IssueState.BLOCKED
+            mock_io.write_label_state.return_value = "advanced"
+
+            # Mock store with db_path and count_specific_pair
+            mock_store = MagicMock()
+            mock_store.db_path = ":memory:"
+            mock_store.count_specific_pair.return_value = 0
+            mock_store.record_confirmed_transition.return_value = (1, 1, 1)
+
+            result = manual_resume(
+                issue_number=123,
+                branch="task/issue-123",
+                target_state=IssueState.READY,
+                actor="cli:user",
+                reason="User approved",
+                github_client=MagicMock(),
+                store=mock_store,
+            )
+
+            assert result.success
+            # Verify projection was written with cleared reason
+            call_args = mock_io.write_projection.call_args
+            projection = call_args[0][1]
+            assert projection.blocked_reason is None
+
+    def test_manual_path_open_deps_fails_closed(self) -> None:
+        """Manual path with open deps → remain blocked and report open deps."""
+        from unittest.mock import MagicMock
+
+        from vibe3.services.flow.resume_api import manual_resume
+
+        with patch("vibe3.services.flow.resume_api.BlockedStateIO") as mock_io_class:
+            mock_io = MagicMock()
+            mock_io_class.return_value = mock_io
+
+            mock_io.github.get_issue_body.return_value = """<!-- vibe3-flow-state-start -->
+
+**Vibe3 Flow State**
+
+- **State**: blocked
+- **Blocked by**: #456
+
+<!-- vibe3-flow-state-end -->
+"""
+            mock_io.read_issue_state.return_value = IssueState.BLOCKED
+
+            with patch(
+                "vibe3.services.flow.resume_api.DependencyResolutionService.is_dependency_resolved"
+            ) as mock_resolved:
+                mock_resolved.return_value = MagicMock(resolved=False)
+
+                # Mock store with db_path and count_specific_pair
+                mock_store = MagicMock()
+                mock_store.db_path = ":memory:"
+                mock_store.count_specific_pair.return_value = 0
+
+                result = manual_resume(
+                    issue_number=123,
+                    branch="task/issue-123",
+                    target_state=IssueState.READY,
+                    actor="cli:user",
+                    reason="User wants to resume",
+                    github_client=MagicMock(),
+                    store=mock_store,
+                )
+
+                assert not result.success
+                assert "456" in result.detail
+                # Verify no projection was written
+                assert not mock_io.write_projection.called
+
+    def test_no_inference_from_pr_ref_plan_ref(self) -> None:
+        """No resume target is inferred solely from pr_ref, plan_ref, or report/audit refs."""
+        # This test verifies that evaluate_auto_resume does NOT look at
+        # pr_ref/plan_ref/report_ref/audit_ref to determine target state
+        # It only routes to handoff for existing flow, or ready for pre-flow
+        from unittest.mock import MagicMock
+
+        from vibe3.services.flow.resume_api import (
+            apply_auto_resume,
+            evaluate_auto_resume,
+        )
+
+        with patch("vibe3.services.flow.resume_api.BlockedStateIO") as mock_io_class:
+            mock_io = MagicMock()
+            mock_io_class.return_value = mock_io
+
+            # Body contains pr_ref and plan_ref
+            body = """<!-- vibe3-flow-state-start -->
+
+**Vibe3 Flow State**
+
+- **State**: blocked
+- **Blocked by**: #456
+
+<!-- vibe3-flow-state-end -->
+
+## pr_ref
+#789
+
+## plan_ref
+docs/plans/issue-123-plan.md
+"""
+            mock_io.github.get_issue_body.return_value = body
+            mock_io.read_issue_state.return_value = IssueState.BLOCKED
+            mock_io.write_label_state.return_value = "advanced"
+
+            with patch(
+                "vibe3.services.flow.resume_api.DependencyResolutionService.is_dependency_resolved"
+            ) as mock_resolved:
+                mock_resolved.return_value = MagicMock(resolved=True)
+
+                decision = evaluate_auto_resume(
+                    issue_number=123,
+                    branch="task/issue-123",
+                    github_client=MagicMock(),
+                )
+
+                assert decision.eligible
+
+                # Mock NO existing flow (pre-flow scenario) with db_path and count_specific_pair
+                mock_store = MagicMock()
+                mock_store.get_flow_state.return_value = None
+                mock_store.db_path = ":memory:"
+                mock_store.count_specific_pair.return_value = 0
+                mock_store.record_confirmed_transition.return_value = (1, 1, 1)
+
+                result = apply_auto_resume(
+                    decision,
+                    github_client=MagicMock(),
+                    store=mock_store,
+                )
+
+                # Should route to READY (pre-flow), not infer from pr_ref/plan_ref
+                assert result.success
+                assert result.target_state == IssueState.READY
+                # Should NOT be DONE or REVIEW based on pr_ref
+                assert result.target_state not in [IssueState.DONE, IssueState.REVIEW]
