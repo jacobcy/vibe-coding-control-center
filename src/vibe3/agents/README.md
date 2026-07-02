@@ -96,5 +96,65 @@ agents/
 
 ## 被依赖
 
+- **execution/**: 使用 CodeagentBackend (codeagent_runner, coordinator), CodeagentResult, ExecutionRole (noop_gate), sync_models_json (execution_role_policy), start_async_command (coordinator)
 - **commands/**: 使用 plan_prompt, run_prompt, review_prompt
 - **roles/**: 使用 agents.backends 执行 agent 任务
+- **domain/handlers/**: 使用 ExecutionRole
+
+## 公开 APIs
+
+| 符号 | 类型 | 消费位置 |
+|------|------|---------|
+| **Protocols & Models** | | |
+| AgentBackend | 协议 | execution/, agents/backends/ |
+| CodeagentCommand | 数据模型 | execution/, agents/backends/ |
+| CodeagentResult | 数据模型 | execution/, domain/handlers/ |
+| ExecutionRole | 类型字面量 | execution/, domain/handlers/, roles/ |
+| create_codeagent_command | 工厂函数 | commands/ |
+| **Backends** | | |
+| CodeagentBackend | 后端实现 | execution/, roles/ |
+| start_async_command | 执行函数 | execution/ |
+| sync_models_json | 配置同步 | execution/ |
+| **Prompt Builders** | | |
+| build_plan_prompt_body | 构建函数 | commands/ |
+| make_plan_context_builder | 工厂函数 | commands/ |
+| build_run_prompt_body | 构建函数 | commands/ |
+| make_run_context_builder | 工厂函数 | commands/ |
+| make_skill_context_builder | 工厂函数 | commands/ |
+| make_publish_context_builder | 工厂函数 | commands/ |
+| build_review_prompt_body | 构建函数 | commands/ |
+| make_review_context_builder | 工厂函数 | commands/ |
+| **Section Inspectors** | | |
+| describe_plan_sections | 检查函数 | commands/ |
+| describe_run_plan_sections | 检查函数 | commands/ |
+| describe_review_sections | 检查函数 | commands/ |
+| **Types** | | |
+| RunPromptMode | 类型字面量 | agents/run_prompt |
+
+## execution 层接口
+
+execution 层是 agents 的主要消费者：
+
+- **execution/codeagent_runner**: 导入 `CodeagentBackend`, `CodeagentCommand`, `CodeagentResult`
+- **execution/coordinator**: 导入 `start_async_command`, `CodeagentBackend`, `CodeagentResult`
+- **execution/execution_role_policy**: 导入 `sync_models_json`
+- **execution/noop_gate**: 导入 `ExecutionRole`
+
+agents 为 execution 层提供 agent 执行能力，是 execution → roles → commands 链路的执行提供者。
+
+## 三层协作关系
+
+```
+runtime (事件循环驱动)
+  └─ HeartbeatServer.on_tick()
+       ├─ domain.OrchestrationFacade.on_tick() → 发布 domain events
+       │    └─ execution.ExecutionCoordinator → 调度 agent 执行
+       │         └─ agents.CodeagentBackend.run(prompt)
+       │              └─ prompts.PromptAssembler.assemble() → 装配 prompt 上下文
+       └─ runtime.execute_periodic_check() → 一致性检查 & 资源清理
+```
+
+agents 模块处于三层架构的中间层：
+- **上层消费者**: execution 层通过 agents 执行 agent 任务
+- **下层依赖**: agents 通过 prompts 模块构建 prompt 上下文
+- **执行角色**: 为 roles → commands 链路提供具体的 agent 执行能力
