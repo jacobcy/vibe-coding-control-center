@@ -401,8 +401,8 @@ class TestTransitionCountFlow:
         gate_kwargs = mock_gate.call_args[1]
         assert gate_kwargs["flow_state"]["transition_count"] == 5
 
-    def test_transition_count_persisted_after_gate_pass(self) -> None:
-        """Executor persists transition_count after gate passes."""
+    def test_transition_count_not_rewritten_after_gate(self) -> None:
+        """The atomic recorder remains the only transition-count writer."""
         mock_store = _make_mock_store()
         mock_store.get_flow_state.return_value = {"transition_count": 0}
         agent_result = _make_mock_agent_result()
@@ -450,13 +450,11 @@ class TestTransitionCountFlow:
 
         assert result.success
         mock_gate.assert_called_once()
-        # Verify persistence call
-        mock_store.update_flow_state.assert_called()
+        # The gate's recorder persists transition_count atomically. Rewriting the
+        # caller snapshot here could clobber a concurrent confirmed transition.
         update_calls = mock_store.update_flow_state.call_args_list
-        # Find the call with transition_count
         transition_call = [c for c in update_calls if "transition_count" in c[1]]
-        assert len(transition_call) > 0
-        assert transition_call[0][1]["transition_count"] == 1
+        assert transition_call == []
 
 
 class TestSeverityAwareErrorHandling:

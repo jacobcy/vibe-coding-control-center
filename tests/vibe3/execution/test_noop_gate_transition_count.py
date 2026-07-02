@@ -15,7 +15,7 @@ def _store(total: int, pair: int) -> MagicMock:
     return store
 
 
-def test_confirmed_state_change_uses_persisted_total() -> None:
+def test_state_change_uses_atomic_transition_recorder() -> None:
     store = _store(total=4, pair=1)
     flow_state = {"transition_count": 3}
 
@@ -34,7 +34,7 @@ def test_confirmed_state_change_uses_persisted_total() -> None:
             flow_state=flow_state,
         )
 
-    assert flow_state["transition_count"] == 4
+    assert flow_state["transition_count"] == 3
     store.record_confirmed_transition.assert_called_once()
     block.assert_not_called()
 

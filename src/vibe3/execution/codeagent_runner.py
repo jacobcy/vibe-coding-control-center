@@ -392,13 +392,6 @@ class CodeagentExecutionService:
                     before_open_pr_numbers=ctx.before_open_pr_numbers,
                 )
 
-                # Persist transition_count after gate call
-                # Note: retry counters are persisted inside noop_gate itself
-                if flow_state and "transition_count" in flow_state:
-                    ctx.store.update_flow_state(
-                        ctx.branch, transition_count=flow_state["transition_count"]
-                    )
-
             # Supervisor success: remove state/handoff label to prevent re-dispatch.
             # Agent is expected to close the issue, but we ensure label cleanup.
             if command.role == "supervisor" and command.issue_number is not None:

@@ -188,8 +188,6 @@ def apply_unified_noop_gate(
             actor=actor,
             issue_number=issue_number,
         )
-        if flow_state is not None:
-            flow_state["transition_count"] = transition.total_count
         if transition.total_limit_reached or transition.pair_limit_reached:
             reason = (
                 f"transition limit reached: total={transition.total_count}, "
