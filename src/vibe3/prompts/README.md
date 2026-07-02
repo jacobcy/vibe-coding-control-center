@@ -86,7 +86,7 @@ prompts/
 
 **被依赖**:
 - **agents/**: prompt 构建（plan_prompt, run_prompt, review_prompt）
-- **execution/**: PromptManifest (governance_sync_runner), collect_dry_run_provenance (governance_sync_runner), resolve_governance_material (governance_sync_runner), PromptAssembler (job_executor)
+- **execution/**: PromptManifest (governance_sync_runner), collect_dry_run_provenance (governance_sync_runner), resolve_governance_material (governance_sync_runner, job_executor), build_governance_execution_name (job_executor)
 - **manager/**: manager prompts
 - **commands/**: dry-run 命令
 - **domain/**: collect_dry_run_provenance, resolve_governance_material
@@ -97,7 +97,7 @@ prompts/
 | 符号 | 类型 | 消费位置 |
 |------|------|---------|
 | **Core** | | |
-| PromptAssembler | 核心拼装器 | agents/, execution/, commands/ |
+| PromptAssembler | 核心拼装器 | agents/, commands/ |
 | PromptContextBuilder | 上下文构建器 | agents/, commands/ |
 | make_context_builder | 工厂函数 | agents/, commands/ |
 | **Manifest** | | |
@@ -159,7 +159,7 @@ prompts/
 execution 层通过以下接口使用 prompts 模块：
 
 - **execution/governance_sync_runner**: 导入 `PromptManifest`, `collect_dry_run_provenance`, `resolve_governance_material`
-- **execution/job_executor**: 导入 `PromptAssembler`
+- **execution/job_executor**: 导入 `resolve_governance_material`, `build_governance_execution_name`
 
 prompts 模块为 execution 层提供 prompt 上下文装配能力，是 agent 执行的下游依赖。
 

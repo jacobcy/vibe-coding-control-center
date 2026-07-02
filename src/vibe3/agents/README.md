@@ -110,9 +110,9 @@ agents/
 | CodeagentCommand | 数据模型 | execution/, agents/backends/ |
 | CodeagentResult | 数据模型 | execution/, domain/handlers/ |
 | ExecutionRole | 类型字面量 | execution/, domain/handlers/, roles/ |
-| create_codeagent_command | 工厂函数 | commands/ |
+| create_codeagent_command | 工厂函数 | roles/ |
 | **Backends** | | |
-| CodeagentBackend | 后端实现 | execution/, roles/ |
+| CodeagentBackend | 后端实现 | execution/ |
 | start_async_command | 执行函数 | execution/ |
 | sync_models_json | 配置同步 | execution/ |
 | **Prompt Builders** | | |
@@ -125,9 +125,9 @@ agents/
 | build_review_prompt_body | 构建函数 | commands/ |
 | make_review_context_builder | 工厂函数 | commands/ |
 | **Section Inspectors** | | |
-| describe_plan_sections | 检查函数 | commands/ |
-| describe_run_plan_sections | 检查函数 | commands/ |
-| describe_review_sections | 检查函数 | commands/ |
+| describe_plan_sections | 检查函数 | commands/, roles/ |
+| describe_run_plan_sections | 检查函数 | commands/, roles/ |
+| describe_review_sections | 检查函数 | commands/, roles/ |
 | **Types** | | |
 | RunPromptMode | 类型字面量 | agents/run_prompt |
 
@@ -136,7 +136,7 @@ agents/
 execution 层是 agents 的主要消费者：
 
 - **execution/codeagent_runner**: 导入 `CodeagentBackend`, `CodeagentCommand`, `CodeagentResult`
-- **execution/coordinator**: 导入 `start_async_command`, `CodeagentBackend`, `CodeagentResult`
+- **execution/coordinator**: 导入 `start_async_command`, `CodeagentBackend`
 - **execution/execution_role_policy**: 导入 `sync_models_json`
 - **execution/noop_gate**: 导入 `ExecutionRole`
 
