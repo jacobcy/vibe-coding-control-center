@@ -470,6 +470,38 @@ class TestApplyUnifiedNoopGate:
         event_args = store.add_event.call_args
         assert event_args[0][1] == "state_unchanged"
 
+    def test_new_pr_publish_completion_is_the_only_unchanged_state_exception(
+        self,
+    ) -> None:
+        store = _make_mock_store()
+        completion = MagicMock()
+        completion.try_complete.return_value.completed = True
+
+        with (
+            patch("vibe3.clients.github_client.GitHubClient") as mock_gh,
+            patch(
+                "vibe3.services.issue.failure.block_executor_noop_issue"
+            ) as mock_block,
+        ):
+            mock_gh.return_value.view_issue.return_value = _make_github_issue_payload(
+                "state/merge-ready"
+            )
+            apply_unified_noop_gate(
+                store=store,
+                issue_number=99,
+                branch="task/issue-99",
+                actor="agent:run",
+                role="executor",
+                before_state_label="state/merge-ready",
+                publish_mode=True,
+                before_open_pr_numbers=frozenset(),
+                publish_completion=completion,
+            )
+
+        completion.try_complete.assert_called_once()
+        mock_block.assert_not_called()
+        store.add_event.assert_not_called()
+
 
 def test_state_verification_returns_complete_state_label_set(monkeypatch):
     """State verification preserves every remote state label."""

@@ -60,6 +60,10 @@ if TYPE_CHECKING:
     )
     from vibe3.execution.noop_gate import apply_unified_noop_gate
     from vibe3.execution.prompt_meta import PromptMeta, build_prompt_meta
+    from vibe3.execution.publish_completion import (
+        PublishCompletionResult,
+        PublishCompletionService,
+    )
     from vibe3.execution.role_interfaces import GovernanceFunctions
     from vibe3.execution.role_request_factory import (
         build_role_async_request,
@@ -106,6 +110,8 @@ _LAZY_IMPORTS = {
     # Prompt metadata
     "build_prompt_meta": "vibe3.execution.prompt_meta",
     "PromptMeta": "vibe3.execution.prompt_meta",
+    "PublishCompletionResult": "vibe3.execution.publish_completion",
+    "PublishCompletionService": "vibe3.execution.publish_completion",
     # Role request factory
     "build_role_async_request": "vibe3.execution.role_request_factory",
     "build_role_sync_request": "vibe3.execution.role_request_factory",
@@ -175,6 +181,8 @@ __all__ = [
     # Prompt metadata
     "build_prompt_meta",
     "PromptMeta",
+    "PublishCompletionResult",
+    "PublishCompletionService",
     # Role request factory
     "build_role_async_request",
     "build_role_sync_request",

@@ -9,6 +9,7 @@ from vibe3.exceptions import AgentExecutionError
 from vibe3.execution.codeagent_runner import (
     CodeagentExecutionService,
 )
+from vibe3.models import PRResponse, PRState
 
 
 def _make_mock_store() -> MagicMock:
@@ -85,6 +86,59 @@ class TestExecuteSyncGateIntegration:
         assert call_kwargs["issue_number"] == 42
         assert call_kwargs["role"] == "planner"
         assert "flow_service" in call_kwargs
+
+    def test_publish_gate_receives_authoritative_before_pr_snapshot(self) -> None:
+        agent_result = _make_mock_agent_result()
+        mock_store = _make_mock_store()
+        command = CodeagentCommand(
+            role="executor",
+            context_builder=lambda: "publish prompt",
+            branch="task/issue-42",
+            issue_number=42,
+            publish_mode=True,
+        )
+        existing = PRResponse(
+            number=91,
+            title="Existing PR",
+            state=PRState.OPEN,
+            head_branch="task/issue-42",
+            base_branch="main",
+            url="https://example.test/pull/91",
+        )
+
+        with (
+            patch(
+                "vibe3.execution.codeagent_runner.SQLiteClient",
+                return_value=mock_store,
+            ),
+            patch("vibe3.clients.github_client.GitHubClient") as github_cls,
+            patch("vibe3.agents.backends.codeagent.CodeagentBackend") as backend_cls,
+            patch(
+                "vibe3.execution.codeagent_runner.load_session_id",
+                return_value=None,
+            ),
+            patch(
+                "vibe3.execution.codeagent_runner.resolve_command_agent_options"
+            ) as options,
+            patch(
+                "vibe3.execution.codeagent_runner.format_agent_actor",
+                return_value="agent:executor",
+            ),
+            patch("vibe3.execution.codeagent_runner.apply_unified_noop_gate") as gate,
+        ):
+            github_cls.return_value.view_issue.return_value = (
+                _make_github_issue_payload("state/merge-ready")
+            )
+            github_cls.return_value.list_prs_for_branch.return_value = [existing]
+            backend_cls.return_value.run.return_value = agent_result
+            options.return_value = MagicMock()
+
+            result = CodeagentExecutionService().execute_sync(command)
+
+        assert result.success
+        gate.assert_called_once()
+        assert gate.call_args.kwargs["publish_mode"] is True
+        assert gate.call_args.kwargs["before_open_pr_numbers"] == frozenset({91})
 
     @pytest.mark.slow
     def test_gate_skipped_without_issue_number_or_branch(self) -> None:

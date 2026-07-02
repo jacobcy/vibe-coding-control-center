@@ -302,6 +302,7 @@ def execute_manual_run(
             branch=branch,
             issue_number=issue_number,
             show_prompt=show_prompt,
+            publish_mode=is_publish_path,
         )
         return CodeagentExecutionService(config).execute_sync(command)
 

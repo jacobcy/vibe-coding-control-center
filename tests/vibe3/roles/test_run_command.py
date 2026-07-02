@@ -358,10 +358,11 @@ class TestPublishPathDetection:
 
     def test_manual_publish_flag_uses_publish_context(self) -> None:
         """Test that --publish flag uses publish context builder (manual channel)."""
-        captured_prompt: dict[str, str] = {}
+        captured_prompt: dict[str, str | bool] = {}
 
         def fake_execute_sync(command):
             captured_prompt["text"] = command.context_builder()
+            captured_prompt["publish_mode"] = command.publish_mode
             return CodeagentResult(success=True)
 
         with (
@@ -410,6 +411,7 @@ class TestPublishPathDetection:
 
         # Should use publish builder when --publish flag is set
         assert captured_prompt["text"] == "PUBLISH_CONTEXT"
+        assert captured_prompt["publish_mode"] is True
         mock_publish_builder.assert_called_once()
         # Should NOT call skill builder
         mock_skill_builder.assert_not_called()

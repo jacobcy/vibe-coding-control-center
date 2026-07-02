@@ -10,6 +10,7 @@ from loguru import logger
 from vibe3.agents import ExecutionRole
 from vibe3.clients import SQLiteClient
 from vibe3.config import get_role_output_contract
+from vibe3.execution.publish_completion import PublishCompletionService
 from vibe3.models import VerdictRecord, VerdictValue
 from vibe3.services.flow import TransitionRecorder
 from vibe3.services.shared import get_role_block_function
@@ -54,6 +55,9 @@ def apply_unified_noop_gate(
     tick_id: int = 0,
     before_issue_is_closed: bool = False,
     flow_service: "FlowQueryProtocol | None" = None,
+    publish_mode: bool = False,
+    before_open_pr_numbers: frozenset[int] | None = None,
+    publish_completion: PublishCompletionService | None = None,
 ) -> None:
     """Apply the single hard no-op gate after agent completion.
 
@@ -286,6 +290,31 @@ def apply_unified_noop_gate(
             return
 
     if not state_set_changed:
+        publish_reason: str | None = None
+        if publish_mode:
+            if before_open_pr_numbers is None:
+                publish_reason = "authoritative pre-publish PR snapshot unavailable"
+            else:
+                if publish_completion is None:
+                    from vibe3.clients import GitHubClient
+                    from vibe3.services.shared import LabelService
+
+                    publish_completion = PublishCompletionService(
+                        GitHubClient(),
+                        LabelService(repo=repo),
+                        TransitionRecorder(store),
+                    )
+                publish_result = publish_completion.try_complete(
+                    issue_number=issue_number,
+                    branch=branch,
+                    before_state_labels=effective_before_labels,
+                    before_open_pr_numbers=before_open_pr_numbers,
+                    actor=actor,
+                )
+                if publish_result.completed:
+                    return
+                publish_reason = publish_result.reason
+
         state_desc = before_state_label or "(no state)"
         logger.bind(
             domain="codeagent",
@@ -299,7 +328,14 @@ def apply_unified_noop_gate(
             branch,
             EVENT_STATE_UNCHANGED,
             actor,
-            detail=f"State unchanged after {role}: still {state_desc}",
+            detail=(
+                f"State unchanged after {role}: still {state_desc}"
+                + (
+                    f"; publish exception rejected: {publish_reason}"
+                    if publish_reason
+                    else ""
+                )
+            ),
             refs={
                 "state": str(before_state_label or ""),
                 "issue": str(issue_number),
@@ -308,7 +344,9 @@ def apply_unified_noop_gate(
         _block_fn(
             issue_number=issue_number,
             repo=repo,
-            reason="state unchanged",
+            reason=(
+                "state unchanged" + (f": {publish_reason}" if publish_reason else "")
+            ),
             actor=actor,
             flow_service=flow_service,
         )

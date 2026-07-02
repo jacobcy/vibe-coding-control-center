@@ -68,6 +68,7 @@ class SyncExecutionContext:
     execution_cwd: Path
     commit_count_before: int | None = None
     before_issue_is_closed: bool = False
+    before_open_pr_numbers: frozenset[int] | None = None
 
 
 class CodeagentExecutionService:
@@ -245,12 +246,14 @@ class CodeagentExecutionService:
         before_state_label: str | None = None
         before_state_labels: set[str] = set()
         before_issue_is_closed = False
+        before_open_pr_numbers: frozenset[int] | None = None
         if command.issue_number is not None:
             try:
                 from vibe3.clients import GitHubClient
 
+                github = GitHubClient()
                 # Only need labels and state for state label extraction
-                issue_payload = GitHubClient().view_issue(
+                issue_payload = github.view_issue(
                     command.issue_number,
                     repo=getattr(self.config, "repo", None),
                     fields=["labels", "state"],
@@ -269,6 +272,15 @@ class CodeagentExecutionService:
                     # Check if issue is closed
                     if str(issue_payload.get("state", "")).upper() == "CLOSED":
                         before_issue_is_closed = True
+                if command.publish_mode and branch:
+                    before_open_pr_numbers = frozenset(
+                        pr.number
+                        for pr in github.list_prs_for_branch(
+                            branch,
+                            state="open",
+                            repo=getattr(self.config, "repo", None),
+                        )
+                    )
             except Exception as exc:
                 log.warning(f"Cannot read issue state for no-op gate: {exc}")
 
@@ -296,6 +308,7 @@ class CodeagentExecutionService:
             execution_cwd=execution_cwd,
             commit_count_before=commit_count_before,
             before_issue_is_closed=before_issue_is_closed,
+            before_open_pr_numbers=before_open_pr_numbers,
         )
 
     def _finalize_sync_execution(
@@ -375,6 +388,8 @@ class CodeagentExecutionService:
                     tick_id=command.tick_id,
                     before_issue_is_closed=ctx.before_issue_is_closed,
                     flow_service=FlowService(),
+                    publish_mode=command.publish_mode,
+                    before_open_pr_numbers=ctx.before_open_pr_numbers,
                 )
 
                 # Persist transition_count after gate call
