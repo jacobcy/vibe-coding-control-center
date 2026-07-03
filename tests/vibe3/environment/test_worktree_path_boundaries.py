@@ -1,10 +1,12 @@
 import subprocess
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.exceptions import SystemError
+from vibe3.models.flow import FlowState
 from vibe3.models.orchestra_config import OrchestraConfig
 
 
@@ -45,6 +47,24 @@ def bare_repo_with_main_worktree(tmp_path: Path) -> tuple[Path, Path]:
 def test_bare_repo_head_is_not_returned_as_checkout(bare_repo_with_main_worktree):
     repo_path, main_worktree = bare_repo_with_main_worktree
     manager = WorktreeManager(OrchestraConfig(), repo_path)
+
+    cwd, missing = manager.resolve_manager_cwd(1, "main")
+
+    assert missing is False
+    assert cwd == main_worktree
+
+
+def test_recorded_management_root_falls_back_to_registered_checkout(
+    bare_repo_with_main_worktree,
+):
+    repo_path, main_worktree = bare_repo_with_main_worktree
+    flow_service = MagicMock()
+    flow_service.get_flow_state.return_value = FlowState(
+        branch="main",
+        flow_slug="issue-1",
+        worktree_path=str(repo_path),
+    )
+    manager = WorktreeManager(OrchestraConfig(), repo_path, flow_service=flow_service)
 
     cwd, missing = manager.resolve_manager_cwd(1, "main")
 

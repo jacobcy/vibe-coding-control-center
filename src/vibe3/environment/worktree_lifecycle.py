@@ -453,6 +453,8 @@ class WorktreeLifecycle:
         Returns:
             WorktreeContext if valid recorded path found, None otherwise
         """
+        from vibe3.environment.worktree_support import find_worktree_for_branch
+
         try:
             flow_state = self.flow_service.get_flow_state(flow_branch)
             if not flow_state:
@@ -460,8 +462,12 @@ class WorktreeLifecycle:
             recorded_path = flow_state.worktree_path
             if recorded_path:
                 recorded = Path(recorded_path)
-                if recorded.exists() and self.validate_branch_matches(
-                    recorded, flow_branch
+                registered = find_worktree_for_branch(repo_path, flow_branch)
+                if (
+                    recorded.exists()
+                    and registered is not None
+                    and recorded.resolve() == registered.resolve()
+                    and self.validate_branch_matches(recorded, flow_branch)
                 ):
                     return WorktreeContext(
                         path=recorded,
