@@ -65,6 +65,20 @@ run_wt_from_bare_repo() {
   [[ "$output" =~ "Unexpected argument: two" ]]
 }
 
+@test "worktree init resolves script from checkout root" {
+  local repo_root worktree_path
+  repo_root="$(mktemp -d)"
+  worktree_path="$repo_root/.worktrees/topic"
+  mkdir -p "$worktree_path/scripts"
+  printf '#!/usr/bin/env bash\ntouch .init-ran\n' > "$worktree_path/scripts/init.sh"
+
+  run_zsh_with_timeout "source \"$VIBE_ROOT/lib/utils.sh\"; source \"$VIBE_ROOT/lib/alias/worktree.sh\"; _vibe_worktree_run_init \"$worktree_path\""
+
+  [ "$status" -eq 0 ]
+  [ -f "$worktree_path/.init-ran" ]
+  rm -rf "$repo_root"
+}
+
 @test "wt/wtrm --help do not fatal from bare repo root" {
   # Test that wt (no args) lists worktrees from bare repo root without fatal error
   run_wt_from_bare_repo "wt 2>&1"
