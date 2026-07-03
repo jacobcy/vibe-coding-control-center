@@ -151,6 +151,7 @@ docs/superpowers/
 .agent/skills/
 .agents/
 .github/prompts/
+.github/skills/
 .codex/skills/
 .codex/config.toml
 .gemini/
