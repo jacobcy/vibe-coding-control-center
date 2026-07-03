@@ -166,3 +166,15 @@ Install via respective tools, then create symlinks in `.claude/skills/`. See [DE
 ## 🔗 Kiro Integration
 
 When using Kiro (AI IDE with spec workflow), follow rules in [supervisor/policies/kiro-integration.md](supervisor/policies/kiro-integration.md).
+
+<!-- BEGIN spec-kit context -->
+## Spec-Kit 工作流（规范驱动开发）
+
+本项目使用 [spec-kit](https://github.com/github/spec-kit)。非平凡变更 SHOULD 走六阶段：
+`brainstorm → specify → plan → tasks → implement → review`。
+
+- 治理真源：[`.specify/memory/constitution.md`](.specify/memory/constitution.md)
+  （治理 spec-kit 使用；权限低于 SOUL.md / CLAUDE.md / `.claude/rules/*`）
+- 规格目录：`.specify/specs/NNN-<slug>/`
+- 可用 skills：`$speckit-*`（如 `$speckit-plan`、`$speckit-specify`、`$speckit-implement`）
+<!-- END spec-kit context -->
