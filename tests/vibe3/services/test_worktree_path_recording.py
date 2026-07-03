@@ -47,10 +47,6 @@ class TestStep3RecordWorktreePath:
                 return_value=None,
             ),
             patch(
-                "vibe3.environment.worktree_support.is_current_branch",
-                return_value=False,
-            ),
-            patch(
                 "vibe3.environment.worktree_support.find_worktree_for_branch",
                 return_value=existing_path,
             ),
@@ -90,10 +86,6 @@ class TestStep3RecordWorktreePath:
                 lifecycle,
                 "_try_recorded_path",
                 return_value=None,
-            ),
-            patch(
-                "vibe3.environment.worktree_support.is_current_branch",
-                return_value=False,
             ),
             patch(
                 "vibe3.environment.worktree_support.find_worktree_for_branch",
@@ -143,10 +135,6 @@ class TestStep4RecordWorktreePath:
                 return_value=None,
             ),
             patch(
-                "vibe3.environment.worktree_support.is_current_branch",
-                return_value=False,
-            ),
-            patch(
                 "vibe3.environment.worktree_support.find_worktree_for_branch",
                 return_value=None,
             ),
@@ -187,10 +175,6 @@ class TestStep4RecordWorktreePath:
                 lifecycle,
                 "_try_recorded_path",
                 return_value=None,
-            ),
-            patch(
-                "vibe3.environment.worktree_support.is_current_branch",
-                return_value=False,
             ),
             patch(
                 "vibe3.environment.worktree_support.find_worktree_for_branch",

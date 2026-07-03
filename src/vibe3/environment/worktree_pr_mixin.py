@@ -273,7 +273,7 @@ class WorktreePRMixin:
             source_branch=base_ref,
             path=str(wt_path),
         )
-        initialize_worktree(self.repo_path, wt_path, reason="issue")
+        initialize_worktree(wt_path, reason="issue")
 
         return WorktreeContext(
             path=wt_path,

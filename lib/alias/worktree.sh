@@ -43,9 +43,8 @@ _vibe_worktree_repo_root() {
 }
 
 _vibe_worktree_run_init() {
-  local repo_root="$1"
-  local worktree_path="$2"
-  local init_script="$repo_root/scripts/init.sh"
+  local worktree_path="$1"
+  local init_script="$worktree_path/scripts/init.sh"
 
   [[ -f "$init_script" ]] || return 0
 
@@ -188,7 +187,7 @@ wtnew() {
     echo "👤 Set worktree actor -> $actor"
   fi
 
-  _vibe_worktree_run_init "$repo_root" "$path"
+  _vibe_worktree_run_init "$path"
 
   echo "💡 Next: Run ${CYAN}vup${NC} to initialize your cockpit."
 }

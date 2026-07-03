@@ -235,7 +235,6 @@ class WorktreeManager(WorktreePRMixin):
         flow_branch: str,
         *,
         check_recorded_path: bool = True,
-        check_current_branch: bool = True,
         validate_issue_number: bool = True,
     ) -> WorktreeContext | None:
         """Shared core: find existing or create new worktree for branch.
@@ -248,7 +247,6 @@ class WorktreeManager(WorktreePRMixin):
             self.repo_path,
             self.acquire_issue_worktree,
             check_recorded_path=check_recorded_path,
-            check_current_branch=check_current_branch,
             validate_issue_number=validate_issue_number,
         )
 
@@ -266,7 +264,6 @@ class WorktreeManager(WorktreePRMixin):
             issue_number,
             flow_branch,
             check_recorded_path=True,
-            check_current_branch=True,
             validate_issue_number=True,
         )
         if ctx is None:
@@ -315,9 +312,14 @@ class WorktreeManager(WorktreePRMixin):
             WorktreeContext describing the execution environment
         """
         if not use_worktree:
-            # Current repo path, no worktree creation
+            existing = find_worktree_for_branch(self.repo_path, branch)
+            if existing is None:
+                raise SystemError(
+                    f"No registered worktree for branch {branch}; "
+                    "repository management root is not an execution checkout"
+                )
             return WorktreeContext(
-                path=self.repo_path,
+                path=existing,
                 is_temporary=False,
                 branch=branch,
                 issue_number=issue_number,
@@ -328,7 +330,6 @@ class WorktreeManager(WorktreePRMixin):
             issue_number,
             branch,
             check_recorded_path=True,
-            check_current_branch=False,  # Skill entry: always ask user first
             validate_issue_number=True,
         )
 

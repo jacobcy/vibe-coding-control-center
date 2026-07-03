@@ -124,9 +124,15 @@ def _best_effort_fetch(cwd: Path, flow_branch: str) -> None:
         )
 
 
-def initialize_worktree(repo_path: Path, wt_path: Path, reason: str) -> None:
-    """Run project init script inside a newly created worktree."""
-    init_script = repo_path / "scripts" / "init.sh"
+def initialize_worktree(wt_path: Path, reason: str) -> None:
+    """Run project init script inside a newly created worktree.
+
+    The script is resolved from ``wt_path`` (the freshly checked-out
+    worktree), not from the repository root. This project's repo root is a
+    bare repository with no working tree, so resolving ``scripts/init.sh``
+    from it would always miss the file and silently skip initialization.
+    """
+    init_script = wt_path / "scripts" / "init.sh"
     if not init_script.exists():
         return
 
@@ -283,20 +289,3 @@ def find_worktree_for_branch(repo_path: Path, branch: str) -> Optional[Path]:
                 return current_path
 
     return None
-
-
-def is_current_branch(repo_path: Path, branch: str) -> bool:
-    """Check whether repo_path currently points at the target branch."""
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except Exception:
-        return False
-    if result.returncode != 0:
-        return False
-    return result.stdout.strip() == branch

@@ -57,6 +57,10 @@ class TestResolveManagerCwd:
             wm = WorktreeManager(config, repo_path, flow_service=mock_flow_service)
 
             with (
+                patch(
+                    "vibe3.environment.worktree_support.find_worktree_for_branch",
+                    return_value=recorded,
+                ),
                 patch.object(
                     wm.lifecycle, "validate_branch_matches", return_value=True
                 ),
@@ -106,10 +110,6 @@ class TestResolveManagerCwd:
             wm = WorktreeManager(config, repo_path, flow_service=mock_flow_service)
 
             with (
-                patch(
-                    "vibe3.environment.worktree_support.is_current_branch",
-                    return_value=False,
-                ),
                 patch(
                     "vibe3.environment.worktree_support.find_worktree_for_branch",
                     return_value=None,

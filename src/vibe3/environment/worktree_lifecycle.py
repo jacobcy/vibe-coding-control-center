@@ -184,7 +184,7 @@ class WorktreeLifecycle:
             branch=branch,
             path=str(wt_path),
         )
-        initialize_worktree(self.repo_path, wt_path, reason="issue")
+        initialize_worktree(wt_path, reason="issue")
 
         return WorktreeContext(
             path=wt_path,
@@ -253,7 +253,7 @@ class WorktreeLifecycle:
             base=base_branch,
             path=str(wt_path),
         )
-        initialize_worktree(self.repo_path, wt_path, reason="temporary")
+        initialize_worktree(wt_path, reason="temporary")
 
         return WorktreeContext(
             path=wt_path,
@@ -369,7 +369,6 @@ class WorktreeLifecycle:
         acquire_issue_worktree_func: Callable[[int, str], WorktreeContext],
         *,
         check_recorded_path: bool = True,
-        check_current_branch: bool = True,
         validate_issue_number: bool = True,
     ) -> WorktreeContext | None:
         """Find existing or create new worktree for branch.
@@ -378,9 +377,8 @@ class WorktreeLifecycle:
 
         Priority:
         1. Recorded worktree_path (if check_recorded_path)
-        2. Current branch (if check_current_branch)
-        3. Find existing worktree
-        4. Acquire new issue worktree
+        2. Find existing worktree
+        3. Acquire new issue worktree
 
         Args:
             issue_number: GitHub issue number
@@ -388,16 +386,12 @@ class WorktreeLifecycle:
             repo_path: Path to main repository
             acquire_issue_worktree_func: Callback to acquire issue worktree
             check_recorded_path: Whether to check flow_state.worktree_path
-            check_current_branch: Whether to check if already on flow_branch
             validate_issue_number: Whether to validate branch contains issue number
 
         Returns:
             WorktreeContext if successful, None if failed
         """
-        from vibe3.environment.worktree_support import (
-            find_worktree_for_branch,
-            is_current_branch,
-        )
+        from vibe3.environment.worktree_support import find_worktree_for_branch
 
         # Step 1: Try recorded worktree_path from flow_state
         if check_recorded_path:
@@ -405,16 +399,7 @@ class WorktreeLifecycle:
             if ctx:
                 return ctx
 
-        # Step 2: Current branch
-        if check_current_branch and is_current_branch(repo_path, flow_branch):
-            return WorktreeContext(
-                path=repo_path,
-                is_temporary=False,
-                branch=flow_branch,
-                issue_number=issue_number,
-            )
-
-        # Step 3: Find existing worktree
+        # Step 2: Find existing worktree
         existing = find_worktree_for_branch(repo_path, flow_branch)
         if existing:
             if validate_issue_number and not self.validate_worktree_branch_for_issue(
@@ -437,7 +422,7 @@ class WorktreeLifecycle:
                 issue_number=issue_number,
             )
 
-        # Step 4: Create new worktree
+        # Step 3: Create new worktree
         try:
             ctx = acquire_issue_worktree_func(issue_number, flow_branch)
             # Record worktree path for auto task branches only
@@ -468,6 +453,8 @@ class WorktreeLifecycle:
         Returns:
             WorktreeContext if valid recorded path found, None otherwise
         """
+        from vibe3.environment.worktree_support import find_worktree_for_branch
+
         try:
             flow_state = self.flow_service.get_flow_state(flow_branch)
             if not flow_state:
@@ -475,8 +462,12 @@ class WorktreeLifecycle:
             recorded_path = flow_state.worktree_path
             if recorded_path:
                 recorded = Path(recorded_path)
-                if recorded.exists() and self.validate_branch_matches(
-                    recorded, flow_branch
+                registered = find_worktree_for_branch(repo_path, flow_branch)
+                if (
+                    recorded.exists()
+                    and registered is not None
+                    and recorded.resolve() == registered.resolve()
+                    and self.validate_branch_matches(recorded, flow_branch)
                 ):
                     return WorktreeContext(
                         path=recorded,
