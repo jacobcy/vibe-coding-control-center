@@ -341,3 +341,15 @@ Vibe 3.0 提供统一的基础设施服务，支持所有执行角色（manager/
 - **[.claude/rules/patterns.md](.claude/rules/patterns.md)** — 执行模式与报告模式
 - **[.claude/rules/modularity-standards.md](.claude/rules/modularity-standards.md)** — 模块化标准（公开 API、导出类型、lazy import）
 - **[docs/standards/agent-workflow-standard.md](docs/standards/agent-workflow-standard.md)** — Agent 工作流规范（权威）
+
+<!-- BEGIN spec-kit context -->
+## Spec-Kit 工作流（规范驱动开发）
+
+本项目使用 [spec-kit](https://github.com/github/spec-kit)。非平凡变更 SHOULD 走六阶段：
+`brainstorm → specify → plan → tasks → implement → review`。
+
+- 治理真源：[`.specify/memory/constitution.md`](.specify/memory/constitution.md)
+  （治理 spec-kit 使用；权限低于 SOUL.md / CLAUDE.md / `.claude/rules/*`）
+- 规格目录：`.specify/specs/NNN-<slug>/`
+- 可用 skills：`/speckit-*`（如 `/speckit-plan`、`/speckit-specify`、`/speckit-implement`）
+<!-- END spec-kit context -->
