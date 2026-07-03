@@ -146,9 +146,18 @@ class SQLiteClientBase:
         Returns:
             New SQLiteClient instance with the resolved db path
         """
-        git_dir = repo_path / ".git"
-        db_path = str(get_vibe3_db_path(git_dir))
-        return cls(db_path=db_path)
+        git_common_dir = GitClient(cwd=repo_path).get_git_common_dir()
+        if not git_common_dir:
+            raise GitError("rev-parse --git-common-dir", "returned empty path")
+
+        git_dir = Path(git_common_dir)
+        if not git_dir.is_absolute():
+            raise GitError(
+                "rev-parse --git-common-dir",
+                f"returned non-absolute path: {git_dir}",
+            )
+        git_dir.joinpath("vibe3").mkdir(parents=True, exist_ok=True)
+        return cls(db_path=str(get_vibe3_db_path(git_dir)))
 
     def _init_db(self) -> None:
         """Initialize schema and run migrations (idempotent).

@@ -1,12 +1,16 @@
 """Tests for SQLiteClient with a fresh database (schema verification)."""
 
 import sqlite3
+import subprocess
 from pathlib import Path
 
 import pytest
 
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.exceptions import GitError
+
+_REAL_GET_GIT_COMMON_DIR = GitClient.get_git_common_dir
 
 
 def test_fresh_db_schema_no_deprecated_columns(tmp_path):
@@ -126,21 +130,57 @@ def test_default_db_path_reopens_closed_singleton_connection(tmp_path, monkeypat
     assert state["branch"] == "task/reopen"
 
 
+def _init_non_bare_repo(path: Path) -> None:
+    subprocess.run(
+        ["git", "init", "-b", "main", str(path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
 class TestFromRepoPath:
     """Test SQLiteClient.from_repo_path classmethod."""
 
-    def test_resolves_db_path_from_repo_path(self, tmp_path):
-        """from_repo_path should resolve handoff.db from .git/vibe3/."""
-        git_dir = tmp_path / ".git" / "vibe3"
-        git_dir.mkdir(parents=True)
-        store = SQLiteClient.from_repo_path(tmp_path)
-        assert store.db_path == str(tmp_path / ".git" / "vibe3" / "handoff.db")
+    def test_non_bare_repo_uses_dot_git_common_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        non_bare_repo = tmp_path / "main"
+        _init_non_bare_repo(non_bare_repo)
+        monkeypatch.setattr(GitClient, "get_git_common_dir", _REAL_GET_GIT_COMMON_DIR)
 
-    def test_returns_correct_subclass_type(self, tmp_path):
+        store = SQLiteClient.from_repo_path(non_bare_repo)
+
+        assert Path(store.db_path) == (non_bare_repo / ".git" / "vibe3" / "handoff.db")
+
+    def test_bare_repo_uses_repo_as_common_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        non_bare_repo = tmp_path / "main"
+        _init_non_bare_repo(non_bare_repo)
+        bare_repo = tmp_path / "repo.git"
+        subprocess.run(
+            ["git", "clone", "--bare", str(non_bare_repo), str(bare_repo)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        monkeypatch.setattr(GitClient, "get_git_common_dir", _REAL_GET_GIT_COMMON_DIR)
+
+        store = SQLiteClient.from_repo_path(bare_repo)
+
+        assert Path(store.db_path) == bare_repo / "vibe3" / "handoff.db"
+
+    def test_returns_correct_subclass_type(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """from_repo_path should return SQLiteClient, not SQLiteClientBase."""
-        git_dir = tmp_path / ".git" / "vibe3"
-        git_dir.mkdir(parents=True)
-        store = SQLiteClient.from_repo_path(tmp_path)
+        repo = tmp_path / "main"
+        _init_non_bare_repo(repo)
+        monkeypatch.setattr(GitClient, "get_git_common_dir", _REAL_GET_GIT_COMMON_DIR)
+
+        store = SQLiteClient.from_repo_path(repo)
+
         assert type(store).__name__ == "SQLiteClient"
 
 
