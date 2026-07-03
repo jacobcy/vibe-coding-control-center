@@ -135,7 +135,11 @@ docs/audits/
 docs/plans/
 docs/reports/
 docs/superpowers/
-openspec/
+
+# OpenSpec (Fission-AI/OpenSpec) — track all project artifacts
+# Track: specs/ (source of truth), changes incl archive/ (proposals + audit),
+#        schemas/, config.yaml, README.md
+# Tool configs (openspec writes to .claude/.cursor/) stay ignored by rules above.
 
 # Spec-Kit (specify CLI + superspec bridge)
 # Track: constitution, specs, templates, workflows, config (*.yml/*.json)
