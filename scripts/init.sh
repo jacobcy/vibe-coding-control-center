@@ -142,6 +142,44 @@ else
   echo "   Run 'vibe doctor' to check optional tools status"
 fi
 
+# ── 3.5 Initialize Spec-Kit integrations + extensions (optional, non-blocking) ──
+# Materializes spec-kit skills + extensions into this worktree's agent dirs.
+# Config (.specify/integration.json, .specify/extensions.yml) ships via git;
+# this step installs the re-installable tooling layer (gitignored).
+echo "📦 Initializing Spec-Kit (optional)..."
+if [[ -d ".specify" ]] && command -v specify &> /dev/null; then
+  # Integrations → speckit-* skills into .claude/skills/ and .agents/skills/
+  for integ in claude codex; do
+    if specify integration upgrade "$integ" >/dev/null 2>&1 || \
+       specify integration install "$integ" --force >/dev/null 2>&1; then
+      echo "  ✅ spec-kit integration: $integ"
+    else
+      echo -e "\033[1;33m⚠️  specify $integ integration failed (non-blocking)\033[0m"
+    fi
+  done
+
+  # Extensions declared in .specify/extensions.yml (e.g. superspec)
+  if [[ -f ".specify/extensions.yml" ]]; then
+    while IFS= read -r ext; do
+      [[ -z "$ext" ]] && continue
+      if specify extension update "$ext" >/dev/null 2>&1 || \
+         specify extension add "$ext" >/dev/null 2>&1; then
+        echo "  ✅ spec-kit extension: $ext"
+      else
+        echo -e "\033[1;33m⚠️  specify extension '$ext' failed (non-blocking)\033[0m"
+      fi
+    done < <(
+      awk '/^installed:/{f=1;next} /^[^ [:space:]-]/{f=0} f&&/^-/{gsub(/^-[[:space:]]*/,"");print}' \
+        .specify/extensions.yml 2>/dev/null | sort -u
+    )
+  fi
+elif [[ ! -d ".specify" ]]; then
+  echo -e "\033[1;33m⚠️  .specify/ not found — skipping spec-kit. Run 'specify init' first.\033[0m"
+else
+  echo -e "\033[1;33m⚠️  'specify' CLI not found — skipping spec-kit (non-blocking).\033[0m"
+  echo "   Install: uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@vX.Y.Z"
+fi
+
 echo "✅ Environment setup complete!"
 
 # ── 5. Install git hooks (pre-commit, optional, non-blocking) ─────────────────
