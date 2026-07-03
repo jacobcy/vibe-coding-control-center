@@ -1,4 +1,4 @@
 {
-  "feature_directory": "specs/010-exception-model",
-  "note": "issue #3299 epic baseline specs (10 total). This pointer tracks the most recently specified feature for downstream commands. All 10 baseline specs: 001-flow-lifecycle, 002-dispatch-execution, 003-role-protocol, 004-environment-isolation, 005-governance-chain, 006-handoff-protocol, 007-analysis-intelligence, 008-client-layer, 009-observability-audit, 010-exception-model."
+  "feature_directory": ".specify/specs/011-adr-recall",
+  "note": "Tracks the most recently specified feature for downstream commands. Baseline epic (issue #3299) shipped 10 specs (001-010). This is feature 011: ADR Context Recall (ADR 按需召回), born from a 7-round brainstorm grill — a thin, zero-Python, dual-layer enforcement design that reuses existing audit/gate/label mechanisms."
 }
