@@ -1,0 +1,34 @@
+installed:
+- superspec
+settings:
+  auto_execute_hooks: true
+hooks:
+  after_tasks:
+  - extension: superspec
+    command: speckit.superspec.tasks
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Run enhanced Superpowers task decomposition and validation?
+    description: Verify task coverage and add Superpowers execution markers after
+      core task generation
+    condition: null
+  before_implement:
+  - extension: superspec
+    command: speckit.superspec.execute
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Run Superpowers-guided implementation with TDD and checkpoints?
+    description: Enforce TDD discipline and Superpowers execution guidance before
+      core implementation
+    condition: null
+  after_implement:
+  - extension: superspec
+    command: speckit.superspec.review
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Run Superpowers review against the specification and implementation?
+    description: Review implementation against the spec, plan, tasks, and constitution
+    condition: null

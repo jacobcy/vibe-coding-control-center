@@ -137,6 +137,12 @@ docs/reports/
 docs/superpowers/
 openspec/
 
+# Spec-Kit (specify CLI + superspec bridge)
+# Track: constitution, specs, templates, workflows, config (*.yml/*.json)
+# Ignore: installed extension code and helper scripts (re-installable via specify)
+.specify/extensions/
+.specify/scripts/
+
 # Tool-specific directories (symlinks only, see DEVELOPER.md)
 .agent/skills/
 .agents/
