@@ -184,7 +184,7 @@ class WorktreeLifecycle:
             branch=branch,
             path=str(wt_path),
         )
-        initialize_worktree(self.repo_path, wt_path, reason="issue")
+        initialize_worktree(wt_path, reason="issue")
 
         return WorktreeContext(
             path=wt_path,
@@ -253,7 +253,7 @@ class WorktreeLifecycle:
             base=base_branch,
             path=str(wt_path),
         )
-        initialize_worktree(self.repo_path, wt_path, reason="temporary")
+        initialize_worktree(wt_path, reason="temporary")
 
         return WorktreeContext(
             path=wt_path,
