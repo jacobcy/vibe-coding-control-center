@@ -289,20 +289,3 @@ def find_worktree_for_branch(repo_path: Path, branch: str) -> Optional[Path]:
                 return current_path
 
     return None
-
-
-def is_current_branch(repo_path: Path, branch: str) -> bool:
-    """Check whether repo_path currently points at the target branch."""
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except Exception:
-        return False
-    if result.returncode != 0:
-        return False
-    return result.stdout.strip() == branch
