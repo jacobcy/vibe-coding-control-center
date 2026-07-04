@@ -45,8 +45,8 @@ code_limits:
         limit: 410
         reason: "Manual dispatch handler 聚合，包含 plan/run/review intent handlers、ReviewRunResult backend/model/tmux/log field resolution（_resolve_review_metadata）、sync/async 双路径 branches review 元数据填充等紧密耦合逻辑；Issue #3137 review display unification 新增 metadata resolver 和 branch review 同步路径后超标（409 行）"
       - path: "src/vibe3/services/handoff/service.py"
-        limit: 650
-        reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀；新增 blocked_reason 自动清除逻辑（当 plan_ref/report_ref 写入时）；新增 event 驱动架构支持（FlowTimelineService 集成，issue_number 查询，event 记录逻辑）；迁移至 handoff/ 子包（Issue #2099）"
+        limit: 690
+        reason: "Handoff 记录管理核心服务，内聚度高，模板函数共生；包含 terminology 统一映射逻辑；--branch 参数统一支持后略微膨胀；新增 blocked_reason 自动清除逻辑（当 plan_ref/report_ref 写入时）；新增 event 驱动架构支持（FlowTimelineService 集成，issue_number 查询，event 记录逻辑）；迁移至 handoff/ 子包（Issue #2099）；spec 012 Phase 2 新增 record_spec 规范写入器 + spec artifact mapping（spec→spec_ref、handoff_spec event 类型，+29 行，#3310/#3311）"
 
       # Clients 聚合 —— 允许 450-560
       - path: "src/vibe3/clients/git_status_ops.py"
