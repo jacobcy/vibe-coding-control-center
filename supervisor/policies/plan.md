@@ -81,7 +81,7 @@ issue 满足任一条件即为代码层补偿反模式：
   - 使用 `grep -rn "Literal\[" --include="*.py" | grep -i "<related-term>"` 定位所有相关 Literal 类型定义点
   - **如果 Pydantic 模型层也需要修改**：该变更属于强制必需的同步变更（运行时 Pydantic 验证会拒绝未在 Literal 中声明的新值），不得列入"禁止的变更类型"
   - **如果任意一层遗漏更新**：必须在 plan 中完整列出需要同步变更的所有文件，不得遗漏
-- **检查 ADR 约束**：先读取 `docs/decisions/INDEX.md`，再读取相关 `accepted` ADR 正文，确认计划不违反任何当前有效 ADR。若需偏离，必须在 plan 中显式提议 supersede（写明将创建的新 ADR 编号及理由），而非静默违反。
+- **检查 ADR 约束**：运行 `vibe-adr-recall` skill 产出 `ADR Consideration` artifact——扫描 `docs/decisions/` 下 `status: accepted` 的 ADR frontmatter（`decides`/`scope`；`INDEX.md` 仅作 discovery，**不**作为约束真源，不复制 `decides`），按 semantic OR scope 相关性圈定候选，只读候选 body，并把 artifact 写进 plan。plan 阶段必须用 **planned paths**（来自 issue/spec/plan），**禁止**用 `vibe3 inspect base` 作为未来文件的证据。若需偏离 accepted ADR，必须在 plan 中显式提议 supersede（写明将创建的新 ADR 编号、`carry/replace/retire` 处置与理由），而非静默违反。
 - **验证 plan 目标的技术可行性**：如果 plan 涉及激活/启用功能，必须先用实际命令验证前提条件（如 import 测试、测试运行、依赖检查）。验证命令示例：`uv run python -c "from vibe3.<module> import <Symbol>"` 或 `uv run pytest <test_path> -k <test_name>`。发现障碍立即标注为 `REQUIRED:BEFORE_CODING` 或记录为 blocker。
 
 优先工具见公共规则；规划阶段通常至少会用到：

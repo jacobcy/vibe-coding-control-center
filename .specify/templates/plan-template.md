@@ -42,6 +42,41 @@
 
 [Gates determined based on constitution file]
 
+## ADR Consideration
+
+> **Required for non-trivial plans.** Run the `vibe-adr-recall` skill and fill this section before the `review-plan` gate. Plan stage records intent using **planned paths**; review stage **appends** actual-diff reconciliation without rewriting plan history. Do NOT use `vibe3 inspect base` as proof of future files.
+
+**Stage**: plan
+**Baseline**: branch=`<branch>`, commit=`<sha>`
+**Accepted snapshot**: ADR-NNNN, ... (only `status: accepted` files from `docs/decisions/`)
+**Planned paths**:
+- `<repo-relative path or glob>`
+
+### Candidates
+- ADR-NNNN — trigger: semantic | scope | metadata-fallback; evidence: `<signal>`
+
+### Applicable constraints
+- ADR-NNNN — constraint: `<binding rule>`; compliance: `<plan evidence>`
+
+### Dismissed candidates
+- ADR-NNNN — reason: `<specific reason after reading candidate body>`
+
+### Metadata flags
+- none | `<ADR, field, problem, consequence>`
+
+### ADR change proposals
+- none | `<RFC/ADR link or planned proposal, with carry/replace/retire disposition>`
+
+### Open conflicts
+- none | `<accepted constraint not yet resolved>`
+
+### Review reconciliation
+<!-- Filled at review time; leave empty at plan time. -->
+**Actual merge base/head**: `<sha>...<sha>`
+**Actual changed paths**: `<paths>`
+**Changes from plan assessment**: `<added/removed candidates and why>`
+**Review conclusion**: compliant | blocking finding `<reference>`
+
 ## Project Structure
 
 ### Documentation (this feature)
