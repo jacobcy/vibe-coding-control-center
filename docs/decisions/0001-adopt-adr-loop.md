@@ -3,6 +3,13 @@ document_type: decision
 title: 采纳 RFC→ADR→Standards 闭环
 adr_id: 0001
 status: accepted
+decides: "架构决策必须经 RFC→ADR→Standards 三层闭环记录；ADR 只写「为什么」、How 段只放链接，accepted 后正文不可重写，只能被 supersede 取代。"
+scope:
+  - docs/decisions/**
+  - docs/standards/doc-organization.md
+  - skills/vibe-task/SKILL.md
+  - skills/vibe-roadmap/SKILL.md
+  - supervisor/policies/plan.md
 date: 2026-06-04
 supersedes: null
 superseded_by: null

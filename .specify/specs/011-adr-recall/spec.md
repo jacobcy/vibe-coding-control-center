@@ -68,6 +68,11 @@ ADR authors maintain concise `decides` and `scope` frontmatter. The agent scans 
 - **FR-014**: the initial implementation MUST be Markdown/YAML, spec-kit template/workflow text, project skill, and review-policy text only. It MUST NOT add Python, a database, a score service, embeddings, RAG, or a `vibe3 adr` command.
 - **FR-015**: code-assisted retrieval may be proposed only through a later RFC after either more than **20 accepted ADRs** exist or at least **10 reviewed plans** provide measured false-positive/false-negative evidence that the agent procedure is unreliable.
 
+### Automated material integration
+
+- **FR-016**: automated planner material MUST consume a recorded flow `spec_ref` through `vibe3 handoff show @spec` before ADR recall. An absent `spec_ref` is allowed; a recorded but unreadable spec MUST NOT be silently ignored.
+- **FR-017**: when relevant long-term memory tooling is available, planning SHOULD query it for architecture history and similar failures. Memory is advisory evidence and MUST NOT override current human instructions, issue/spec requirements, accepted ADRs, or repository facts.
+
 ## ADR Consideration artifact
 
 The normative schema is [contracts/artifact.md](./contracts/artifact.md). Plan time records intent; review time appends reconciliation evidence rather than rewriting history.
@@ -79,9 +84,11 @@ The normative schema is [contracts/artifact.md](./contracts/artifact.md). Plan t
 - **SC-003**: only accepted ADR files constrain delivery; proposed and placeholder index entries do not.
 - **SC-004**: candidate ADR bodies are read selectively while metadata scanning remains explicit and linear.
 - **SC-005**: the initial delivery contains no runtime code and names the measurable threshold for reconsidering that choice.
+- **SC-006**: planner policy distinguishes an absent optional spec from an unreadable recorded spec and documents memory's advisory evidence boundary.
 
 ## Non-goals
 
 - Automatic semantic scoring or retrieval.
 - Automatic issue labels or direct flow mutation by the skill.
 - Treating ADRs as replacements for feature specs, standards, or repository principles.
+- Redesigning `spec_ref`, adding `handoff spec`, or changing missing-ref recovery semantics; these are tracked by [#3310](https://github.com/jacobcy/vibe-coding-control-center/issues/3310) and proposed ADR-0006.

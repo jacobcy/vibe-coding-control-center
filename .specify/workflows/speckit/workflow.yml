@@ -60,7 +60,7 @@ steps:
 
   - id: review-plan
     type: gate
-    message: "Review the plan before generating tasks."
+    message: "Review the plan before generating tasks. Verify the ADR Consideration artifact is present and complete (accepted snapshot, planned paths, candidates, applicable constraints, scan evidence for zero-candidate results, open conflicts) and that every open ADR conflict is resolved or explicitly carried as an RFC/ADR proposal."
     options: [approve, reject]
     on_reject: abort
 

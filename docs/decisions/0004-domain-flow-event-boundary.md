@@ -3,6 +3,15 @@ document_type: decision
 title: DomainEvent 与 FlowEvent 分层边界及投影关系
 adr_id: 0004
 status: accepted
+decides: "DomainEvent 是因果事件（runtime orchestration / dispatch），FlowEvent 是 flow-local 审计投影；二者单向投影，domain handler 不得重新承担 flow 状态机判断。"
+scope:
+  - src/vibe3/models/domain_events.py
+  - src/vibe3/models/flow.py
+  - src/vibe3/domain/**
+  - src/vibe3/services/flow/event_projection.py
+  - tests/vibe3/services/test_event_projection.py
+  - docs/standards/v3/event-driven-standard.md
+  - docs/standards/v3/database-schema-standard.md
 date: 2026-06-12
 supersedes: null
 superseded_by: null

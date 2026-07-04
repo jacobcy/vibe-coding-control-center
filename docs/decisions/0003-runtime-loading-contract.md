@@ -3,6 +3,14 @@ document_type: decision
 title: 运行时加载时机契约 — Kernel/Material/Job 三层与可插拔边界
 adr_id: 0003
 status: accepted
+decides: "可插拔边界以加载时机为物理判据：kernel 进程级；material 在 dispatch 边界解析，其中生产缓存模式在 server 生命周期冻结、开发模式逐 dispatch 重读；job-frozen 在运行中冻结；层归属不由目录决定。"
+scope:
+  - src/vibe3/prompts/manifest.py
+  - src/vibe3/config/convention_resolver.py
+  - src/vibe3/config/loader.py
+  - src/vibe3/runtime/heartbeat.py
+  - src/vibe3/execution/command_adapter.py
+  - tests/vibe3/test_modularity/**
 date: 2026-06-09
 supersedes: null
 superseded_by: null

@@ -15,8 +15,9 @@ document_type: index
 | [ADR-0003](0003-runtime-loading-contract.md) | 运行时加载时机契约 — Kernel/Material/Job 三层与可插拔边界 | accepted | 2026-06-09 | - | - | docs/standards/v3/runtime-loading-contract.md（待写） |
 | [ADR-0004](0004-domain-flow-event-boundary.md) | DomainEvent 与 FlowEvent 分层边界及投影关系 | accepted | 2026-06-12 | - | - | docs/standards/v3/event-driven-standard.md |
 | [ADR-0005](0005-prompt-policy-skill-audit-evidence-model.md) | Prompt/Policy/Skill 审计证据模型 | proposed | 2026-06-17 | - | - | docs/standards/v3/audit-evidence-model-standard.md |
-| ADR-XXXX | 3-Tier Layering 演进路径 | accepted | 2026-06-18 | - | - | （待补写） |
-| ADR-XXXX | Orchestra 编排机制 | accepted | 2026-06-18 | - | - | （待补写） |
+| [ADR-0006](0006-spec-artifact-handoff-contract.md) | Spec Artifact 与 Handoff 统一契约 | proposed | 2026-07-04 | - | - | docs/standards/v3/handoff-store-standard.md |
+
+> 未编号的「待立项」决策（如 3-Tier Layering 演进、Orchestra 编排机制）不登记在本表；正式记录必须先走 ADR 编号流程创建对应文件，再登记为 `proposed`。本表只索引实际存在的 ADR 文件，不作为约束真源。
 
 ## 使用指南
 

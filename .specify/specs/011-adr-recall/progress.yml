@@ -1,0 +1,42 @@
+# Superspec execution progress for spec 011
+# Tracks phase completion for resumable execution.
+spec: "011-adr-recall"
+title: "Low-Code ADR Recall"
+branch: dev/issue-3308
+pr: 3309
+
+phases:
+  brainstorm:
+    status: completed
+    completed_at: "2026-07-03"
+  specify:
+    status: completed
+    completed_at: "2026-07-03"
+  plan:
+    status: completed
+    completed_at: "2026-07-03"
+  tasks:
+    status: completed
+    completed_at: "2026-07-03"
+  implementing:
+    status: completed
+    completed_at: "2026-07-04"
+    commits:
+      - sha: dd6ece56
+        subject: "feat(adr): add low-code ADR recall procedure (spec 011)"
+    verification:
+      - "src/vibe3/ zero changes (FR-014)"
+      - "accepted ADR boundary: ADR-0005 not referenced as constraint"
+      - "threshold documented (>20 accepted / >=10 reviewed plans)"
+      - "7 quickstart scenarios covered"
+      - "pre-commit + pre-push passed"
+  reviewing:
+    status: follow_up_in_progress
+    findings:
+      - "ADR metadata path/scope corrections"
+      - "semantic-only fixture correction"
+      - "review verdict/reconciliation contract alignment"
+      - "spec and memory consumption boundary"
+    follow_up_issue: 3310
+
+last_updated: "2026-07-04"

@@ -70,6 +70,8 @@ issue 满足任一条件即为代码层补偿反模式：
 至少完成：
 - 读取需求来源或任务上下文
 - 读取当前 flow 的 handoff 现场
+- **消费已登记的 spec**：先看 `vibe3 flow show`。若存在 `spec_ref`，必须通过 `vibe3 handoff show @spec` 读取正文并纳入需求语义；已登记但无法解析的 spec 是 blocker，不得静默退化为只读 issue。若没有 `spec_ref`，允许按 issue 直接规划。
+- **查询相关长期记忆**：涉及架构决策、相似历史问题或模块演进时，使用可用的 `claude-memory smart search` / `smart_search` 检索。memory 只作历史证据，不得覆盖最新人类指令、issue、spec、accepted ADR 或当前仓库事实；工具不可用时记录证据限制后继续。
 - 使用项目工具确认受影响文件和符号
 - 判断是否触及关键路径、公开入口或共享状态
 - 判断本次任务属于哪一类改动
@@ -81,12 +83,13 @@ issue 满足任一条件即为代码层补偿反模式：
   - 使用 `grep -rn "Literal\[" --include="*.py" | grep -i "<related-term>"` 定位所有相关 Literal 类型定义点
   - **如果 Pydantic 模型层也需要修改**：该变更属于强制必需的同步变更（运行时 Pydantic 验证会拒绝未在 Literal 中声明的新值），不得列入"禁止的变更类型"
   - **如果任意一层遗漏更新**：必须在 plan 中完整列出需要同步变更的所有文件，不得遗漏
-- **检查 ADR 约束**：先读取 `docs/decisions/INDEX.md`，再读取相关 `accepted` ADR 正文，确认计划不违反任何当前有效 ADR。若需偏离，必须在 plan 中显式提议 supersede（写明将创建的新 ADR 编号及理由），而非静默违反。
+- **检查 ADR 约束**：运行 `vibe-adr-recall` skill 产出 `ADR Consideration` artifact——扫描 `docs/decisions/` 下 `status: accepted` 的 ADR frontmatter（`decides`/`scope`；`INDEX.md` 仅作 discovery，**不**作为约束真源，不复制 `decides`），按 semantic OR scope 相关性圈定候选，只读候选 body，并把 artifact 写进 plan。plan 阶段必须用 **planned paths**（来自 issue/spec/plan），**禁止**用 `vibe3 inspect base` 作为未来文件的证据。若需偏离 accepted ADR，必须在 plan 中显式提议 supersede（写明将创建的新 ADR 编号、`carry/replace/retire` 处置与理由），而非静默违反。
 - **验证 plan 目标的技术可行性**：如果 plan 涉及激活/启用功能，必须先用实际命令验证前提条件（如 import 测试、测试运行、依赖检查）。验证命令示例：`uv run python -c "from vibe3.<module> import <Symbol>"` 或 `uv run pytest <test_path> -k <test_name>`。发现障碍立即标注为 `REQUIRED:BEFORE_CODING` 或记录为 blocker。
 
 优先工具见公共规则；规划阶段通常至少会用到：
 - `vibe3 handoff status`
 - `vibe3 handoff show @current`
+- `vibe3 handoff show @spec`（仅当 flow 已登记 `spec_ref`）
 - `vibe3 inspect symbols`
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`

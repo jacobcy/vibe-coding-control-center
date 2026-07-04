@@ -124,6 +124,34 @@ git diff main...HEAD --name-only
 - **不要继续审查细节**（scope violation 本身就是最严重的 finding）
 - 建议：回退超出 scope 的变更，或通过 manager 扩展 issue scope
 
+### 0e. ADR Reconciliation（actual-diff 对账）
+
+Scope 审查完成后，必须把实际变更路径与 plan 阶段的 `ADR Consideration` artifact 做对账。这是 low-code ADR recall 在 review 阶段的落地步骤。
+
+**对账步骤**：
+
+1. 读取 plan 中的 `ADR Consideration` 段；若无该段，视为 plan 阶段缺失，至少 **MAJOR**。
+2. 用 0b 已获取的 actual changed paths（`git diff main...HEAD --name-only`）与 artifact 的 **Planned paths** 比对。
+3. 重新扫描当前 `accepted` ADR 的 `scope` frontmatter，看 actual diff 是否命中 plan 遗漏的候选：
+   - 若 actual diff 命中某 accepted ADR 的 `scope` glob，但该 ADR 不在 plan 的 Candidates 中 → 视为 plan 阶段遗漏，产生 blocking finding；在补齐候选评估前不得 PASS。
+4. 在 artifact 的 `Review reconciliation` 子段补写：
+   - Actual merge base/head、actual changed paths
+   - 相对 plan assessment 的增删候选及原因
+   - Review conclusion：`compliant` | `blocking finding <reference>`
+
+**判定规则**：
+
+- 实际变更违反某条 accepted ADR 的 `decides` 绑定约束，且 plan 未提议 supersede → **BLOCK**。
+- plan 的 Candidates 评估有误但实际变更未违反约束 → 至少 **MAJOR**（plan 质量问题）。
+- plan 与 actual diff 完全一致、无新增相关候选 → 仍须追加最小 `compliant` reconciliation，留下 actual merge base/head 与 changed-path 证据。
+
+**边界声明（重要）**：
+
+- ADR 违反**只产生正常 review finding / blocking verdict**，沿用 reviewer 现有的 verdict 与 state 处理路径。
+- ADR 违反**不激活 FailedGate、不自动打 label、不改 flow state**。FailedGate 与自动 labeling 不在本 low-code 实现的 scope 内。
+- review 阶段不得重写 plan 历史，只能在 `Review reconciliation` 子段追加。
+- 不得用 `vibe3 inspect base` 作为 ADR 命中证据的替代；inspect 的 exact partitions 用于 scope 核对，ADR scope 命中看 `git diff` 路径与 ADR frontmatter `scope` glob 的匹配。
+
 ### 0.5. 分支身份验证
 
 在开始详细审查前，**必须验证当前 HEAD 的 commit 属于目标分支**。

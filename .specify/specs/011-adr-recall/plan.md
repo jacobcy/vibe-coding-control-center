@@ -33,6 +33,8 @@ Create `skills/vibe-adr-recall/SKILL.md`. The skill:
 5. reads candidate bodies;
 6. writes the artifact defined in `contracts/artifact.md`.
 
+Planner material first consumes any recorded `@spec`; when architecture history or similar failures matter, it queries available long-term memory as advisory evidence. A missing optional spec is distinct from a recorded spec that cannot be resolved.
+
 ### 3. spec-kit plan visibility
 
 Add `ADR Consideration` to `.specify/templates/plan-template.md`. Update the spec-kit workflow's `review-plan` message to require artifact/conflict review. Update planner policy to invoke the canonical skill instead of a vague “read INDEX” instruction.
@@ -54,6 +56,8 @@ Update reviewer policy and `skills/vibe-review-code/SKILL.md` to compare planned
 - `skills/vibe-review-code/SKILL.md`
 
 No file below `src/vibe3/` is in scope.
+
+The runtime `spec_ref` / Handoff unification discovered during review is explicitly deferred to #3310 and proposed ADR-0006.
 
 ## Verification strategy
 

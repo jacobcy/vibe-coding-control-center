@@ -151,6 +151,17 @@ For every changed function/class/command with meaningful behavior, check:
 - Is any new code unreachable, duplicated, or unused?
 - Does the verification evidence exercise the actual failure mode?
 
+### 4.5 Reconcile ADR Consideration
+
+If the plan contains an `ADR Consideration` artifact, reconcile it against the actual diff before finalizing severity:
+
+- Compare actual changed paths (`git diff <base>...HEAD --name-only`) against the artifact's **Planned paths**.
+- Re-scan `docs/decisions/` for `status: accepted` ADRs whose `scope` glob now matches the actual diff but were missed by the plan assessment.
+- Append findings to the artifact's `Review reconciliation` subsection — do **not** rewrite plan history.
+- An ADR violation produces a normal review finding / blocking verdict through the existing reviewer verdict and state path. It does **not** activate FailedGate, auto-label, or change flow state.
+
+Verdict thresholds and the full rule set live in `@vibe/supervisor/policies/review.md` §0e.
+
 ### 5. Verify
 
 Run targeted verification proportional to risk:
