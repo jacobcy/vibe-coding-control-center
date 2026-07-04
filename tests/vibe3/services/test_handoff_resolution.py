@@ -108,6 +108,59 @@ def test_resolve_handoff_target_branch_no_worktree_raises(tmp_path: Path) -> Non
         )
 
 
+# --- @spec alias resolution (FR-004 round-trip with `handoff spec`) ---
+
+
+def test_resolve_handoff_target_at_spec_alias(tmp_path: Path) -> None:
+    """FR-004: @spec resolves via flow_state.spec_ref.
+
+    Round-trip regression: the canonical path written by `handoff spec` /
+    `flow update --spec` (HandoffService.record_spec → spec_ref column) is
+    recovered verbatim by `handoff show @spec` (resolve_handoff_target)."""
+    from unittest.mock import patch
+
+    # The canonical spec file (ADR-0006 form) written by the spec writer
+    canonical = ".specify/specs/012-foo/spec.md"
+    artifact = tmp_path / canonical
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("# Spec 012\n")
+
+    client = _make_git_client(str(tmp_path / ".git"), str(tmp_path))
+    client.get_current_branch.return_value = "task/issue-3310"
+    client.find_worktree_path_for_branch.return_value = tmp_path
+
+    # spec_ref holds the canonical path exactly as record_spec wrote it
+    mock_flow_state = {"spec_ref": canonical}
+    with patch("vibe3.clients.SQLiteClient") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client.get_flow_state.return_value = mock_flow_state
+        mock_client_class.return_value = mock_client
+
+        result = resolve_handoff_target(
+            "@spec", branch="task/issue-3310", git_client=client
+        )
+        assert result == artifact
+
+
+def test_resolve_handoff_target_at_spec_not_set(tmp_path: Path) -> None:
+    """@spec raises FileNotFoundError when spec_ref is unset — the correct
+    state for a freshly bootstrapped flow that has not yet run the canonical
+    spec writer (issue #3310: bootstrap no longer self-binds spec_ref)."""
+    from unittest.mock import patch
+
+    client = _make_git_client(str(tmp_path / ".git"), str(tmp_path))
+    client.get_current_branch.return_value = "task/issue-3310"
+
+    mock_flow_state = {"plan_ref": "docs/plans/plan.md"}  # No spec_ref
+    with patch("vibe3.clients.SQLiteClient") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client.get_flow_state.return_value = mock_flow_state
+        mock_client_class.return_value = mock_client
+
+        with pytest.raises(FileNotFoundError, match="No spec_ref recorded"):
+            resolve_handoff_target("@spec", branch="task/issue-3310", git_client=client)
+
+
 # --- @indicate alias resolution ---
 
 

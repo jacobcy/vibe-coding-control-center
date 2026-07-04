@@ -102,6 +102,129 @@ def test_record_indicate_writes_indicate_ref(tmp_path: Path) -> None:
     assert flow_state["manager_actor"] == "codex/gpt-5.4"
 
 
+def test_record_spec_writes_canonical_spec_ref(tmp_path: Path) -> None:
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    spec_path = (
+        worktree_root / ".specify" / "specs" / "012-spec-handoff-bridge" / "spec.md"
+    )
+    spec_path.parent.mkdir(parents=True)
+    spec_path.write_text("# Spec\n", encoding="utf-8")
+
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    service = HandoffService(
+        store=store,
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-3310"),
+    )
+
+    service.record_spec(
+        ".specify/specs/012-spec-handoff-bridge/spec.md", actor="planner"
+    )
+
+    flow_state = store.get_flow_state("task/issue-3310")
+    assert flow_state is not None
+    assert flow_state["spec_ref"] == ".specify/specs/012-spec-handoff-bridge/spec.md"
+    events = service.get_handoff_events("task/issue-3310")
+    assert any(e.event_type == "handoff_spec" for e in events)
+
+
+def _make_spec_service(tmp_path: Path) -> tuple[SQLiteClient, HandoffService, Path]:
+    """Fixture: worktree with a canonical spec file present."""
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    spec_path = (
+        worktree_root / ".specify" / "specs" / "012-spec-handoff-bridge" / "spec.md"
+    )
+    spec_path.parent.mkdir(parents=True)
+    spec_path.write_text("# Spec\n", encoding="utf-8")
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    service = HandoffService(
+        store=store,
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-3310"),
+    )
+    return store, service, worktree_root
+
+
+@pytest.mark.parametrize(
+    "bad_ref",
+    [
+        "#3310",  # legacy issue-id (write-strict rejection, T013)
+        "3310",  # bare issue number
+        "https://example.com/spec.md",  # URL
+        "/abs/path/spec.md",  # absolute path
+        "docs/spec.md",  # non-canonical location
+        ".specify/specs/012-spec-handoff-bridge/spec.txt",  # wrong filename
+        ".specify/specs/spec.md",  # missing NNN-slug segment
+    ],
+)
+def test_record_spec_rejects_non_canonical_forms(tmp_path: Path, bad_ref: str) -> None:
+    _, service, _ = _make_spec_service(tmp_path)
+
+    with pytest.raises(UserError, match="canonical repository-relative path"):
+        service.record_spec(bad_ref, actor="planner")
+
+
+def test_record_spec_rejects_missing_file(tmp_path: Path) -> None:
+    """Canonical shape but file does not exist → rejected."""
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    worktree_root.mkdir()
+    git_common.mkdir()
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    service = HandoffService(
+        store=store,
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-3310"),
+    )
+
+    with pytest.raises(UserError, match="existing regular file"):
+        service.record_spec(".specify/specs/099-missing/spec.md", actor="planner")
+
+
+def test_record_spec_rejects_directory_at_spec_md(tmp_path: Path) -> None:
+    """spec.md resolves to a directory, not a regular file → rejected."""
+    worktree_root = tmp_path / "wt"
+    git_common = tmp_path / ".git"
+    dir_at_spec = worktree_root / ".specify" / "specs" / "012-foo" / "spec.md"
+    dir_at_spec.mkdir(parents=True)
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+    service = HandoffService(
+        store=store,
+        git_client=StubGitClient(worktree_root, git_common, "task/issue-3310"),
+    )
+
+    with pytest.raises(UserError, match="existing regular file"):
+        service.record_spec(".specify/specs/012-foo/spec.md", actor="planner")
+
+
+def test_record_spec_no_partial_mutation_on_rejection(tmp_path: Path) -> None:
+    """Failed validation must not write spec_ref or emit an event (FR-007)."""
+    store, service, _ = _make_spec_service(tmp_path)
+
+    with pytest.raises(UserError):
+        service.record_spec("#3310", actor="planner")
+
+    # Validation runs before _record_ref, so neither a flow_state row nor an
+    # event is produced. Accept both "no row" and "row without spec_ref".
+    flow_state = store.get_flow_state("task/issue-3310")
+    if flow_state is not None:
+        assert flow_state.get("spec_ref") in (None, "")
+    events = service.get_handoff_events("task/issue-3310")
+    assert not any(e.event_type == "handoff_spec" for e in events)
+
+
+def test_record_spec_idempotent_rerecord(tmp_path: Path) -> None:
+    """Re-recording the same canonical spec_ref is safe (FR-009)."""
+    store, service, _ = _make_spec_service(tmp_path)
+    canonical = ".specify/specs/012-spec-handoff-bridge/spec.md"
+
+    service.record_spec(canonical, actor="planner")
+    service.record_spec(canonical, actor="planner")
+
+    flow_state = store.get_flow_state("task/issue-3310")
+    assert flow_state is not None
+    assert flow_state["spec_ref"] == canonical
+
+
 def test_record_ref_event_refs_use_database_ref_field(tmp_path: Path) -> None:
     worktree_root = tmp_path / "wt"
     git_common = tmp_path / ".git"

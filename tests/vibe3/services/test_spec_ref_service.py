@@ -139,3 +139,28 @@ class TestSpecRefService:
 
         content = svc.get_spec_content_for_prompt(info)
         assert content is None
+
+    def test_legacy_hash_ref_reads_as_issue_body(self, svc: SpecRefService) -> None:
+        """Regression (T013a, ADR-0006): legacy ``#nnn`` spec_ref stays
+        read-compatible — parsing it and rendering for a prompt surfaces the
+        issue body, equivalent to ``vibe3 task show #nnn``. The write path
+        rejects ``#nnn`` (see test_record_spec_rejects_non_canonical_forms),
+        but stored legacy values must keep rendering."""
+        with patch.object(
+            svc,
+            "_fetch_issue_data",
+            return_value={
+                "number": 3310,
+                "title": "Spec Handoff Bridge",
+                "body": "Acceptance: canonical spec_ref on write.",
+            },
+        ):
+            info = svc.parse_spec_ref("#3310")
+            content = svc.get_spec_content_for_prompt(info)
+
+        assert info.kind == "issue"
+        assert info.issue_number == 3310
+        assert content is not None
+        assert "3310" in content
+        assert "Spec Handoff Bridge" in content
+        assert "Acceptance: canonical spec_ref on write." in content
