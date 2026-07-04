@@ -31,6 +31,12 @@ phases:
       - "7 quickstart scenarios covered"
       - "pre-commit + pre-push passed"
   reviewing:
-    status: pending_ci
+    status: follow_up_in_progress
+    findings:
+      - "ADR metadata path/scope corrections"
+      - "semantic-only fixture correction"
+      - "review verdict/reconciliation contract alignment"
+      - "spec and memory consumption boundary"
+    follow_up_issue: 3310
 
 last_updated: "2026-07-04"

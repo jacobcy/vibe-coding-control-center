@@ -74,7 +74,7 @@ description: Use when creating or reviewing a non-trivial spec-kit implementatio
 
 对 accepted ADR 的 metadata 健康度保守标注：
 
-- `decides` 缺失或不含 must / must not / only 等绑定措辞。
+- `decides` 缺失或不含 must / must not / only、必须 / 禁止 / 只允许等语义等价的绑定措辞。
 - `scope` 缺失、含仓库外路径、或全为 `**` 通配（无法做 relevance 判定）。
 - lifecycle/index 不一致（INDEX 标 accepted 但无文件，或反之）。
 

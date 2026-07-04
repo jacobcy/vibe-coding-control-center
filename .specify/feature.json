@@ -1,4 +1,4 @@
 {
-  "feature_directory": ".specify/specs/011-adr-recall",
-  "note": "Tracks the most recently specified feature for downstream commands. Baseline epic (issue #3299) shipped 10 specs (001-010). This is feature 011: ADR Context Recall (ADR 按需召回), born from a 7-round brainstorm grill — a thin, zero-Python, dual-layer enforcement design that reuses existing audit/gate/label mechanisms."
+  "feature_directory": ".specify/specs/012-spec-handoff-bridge",
+  "note": "Tracks the most recently specified feature for downstream commands. Feature 012 defines the follow-up architecture for canonical spec artifacts, unified Handoff refs, project-owned spec-kit adapters, and automated material consumption; implementation is tracked by issue #3310."
 }

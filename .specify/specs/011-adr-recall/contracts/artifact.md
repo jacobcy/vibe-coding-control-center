@@ -23,6 +23,9 @@ The artifact is embedded in the spec-kit plan.
 ### Metadata flags
 - none | <ADR, field, problem, consequence>
 
+### Scan evidence
+- <accepted metadata source and semantic/scope signals checked; required for zero-candidate results>
+
 ### ADR change proposals
 - none | <RFC/ADR link or planned proposal, with carry/replace/retire disposition>
 
@@ -44,3 +47,4 @@ The artifact is embedded in the spec-kit plan.
 - Every applicable constraint has compliance evidence or an open conflict.
 - Proposed ADRs can appear in narrative context but not in `Accepted snapshot`.
 - An unresolved accepted-ADR conflict prevents a passing review.
+- A zero-candidate result records scan signals and metadata quality flags without exhaustive dismissal prose.

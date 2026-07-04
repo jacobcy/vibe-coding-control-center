@@ -1,0 +1,24 @@
+# Superspec execution progress for spec 012
+# This follow-up is specified here; implementation belongs to issue #3310.
+spec: "012-spec-handoff-bridge"
+title: "Spec Artifact Handoff Bridge"
+branch: task/issue-3310
+issue: 3310
+
+phases:
+  brainstorm:
+    status: completed
+    completed_at: "2026-07-04"
+  specify:
+    status: completed
+    completed_at: "2026-07-04"
+  plan:
+    status: pending
+  tasks:
+    status: pending
+  implementing:
+    status: pending
+  reviewing:
+    status: pending
+
+last_updated: "2026-07-04"

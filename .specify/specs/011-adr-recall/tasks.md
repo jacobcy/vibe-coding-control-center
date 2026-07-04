@@ -31,3 +31,11 @@
 - [x] Confirm no `src/vibe3/` files changed.
 - [x] Confirm only accepted ADR files constrain the plan.
 - [x] Confirm the implementation documents the `>20 accepted ADRs` or `10 reviewed plans with measured errors` threshold.
+
+## Phase 6 - review follow-up
+
+- [x] Correct accepted ADR metadata paths/scopes and loading-mode summary found during PR review.
+- [x] Replace the invalid semantic-only fixture with a path that does not match ADR-0002 scope.
+- [x] Align blocking/reconciliation policy and add zero-candidate scan evidence to the artifact schema.
+- [x] Require planner material to consume a recorded spec and treat long-term memory as advisory evidence.
+- [x] Record the runtime spec/handoff architecture gap in proposed ADR-0006, Spec 012, and follow-up issue #3310.

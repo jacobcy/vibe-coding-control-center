@@ -64,6 +64,9 @@
 ### Metadata flags
 - none | `<ADR, field, problem, consequence>`
 
+### Scan evidence
+- `<accepted metadata source and semantic/scope signals checked; required for zero-candidate results>`
+
 ### ADR change proposals
 - none | `<RFC/ADR link or planned proposal, with carry/replace/retire disposition>`
 

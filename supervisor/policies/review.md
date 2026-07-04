@@ -133,7 +133,7 @@ Scope 审查完成后，必须把实际变更路径与 plan 阶段的 `ADR Consi
 1. 读取 plan 中的 `ADR Consideration` 段；若无该段，视为 plan 阶段缺失，至少 **MAJOR**。
 2. 用 0b 已获取的 actual changed paths（`git diff main...HEAD --name-only`）与 artifact 的 **Planned paths** 比对。
 3. 重新扫描当前 `accepted` ADR 的 `scope` frontmatter，看 actual diff 是否命中 plan 遗漏的候选：
-   - 若 actual diff 命中某 accepted ADR 的 `scope` glob，但该 ADR 不在 plan 的 Candidates 中 → 视为 plan 阶段遗漏，至少 **MAJOR**。
+   - 若 actual diff 命中某 accepted ADR 的 `scope` glob，但该 ADR 不在 plan 的 Candidates 中 → 视为 plan 阶段遗漏，产生 blocking finding；在补齐候选评估前不得 PASS。
 4. 在 artifact 的 `Review reconciliation` 子段补写：
    - Actual merge base/head、actual changed paths
    - 相对 plan assessment 的增删候选及原因
@@ -143,7 +143,7 @@ Scope 审查完成后，必须把实际变更路径与 plan 阶段的 `ADR Consi
 
 - 实际变更违反某条 accepted ADR 的 `decides` 绑定约束，且 plan 未提议 supersede → **BLOCK**。
 - plan 的 Candidates 评估有误但实际变更未违反约束 → 至少 **MAJOR**（plan 质量问题）。
-- plan 与 actual diff 完全一致、无新增相关候选 → `compliant`，无需追加。
+- plan 与 actual diff 完全一致、无新增相关候选 → 仍须追加最小 `compliant` reconciliation，留下 actual merge base/head 与 changed-path 证据。
 
 **边界声明（重要）**：
 

@@ -70,6 +70,8 @@ issue 满足任一条件即为代码层补偿反模式：
 至少完成：
 - 读取需求来源或任务上下文
 - 读取当前 flow 的 handoff 现场
+- **消费已登记的 spec**：先看 `vibe3 flow show`。若存在 `spec_ref`，必须通过 `vibe3 handoff show @spec` 读取正文并纳入需求语义；已登记但无法解析的 spec 是 blocker，不得静默退化为只读 issue。若没有 `spec_ref`，允许按 issue 直接规划。
+- **查询相关长期记忆**：涉及架构决策、相似历史问题或模块演进时，使用可用的 `claude-memory smart search` / `smart_search` 检索。memory 只作历史证据，不得覆盖最新人类指令、issue、spec、accepted ADR 或当前仓库事实；工具不可用时记录证据限制后继续。
 - 使用项目工具确认受影响文件和符号
 - 判断是否触及关键路径、公开入口或共享状态
 - 判断本次任务属于哪一类改动
@@ -87,6 +89,7 @@ issue 满足任一条件即为代码层补偿反模式：
 优先工具见公共规则；规划阶段通常至少会用到：
 - `vibe3 handoff status`
 - `vibe3 handoff show @current`
+- `vibe3 handoff show @spec`（仅当 flow 已登记 `spec_ref`）
 - `vibe3 inspect symbols`
 - `vibe3 inspect files`
 - `vibe3 inspect base --json`

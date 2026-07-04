@@ -5,7 +5,8 @@ adr_id: 0002
 status: accepted
 decides: "services 层禁止直接依赖 agents 具体实现，必须通过 clients 层 Protocol（BackendProtocol）依赖注入；新增 backend 只许实现 Protocol。"
 scope:
-  - src/vibe3/clients/protocols.py
+  - src/vibe3/clients/protocols/backend.py
+  - src/vibe3/clients/protocols/__init__.py
   - src/vibe3/services/**
   - src/vibe3/agents/backends/**
 date: 2026-06-04

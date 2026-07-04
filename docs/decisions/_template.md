@@ -3,7 +3,7 @@ document_type: decision
 title: <决策标题>
 adr_id: NNNN
 status: proposed | accepted | superseded
-decides: "<一句话：命名决策对象与绑定约束，使用 must / must not / only 等精确措辞>"
+decides: "<一句话：命名决策对象与绑定约束，使用 must / must not / only 或语义等价的精确约束措辞>"
 scope:
   - "<仓库相对路径或 glob，受该决策约束的实际产物>"
 date: YYYY-MM-DD
@@ -64,6 +64,6 @@ issues:
 - How 段只放链接，不复制实现细节
 - ADR 一旦 accepted，决策正文不可重写；只能通过 supersede 机制被新 ADR 取代
 - supersede 时允许更新旧 ADR 的 lifecycle metadata，以保持追溯链可读
-- decides / scope 是 ADR recall 的元数据真源（见 skills/vibe-adr-recall）：decides 一句话命名决策对象与绑定约束；scope 列受约束的仓库相对路径/glob，是相关信号而非授权边界
+- decides / scope 是 ADR recall 的元数据真源（见 skills/vibe-adr-recall）：decides 一句话命名决策对象与绑定约束，可使用 must / must not / only 或语义等价的「必须/禁止/只允许」；scope 列受约束的仓库相对路径/glob，是相关信号而非授权边界
 - INDEX.md 只索引实际存在的 ADR 文件，禁止登记无对应文件的 placeholder accepted 行
 -->

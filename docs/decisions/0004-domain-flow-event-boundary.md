@@ -8,6 +8,8 @@ scope:
   - src/vibe3/models/domain_events.py
   - src/vibe3/models/flow.py
   - src/vibe3/domain/**
+  - src/vibe3/services/flow/event_projection.py
+  - tests/vibe3/services/test_event_projection.py
   - docs/standards/v3/event-driven-standard.md
   - docs/standards/v3/database-schema-standard.md
 date: 2026-06-12
