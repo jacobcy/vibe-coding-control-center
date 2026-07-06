@@ -313,6 +313,7 @@ def test_plan_spec_issue_number_does_not_bind(monkeypatch) -> None:
     result = runner.invoke(plan_app, ["--spec", "#123", "--branch", "42"])
     assert result.exit_code == 0
     mock_flow_service.bind_spec.assert_not_called()
+    mock_resolve.assert_called_once_with("task/issue-42", spec_ref="#123")
 
 
 def test_plan_issue_subcommand_works(monkeypatch) -> None:

@@ -151,6 +151,7 @@ def _plan_spec_impl(
         raise typer.Exit(1)
 
     spec_file: Path | None = None
+    spec_ref_override: str | None = None
     # When spec_ref is an issue number, we don't need a file path
     spec_is_issue = False
 
@@ -184,7 +185,8 @@ def _plan_spec_impl(
                 # into spec_ref (G2 — issue identity belongs in task_issue_number).
                 # Bind a spec via `vibe3 flow update --spec` or `vibe3 handoff spec`.
                 spec_is_issue = True
-                typer.echo(f"Using spec (read-only): #{spec_path.lstrip('#')} (issue)")
+                spec_ref_override = f"#{spec_path.lstrip('#')}"
+                typer.echo(f"Using spec (read-only): {spec_ref_override} (issue)")
             else:
                 resolved_spec = Path(spec_path)
                 if not resolved_spec.exists() or not resolved_spec.is_file():
@@ -224,9 +226,12 @@ def _plan_spec_impl(
     # Build request from spec file or issue
     try:
         # When spec is an issue number, pass None to use SpecRefService logic
-        spec_input = resolve_spec_plan_input(
-            branch, file=None if spec_is_issue else spec_file
-        )
+        if spec_ref_override is not None:
+            spec_input = resolve_spec_plan_input(branch, spec_ref=spec_ref_override)
+        else:
+            spec_input = resolve_spec_plan_input(
+                branch, file=None if spec_is_issue else spec_file
+            )
     except (ValueError, FileNotFoundError) as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
