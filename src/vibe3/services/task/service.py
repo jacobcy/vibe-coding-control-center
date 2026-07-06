@@ -154,27 +154,14 @@ class TaskService:
         existing_events = self.store.get_events(normalized_branch)
 
         if role == "task":
-            # Write spec_ref for task role (issue number as spec)
+            # Record the linking actor on the flow. Per issue #3310 / ADR-0006,
+            # the task issue is bound as a `task` link (flow_issue_links) and
+            # MUST NOT be self-bound as spec_ref. spec_ref is set only by the
+            # canonical spec writer (`handoff spec` / `flow update --spec`).
             self.store.update_flow_state(
                 normalized_branch,
                 latest_actor=effective_actor,
-                spec_ref=f"#{issue_number}",
             )
-            # Add spec_bound event (idempotent)
-            already_bound = any(
-                e.get("event_type") == "spec_bound"
-                and str((e.get("refs") or {}).get("issue_number") or "")
-                == str(issue_number)
-                for e in existing_events
-            )
-            if not already_bound:
-                self.store.add_event(
-                    normalized_branch,
-                    "spec_bound",
-                    effective_actor,
-                    f"Spec bound: #{issue_number}",
-                    refs={"issue_number": issue_number},
-                )
 
         # Add issue_linked event (idempotent)
         already_linked = any(

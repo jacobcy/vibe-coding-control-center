@@ -6,6 +6,7 @@ import typer
 from loguru import logger
 
 from vibe3.commands.common import enable_method_trace
+from vibe3.exceptions import UserError
 from vibe3.models import VerdictValue
 from vibe3.services.flow import resolve_branch_arg
 from vibe3.services.handoff import HandoffService
@@ -42,7 +43,14 @@ def _record_handoff_reference(
     # Branch is resolved to non-None string at command level
     extra_kwargs = {k: v for k, v in extra_kw.items() if v is not None}
     extra_kwargs["branch"] = branch
-    method(ref_value, actor, **extra_kwargs)
+    try:
+        method(ref_value, actor, **extra_kwargs)
+    except UserError as exc:
+        # Unified failure UX: clean `Error:` line + exit 1, mirroring
+        # `flow update --spec` (flow_manage.py). Keeps every `handoff <kind>`
+        # command consistent when the canonical writer rejects a ref.
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
     console.print(f"[green]✓[/] {ref_label} handoff recorded: {ref_value}")
 
 
@@ -276,6 +284,47 @@ def plan(
     )
 
 
+def spec(
+    spec_ref: Annotated[str, typer.Argument(help="Canonical spec document reference")],
+    actor: Annotated[
+        str | None,
+        typer.Option(
+            "--actor",
+            "-a",
+            help=(
+                "Actor identifier (format: backend/model, e.g., codex/gpt-5.4). "
+                "Default: flow actor if configured, otherwise workflow."
+            ),
+        ),
+    ] = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name or issue number"),
+    ] = None,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪（set VIBE3_TRACE=1）")
+    ] = False,
+) -> None:
+    """Record canonical spec handoff for a branch.
+
+    The spec_ref MUST be a canonical repository-relative path of the form
+    ``.specify/specs/<NNN-slug>/spec.md`` (ADR-0006). Legacy issue-ids
+    (``#nnn``) are rejected on write; read-side compatibility is preserved.
+    """
+
+    target_branch = resolve_branch_arg(branch)
+
+    _record_handoff_reference(
+        command="handoff spec",
+        ref_label="Spec",
+        ref_value=spec_ref,
+        actor=actor,
+        trace=trace,
+        method_name="record_spec",
+        branch=target_branch,
+    )
+
+
 def report(
     report_ref: Annotated[str, typer.Argument(help="Report document reference")],
     actor: Annotated[
@@ -493,6 +542,7 @@ def register_write_commands(app: typer.Typer) -> None:
     app.command()(init)
     app.command()(append)
     app.command()(plan)
+    app.command()(spec)
     app.command()(report)
     app.command()(indicate)
     app.command()(audit)

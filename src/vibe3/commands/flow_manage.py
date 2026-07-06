@@ -14,6 +14,7 @@ from vibe3.commands.command_options import (
 from vibe3.commands.common import enable_method_trace, validate_trace_options
 from vibe3.models import IssueLink
 from vibe3.services.flow import FlowService
+from vibe3.services.handoff import HandoffService
 from vibe3.services.task import TaskService
 from vibe3.ui import console, render_flow_created
 
@@ -37,7 +38,10 @@ SpecOption = Annotated[
     str | None,
     typer.Option(
         "--spec",
-        help="Spec file path or issue reference. Use empty string '' to clear spec_ref",
+        help=(
+            "Canonical spec path (.specify/specs/<NNN-slug>/spec.md). "
+            "Delegates to `handoff spec`. Use empty string '' to clear spec_ref."
+        ),
     ),
 ]
 ActorOption = Annotated[
@@ -140,6 +144,10 @@ def ensure_current_handoff_for_flow(target_branch: str, source: str) -> None:
         source: Caller identifier for logging context
     """
     from vibe3.exceptions import UserError
+
+    # Lazy import: resolve HandoffService from its source module at call time
+    # so tests can patch `vibe3.services.handoff.HandoffService` directly (the
+    # module-level alias is a separate, import-time reference). Do NOT remove.
     from vibe3.services.handoff import HandoffService
 
     service = HandoffService()
@@ -262,20 +270,19 @@ def update(
             # Clear spec_ref
             flow_service.store.update_flow_state(flow.branch, spec_ref=None)
         else:
-            # Validate file path exists
-            from pathlib import Path
+            # FR-006: delegate to the canonical spec writer (`handoff spec`).
+            # HandoffService.record_spec enforces the canonical spec path
+            # contract (ADR-0006) and emits the handoff_spec event, producing
+            # state/event semantics equivalent to `vibe3 handoff spec <path>`.
+            # The legacy FlowService.bind_spec path is intentionally bypassed.
+            from vibe3.exceptions import UserError
 
-            spec_path = Path(spec)
-            if not spec_path.exists() or not spec_path.is_file():
-                typer.echo(f"Error: Spec file not found: {spec}", err=True)
-                typer.echo(
-                    "Use a valid file path (e.g., docs/spec.md). "
-                    "For issue binding, use 'vibe flow bind <issue> --role task'.",
-                    err=True,
-                )
-                raise typer.Exit(1)
-            # Bind spec (absolute path)
-            flow_service.bind_spec(flow.branch, str(spec_path.resolve()), actor)
+            handoff_service = HandoffService()
+            try:
+                handoff_service.record_spec(spec, actor, branch=flow.branch)
+            except UserError as exc:
+                typer.echo(f"Error: {exc}", err=True)
+                raise typer.Exit(1) from exc
 
     if output_format in ("json", "yaml"):
         if output_format == "json":

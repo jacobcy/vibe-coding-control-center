@@ -12,7 +12,13 @@ class TestFlowBinding:
     """Tests for binding tasks to flows via TaskService."""
 
     def test_bind_flow_success(self, mock_store) -> None:
-        """Test binding a task issue to a flow via TaskService.link_issue."""
+        """Test binding a task issue to a flow via TaskService.link_issue.
+
+        Per issue #3310 / ADR-0006: binding the task issue MUST NOT self-bind
+        ``spec_ref``. The issue is recorded as a ``task`` link (queryable via
+        flow_issue_links); ``spec_ref`` is set only by the canonical spec
+        writer (``handoff spec`` / ``flow update --spec``).
+        """
         mock_store.get_events.return_value = []
         service = TaskService(store=mock_store)
         result = service.link_issue(
@@ -26,13 +32,32 @@ class TestFlowBinding:
         assert result.issue_role == "task"
 
         mock_store.add_issue_link.assert_called_once_with("test-branch", 123, "task")
+        # latest_actor is still recorded; spec_ref is NOT written here.
         mock_store.update_flow_state.assert_called_once_with(
             "test-branch",
             latest_actor="test-actor",
-            spec_ref="#123",
         )
-        # Should have both spec_bound and issue_linked events
-        assert mock_store.add_event.call_count == 2
+        # Only the issue_linked event — NO spec_bound event.
+        assert mock_store.add_event.call_count == 1
+        event_types = [call.args[1] for call in mock_store.add_event.call_args_list]
+        assert "spec_bound" not in event_types
+
+    def test_link_issue_task_role_never_self_binds_spec_ref(self, mock_store) -> None:
+        """Regression (issue #3310 acceptance): ``link_issue(role="task")``
+        must never write ``spec_ref`` nor emit ``spec_bound`` — the task issue
+        is bound as a link, not as the flow's spec artifact. spec_ref stays
+        unset until an explicit canonical spec write occurs."""
+        mock_store.get_events.return_value = []
+        service = TaskService(store=mock_store)
+        service.link_issue(branch="task/issue-3310", issue_number=3310, role="task")
+
+        for call in mock_store.update_flow_state.call_args_list:
+            assert "spec_ref" not in call.kwargs, (
+                "link_issue(role='task') must not write spec_ref; got "
+                f"{call.kwargs!r}"
+            )
+        event_types = [call.args[1] for call in mock_store.add_event.call_args_list]
+        assert "spec_bound" not in event_types
 
     def test_bind_flow_already_bound(self, mock_store) -> None:
         """Binding again overwrites — link_issue is idempotent at store level."""

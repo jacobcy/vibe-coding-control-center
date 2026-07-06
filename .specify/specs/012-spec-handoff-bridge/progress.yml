@@ -15,9 +15,13 @@ phases:
   plan:
     status: pending
   tasks:
-    status: pending
+    status: completed
+    completed_at: "2026-07-04"
+    note: "decomposed from spec.md + ADR-0006 + issue #3310 (plan.md pending)"
   implementing:
-    status: pending
+    status: in_progress
+    started_at: "2026-07-04"
+    note: "Phase 3 (US1 MVP spec writer) complete: T030-T035 done. (1) `handoff spec <canonical>` command added to handoff_write.py reusing _record_handoff_reference (FR-005). (2) `flow update --spec` now delegates to HandoffService.record_spec, bypassing legacy bind_spec (FR-006). (3) @spec alias resolution regression-locked (FR-004). (4) Removed TaskService.link_issue self-bind of spec_ref='#nnn' + spec_bound event (issue #3310 acceptance). Test evidence: 7 flow_update_spec/handoff_spec + 20 handoff_resolution + 192-test integration sweep (incl. 45 task/orchestrator/binding) all green; mypy clean. Paused at checkpoint before Phase 4 (US2 P1 recover)."
   reviewing:
     status: pending
 

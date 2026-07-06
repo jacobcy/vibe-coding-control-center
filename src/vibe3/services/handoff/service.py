@@ -12,7 +12,10 @@ from vibe3.models import FlowEvent, VerdictRecord
 from vibe3.services.handoff.external_events import ExternalEventRecorder
 from vibe3.services.handoff.resolution import _SHARED_HANDOFF_PREFIX
 from vibe3.services.handoff.storage import HandoffStorage
-from vibe3.services.handoff.validation import validate_authoritative_ref
+from vibe3.services.handoff.validation import (
+    validate_authoritative_ref,
+    validate_canonical_spec_path,
+)
 from vibe3.services.shared.actors import (
     extract_role_from_actor,
 )
@@ -32,6 +35,7 @@ class HandoffService:
         "plan": "plan_ref",
         "run": "report_ref",
         "review": "audit_ref",
+        "spec": "spec_ref",
     }
     _ACTIVE_KIND_TO_REF_FIELD: dict[str, str] = {
         **_KIND_TO_REF_FIELD,
@@ -50,13 +54,17 @@ class HandoffService:
         "audit": "review",
     }
 
-    _AUTHORITATIVE_REF_KINDS = {"plan", "report", "audit", "run", "review"}
+    _AUTHORITATIVE_REF_KINDS = {"plan", "report", "audit", "run", "review", "spec"}
     _HANDOFF_EVENT_TYPES = {
         "handoff_plan",
         "handoff_report",
         "handoff_run",  # backward-compat: legacy event type
         "handoff_audit",
         "handoff_indicate",
+        # spec has no passive `spec_recorded` variant in US1; only the active
+        # handoff_spec event is emitted. Do NOT blindly mirror report_recorded
+        # when adding spec-kit extension publication (US3 / FR-018).
+        "handoff_spec",
         "next_step_set",
         "plan_recorded",
         "report_recorded",  # new canonical name
@@ -71,6 +79,7 @@ class HandoffService:
         "handoff_run",  # backward-compat: legacy name for handoff_report
         "handoff_audit",
         "handoff_indicate",
+        "handoff_spec",
         "handoff_verdict",
         "handoff_ci_status",
         "handoff_pr_comment",
@@ -376,6 +385,29 @@ class HandoffService:
             branch: Target branch name (defaults to current branch)
         """
         return self._record_ref("plan", plan_ref, actor, branch=branch)
+
+    def record_spec(
+        self,
+        spec_ref: str,
+        actor: str | None = None,
+        branch: str | None = None,
+    ) -> Path:
+        """Record spec handoff reference.
+
+        The spec_ref MUST be a canonical repository-relative path of the form
+        ``.specify/specs/<NNN-slug>/spec.md`` (see ADR-0006). Legacy issue-id
+        references (``#nnn``) are rejected on the write path; read-side
+        compatibility is preserved by ``SpecRefService``.
+
+        Args:
+            spec_ref: Canonical spec document reference
+            actor: Actor identifier
+            branch: Target branch name (defaults to current branch)
+        """
+        target_branch = branch or self.git_client.get_current_branch()
+        worktree_root = self._resolve_branch_worktree_root(target_branch)
+        validate_canonical_spec_path(spec_ref, worktree_root)
+        return self._record_ref("spec", spec_ref, actor, branch=branch)
 
     def record_report(
         self,
