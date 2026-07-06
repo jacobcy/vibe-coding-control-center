@@ -6,6 +6,7 @@ import typer
 from loguru import logger
 
 from vibe3.commands.common import enable_method_trace
+from vibe3.exceptions import UserError
 from vibe3.models import VerdictValue
 from vibe3.services.flow import resolve_branch_arg
 from vibe3.services.handoff import HandoffService
@@ -42,7 +43,14 @@ def _record_handoff_reference(
     # Branch is resolved to non-None string at command level
     extra_kwargs = {k: v for k, v in extra_kw.items() if v is not None}
     extra_kwargs["branch"] = branch
-    method(ref_value, actor, **extra_kwargs)
+    try:
+        method(ref_value, actor, **extra_kwargs)
+    except UserError as exc:
+        # Unified failure UX: clean `Error:` line + exit 1, mirroring
+        # `flow update --spec` (flow_manage.py). Keeps every `handoff <kind>`
+        # command consistent when the canonical writer rejects a ref.
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
     console.print(f"[green]✓[/] {ref_label} handoff recorded: {ref_value}")
 
 

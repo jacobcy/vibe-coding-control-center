@@ -61,6 +61,9 @@ class HandoffService:
         "handoff_run",  # backward-compat: legacy event type
         "handoff_audit",
         "handoff_indicate",
+        # spec has no passive `spec_recorded` variant in US1; only the active
+        # handoff_spec event is emitted. Do NOT blindly mirror report_recorded
+        # when adding spec-kit extension publication (US3 / FR-018).
         "handoff_spec",
         "next_step_set",
         "plan_recorded",

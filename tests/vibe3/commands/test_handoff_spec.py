@@ -70,5 +70,10 @@ def test_handoff_spec_command_propagates_validation_error(
         ["handoff", "spec", "#3310", "--actor", "planner/claude"],
     )
 
-    assert result.exit_code != 0
+    # Clean failure UX (FR-008): exit 1 + `Error:` line, mirroring
+    # `flow update --spec`. Locks the unified writer-failure contract so a
+    # regression to an uncaught-traceback exit is caught here.
+    assert result.exit_code == 1, result.output
+    assert "Error:" in result.output
+    assert "canonical repository-relative path" in result.output
     mock_service.record_spec.assert_called_once()
