@@ -439,8 +439,11 @@ code_limits:
         limit: 420
         reason: "Run command 测试集，覆盖 skill resolution、dispatch async/sync、publish path detection（手动/自动通道）、commit_mode 类型验证、graceful degradation 等紧密耦合场景，新增 10 个测试验证 publish path detection 和 manual channel（#2028），拆分收益低"
       - path: "tests/vibe3/roles/test_plan.py"
-        limit: 410
-        reason: "Planner role 测试集，覆盖 no-op gate、prompt building、spec plan input resolution、async worktree requirement、sync cwd handling 等紧密耦合场景；Issue #3135 新增 backend/model 传播测试和 spec_ref 解析测试（+50 行）"
+        limit: 430
+        reason: "Planner role 测试集，覆盖 no-op gate、prompt building、spec plan input resolution、async worktree requirement、sync cwd handling 等紧密耦合场景；Issue #3135 新增 backend/model 传播测试和 spec_ref 解析测试（+50 行）；PR #3314 corrective review 新增 spec_ref 显式覆盖测试（+24 行）"
+      - path: "tests/vibe3/extensions/test_spec_kit_bridge.py"
+        limit: 430
+        reason: "Spec-kit bridge 测试集，覆盖 extension.yml 元数据、四个生命周期 hook 声明、运行时发现、.gitignore 屏蔽、adapter 四种 artifact 类型适配、显式 --artifact 路径绕过 spec-dir 解析、目录选择按 NNN/name 排序（非 mtime）等紧密耦合场景；PR #3314 corrective review 新增 init 集成测试、显式 artifact 路径测试、目录排序测试（+107 行）"
       - path: "tests/vibe3/config/test_loader.py"
         limit: 430
         reason: "Config loader 测试集，覆盖配置文件查找、YAML 加载、环境变量覆盖、keys.env fallback、load_runtime_config 统一入口、target_repo 参数等紧密耦合场景，新增 7 个测试验证 load_runtime_config 和 target_repo 功能（#1925）"
