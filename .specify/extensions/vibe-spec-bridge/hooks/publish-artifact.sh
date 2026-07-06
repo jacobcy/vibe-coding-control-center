@@ -17,7 +17,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
-  echo "Usage: publish-artifact.sh <spec|plan|report|audit> [--spec-dir <dir>] [--branch <branch>]" >&2
+  echo "Usage: publish-artifact.sh <spec|plan|report|audit> [--spec-dir <dir>] [--branch <branch>] [--artifact <path>]" >&2
   exit 64
 fi
 
@@ -43,18 +43,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Resolve spec-dir: explicit > newest .specify/specs/<NNN-*/ > error.
-if [[ -z "$SPEC_DIR" ]]; then
-  SPEC_DIR=$(ls -dt .specify/specs/*/ 2>/dev/null | head -n1 || true)
-fi
-if [[ -z "$SPEC_DIR" ]]; then
-  echo "Error: no spec directory found under .specify/specs/" >&2
-  exit 66
-fi
-
 if [[ -n "$ARTIFACT" ]]; then
   RESOLVED="$ARTIFACT"
 else
+  # Resolve spec-dir: explicit > greatest NNN/name > error. Directory mtime is
+  # unrelated to feature identity and can change when an older spec is edited.
+  if [[ -z "$SPEC_DIR" ]]; then
+    SPEC_DIR=$(find .specify/specs -mindepth 1 -maxdepth 1 -type d -print \
+      2>/dev/null | LC_ALL=C sort -r | head -n1 || true)
+  fi
+  if [[ -z "$SPEC_DIR" ]]; then
+    echo "Error: no spec directory found under .specify/specs/" >&2
+    exit 66
+  fi
   RESOLVED="${SPEC_DIR%/}/${REL}"
 fi
 if [[ ! -f "$RESOLVED" ]]; then

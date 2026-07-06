@@ -23,6 +23,7 @@ stay idempotent — the CLI surface the adapter calls is already covered by
 
 import os
 import stat
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -34,6 +35,8 @@ from vibe3.services.handoff import HandoffService
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXT_DIR = REPO_ROOT / ".specify" / "extensions" / "vibe-spec-bridge"
 SUPER_SPEC_DIR = REPO_ROOT / ".specify" / "extensions" / "superspec"
+EXTENSIONS_CONFIG = REPO_ROOT / ".specify" / "extensions.yml"
+ROOT_GITIGNORE = REPO_ROOT / ".gitignore"
 
 
 # --- A. extension.yml metadata (T051) ---------------------------------------
@@ -58,6 +61,45 @@ def test_extension_yml_declares_four_lifecycle_hooks() -> None:
     hooks = meta["hooks"]
     for lifecycle in ("after_specify", "after_plan", "after_implement", "after_review"):
         assert lifecycle in hooks, f"missing lifecycle hook: {lifecycle}"
+
+
+def test_project_extension_is_declared_for_runtime_discovery() -> None:
+    """Tracked config must let bootstrap materialize spec-kit's registry."""
+    config = yaml.safe_load(EXTENSIONS_CONFIG.read_text(encoding="utf-8"))
+
+    assert "vibe-spec-bridge" in config["installed"]
+    registered = {
+        (hook_name, hook["extension"], hook["command"])
+        for hook_name, hooks in config["hooks"].items()
+        for hook in hooks
+    }
+    assert (
+        "after_specify",
+        "vibe-spec-bridge",
+        "speckit.vibe-spec-bridge.publish-spec",
+    ) in registered
+    assert (
+        "after_plan",
+        "vibe-spec-bridge",
+        "speckit.vibe-spec-bridge.publish-plan",
+    ) in registered
+    assert (
+        "after_implement",
+        "vibe-spec-bridge",
+        "speckit.vibe-spec-bridge.publish-report",
+    ) in registered
+    assert (
+        "after_review",
+        "vibe-spec-bridge",
+        "speckit.vibe-spec-bridge.publish-audit",
+    ) in registered
+
+
+def test_project_extension_ignores_dev_materialization() -> None:
+    """Local installs generate command caches that are not extension source."""
+    patterns = ROOT_GITIGNORE.read_text(encoding="utf-8").splitlines()
+
+    assert ".specify/extensions/vibe-spec-bridge/.specify-dev/" in patterns
 
 
 def test_extension_yml_hooks_map_to_correct_publish_commands() -> None:
@@ -156,6 +198,71 @@ def test_publish_artifact_adapter_accepts_all_four_kinds() -> None:
     joined = "\n".join(_adapter_code_lines())
     for kind in ("spec", "plan", "report", "audit"):
         assert kind in joined, f"adapter missing kind: {kind}"
+
+
+def _write_vibe3_probe(bin_dir: Path) -> None:
+    bin_dir.mkdir()
+    probe = bin_dir / "vibe3"
+    probe.write_text("#!/bin/sh\nprintf '%s\\n' \"$*\"\n", encoding="utf-8")
+    probe.chmod(probe.stat().st_mode | stat.S_IXUSR)
+
+
+def test_explicit_artifact_does_not_require_spec_directory(tmp_path: Path) -> None:
+    """Report/audit exit paths may publish without any spec directory."""
+    artifact = tmp_path / "docs" / "report.md"
+    artifact.parent.mkdir()
+    artifact.write_text("# Report\n", encoding="utf-8")
+    bin_dir = tmp_path / "bin"
+    _write_vibe3_probe(bin_dir)
+
+    result = subprocess.run(
+        [
+            str(EXT_DIR / "hooks" / "publish-artifact.sh"),
+            "report",
+            "--artifact",
+            "docs/report.md",
+            "--branch",
+            "dev/issue-3312",
+        ],
+        cwd=tmp_path,
+        env={**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == (
+        "handoff report docs/report.md --branch dev/issue-3312"
+    )
+
+
+def test_implicit_artifact_selects_greatest_spec_directory_by_name(
+    tmp_path: Path,
+) -> None:
+    """Fallback selection follows documented NNN/name ordering, not mtime."""
+    old = tmp_path / ".specify" / "specs" / "012-old"
+    current = tmp_path / ".specify" / "specs" / "013-current"
+    old.mkdir(parents=True)
+    current.mkdir(parents=True)
+    (old / "spec.md").write_text("# Old\n", encoding="utf-8")
+    (current / "spec.md").write_text("# Current\n", encoding="utf-8")
+    os.utime(old, (2_000_000_000, 2_000_000_000))
+    os.utime(current, (1_000_000_000, 1_000_000_000))
+    bin_dir = tmp_path / "bin"
+    _write_vibe3_probe(bin_dir)
+
+    result = subprocess.run(
+        [str(EXT_DIR / "hooks" / "publish-artifact.sh"), "spec"],
+        cwd=tmp_path,
+        env={**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == ("handoff spec .specify/specs/013-current/spec.md")
 
 
 # --- C. EXIT_CONTRACT + FR-014 (T054) ---------------------------------------

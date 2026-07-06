@@ -149,6 +149,7 @@ docs/superpowers/
 # external cloned extensions (superspec etc.) stay ignored.
 .specify/extensions/*
 !.specify/extensions/vibe-spec-bridge/
+.specify/extensions/vibe-spec-bridge/.specify-dev/
 .specify/scripts/
 .specify/integrations/
 .specify/init-options.json

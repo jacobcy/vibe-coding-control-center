@@ -4,6 +4,77 @@ setup() {
   export VIBE_ROOT="$BATS_TEST_DIRNAME/../../.."
 }
 
+@test "init installs tracked project extension through local dev source" {
+  local fixture bin_dir home_dir specify_log
+  fixture="$(mktemp -d)"
+  bin_dir="$fixture/bin"
+  home_dir="$fixture/home"
+  specify_log="$fixture/specify.log"
+
+  mkdir -p "$bin_dir" "$home_dir" \
+    "$fixture/.specify/extensions/vibe-spec-bridge" \
+    "$fixture/.specify/extensions/superspec" "$fixture/skills"
+  cp "$VIBE_ROOT/.specify/extensions/vibe-spec-bridge/extension.yml" \
+    "$fixture/.specify/extensions/vibe-spec-bridge/extension.yml"
+  touch "$fixture/.specify/extensions/vibe-spec-bridge/.project-owned"
+  mkdir -p "$fixture/.specify/extensions/vibe-spec-bridge/.specify-dev"
+  touch "$fixture/.specify/extensions/vibe-spec-bridge/.specify-dev/cache"
+  cat > "$fixture/.specify/extensions/superspec/extension.yml" <<'YAML'
+schema_version: "1.0"
+extension:
+  id: superspec
+  name: External Fixture
+  version: "1.0.0"
+provides:
+  commands: []
+hooks: {}
+YAML
+  cat > "$fixture/.specify/extensions.yml" <<'YAML'
+installed:
+- superspec
+- vibe-spec-bridge
+settings:
+  auto_execute_hooks: true
+hooks: {}
+YAML
+
+  for command in npx openspec pre-commit; do
+    cat > "$bin_dir/$command" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  done
+  cat > "$bin_dir/specify" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$SPECIFY_LOG"
+if [[ "$1 $2" == "extension add" && -d "$3/.specify-dev" ]]; then
+  exit 2
+fi
+if [[ "$1 $2 $3" == "extension update vibe-spec-bridge" ]]; then
+  exit 1
+fi
+exit 0
+SH
+  chmod +x "$bin_dir/npx" "$bin_dir/openspec" "$bin_dir/pre-commit" \
+    "$bin_dir/specify"
+
+  run env HOME="$home_dir" SPECIFY_LOG="$specify_log" \
+    PATH="$bin_dir:$PATH" bash -c \
+    'cd "'"$fixture"'" && bash "'"$VIBE_ROOT"'/scripts/init.sh"'
+
+  if [ "$status" -ne 0 ]; then
+    echo "$output" >&2
+  fi
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"spec-kit extension: vibe-spec-bridge"* ]]
+  run grep -E '^extension add .+/vibe-spec-bridge --dev --force$' "$specify_log"
+  [ "$status" -eq 0 ]
+  run grep -F 'extension update superspec' "$specify_log"
+  [ "$status" -eq 0 ]
+  run grep -E 'extension add .+/superspec --dev --force' "$specify_log"
+  [ "$status" -ne 0 ]
+}
+
 @test "install migrates pending task title as YAML-safe single-line frontmatter" {
   local fixture bin_dir home_dir task_id readme current_dir
   fixture="$(mktemp -d)"

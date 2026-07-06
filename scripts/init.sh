@@ -162,8 +162,26 @@ if [[ -d ".specify" ]] && command -v specify &> /dev/null; then
   if [[ -f ".specify/extensions.yml" ]]; then
     while IFS= read -r ext; do
       [[ -z "$ext" ]] && continue
-      if specify extension update "$ext" >/dev/null 2>&1 || \
-         specify extension add "$ext" >/dev/null 2>&1; then
+      extension_ready=false
+      local_extension=".specify/extensions/$ext"
+      if [[ -f "$local_extension/.project-owned" ]]; then
+        # `specify extension add --dev` refuses a source that is already its
+        # install destination. A disposable source copy lets spec-kit safely
+        # materialize the gitignored registry from tracked project content.
+        extension_source_root="$(mktemp -d 2>/dev/null || true)"
+        if [[ -n "$extension_source_root" ]] && \
+           cp -R "$local_extension" "$extension_source_root/$ext" && \
+           rm -rf "$extension_source_root/$ext/.specify-dev" && \
+           specify extension add "$extension_source_root/$ext" --dev --force \
+             >/dev/null 2>&1; then
+          extension_ready=true
+        fi
+        [[ -z "$extension_source_root" ]] || rm -rf "$extension_source_root"
+      elif specify extension update "$ext" >/dev/null 2>&1 || \
+           specify extension add "$ext" >/dev/null 2>&1; then
+        extension_ready=true
+      fi
+      if [[ "$extension_ready" == true ]]; then
         echo "  ✅ spec-kit extension: $ext"
       else
         echo -e "\033[1;33m⚠️  specify extension '$ext' failed (non-blocking)\033[0m"
