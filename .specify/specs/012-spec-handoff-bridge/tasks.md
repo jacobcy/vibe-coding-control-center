@@ -1,10 +1,10 @@
 # Tasks: Spec Artifact Handoff Bridge
 
-**Input**: `spec.md` (012-spec-handoff-bridge), [ADR-0006](../../../docs/decisions/0006-spec-artifact-handoff-contract.md) (`proposed`), [issue #3310](https://github.com/jacobcy/vibe-coding-control-center/issues/3310)
+**Input**: `spec.md` (012-spec-handoff-bridge), [ADR-0006](../../../docs/decisions/0006-spec-artifact-handoff-contract.md) (`proposed`), parent [issue #3310](https://github.com/jacobcy/vibe-coding-control-center/issues/3310), implementation [issue #3312](https://github.com/jacobcy/vibe-coding-control-center/issues/3312)
 
-> **⚠️ Plan provenance**: `plan.md` is **not yet generated** (progress.yml `plan: pending`). This task list was decomposed **directly from `spec.md` + ADR-0006 Decision/Consequences + issue #3310 Required design**, applying the `superpowers:writing-plans` decomposition methodology onto the spec-kit tasks template. Before `implement`, either (a) backfill `plan.md` via `/speckit-superspec-plan`, or (b) treat this file as the plan-of-record and reconcile at `/speckit-superspec-review`. File paths and line anchors below reflect the **explored baseline** (commit `306ef3b4`); re-anchor line numbers at implementation time.
+> **Plan provenance**: [`plan.md`](./plan.md) was backfilled during PR #3314 review from `spec.md`, ADR-0006, issue #3312, and this task decomposition. Its ADR Consideration records the accepted snapshot and actual-diff reconciliation. File paths and line anchors below originated at explored baseline `306ef3b4` and must be re-anchored against the implementation diff.
 
-**Prerequisites**: spec.md ✓, ADR-0006 ✓ (proposed), plan.md ✗ (see above), constitution ✓ (`.specify/memory/constitution.md`)
+**Prerequisites**: spec.md ✓, ADR-0006 ✓ (proposed), plan.md ✓, constitution ✓ (`.specify/memory/constitution.md`)
 
 **Tests**: This feature changes shared-state write/validation/recovery contracts — tests are **mandatory** (spec SC-006, constitution principle III). Every implementation task is `[TDD]`.
 
@@ -272,4 +272,4 @@ Verbatim from spec.md / ADR-0006 / CLAUDE.md HARD RULES — every task inherits 
 - Every implementation task is `[TDD]` (constitution principle III; superspec `before_implement` hook enforces Red-Green-Refactor).
 - Adapters touch `.specify/extensions/vibe-spec-bridge/` only — never `.specify/extensions/superspec/` or external sources (G7).
 - Shared-state writes always via public handoff commands (HARD RULE #2); never raw `.git/vibe3` access.
-- If `plan.md` is backfilled later, reconcile this file against it at `/speckit-superspec-review` — do not maintain two divergent task lists (constitution principle II).
+- Keep this task list reconciled with `plan.md`; do not maintain two divergent planning artifacts (constitution principle II).
