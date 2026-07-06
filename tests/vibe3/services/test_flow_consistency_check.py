@@ -112,6 +112,20 @@ def test_present_spec_ref_still_ok_when_file_exists():
         mod.check_ref_exists = orig
 
 
+def test_legacy_issue_spec_ref_remains_read_compatible():
+    """Historical ``#nnn`` spec refs identify issues, not missing files."""
+    git = _make_git_client(Path("/wt/task/issue-1"))
+    state = {
+        "worktree_path": "/wt/task/issue-1",
+        "spec_ref": "#3310",
+    }
+
+    result = check_flow_consistency("task/issue-1", state, git_client=git)
+
+    assert result.code == FlowConsistencyCode.OK
+    assert not result.needs_rebuild
+
+
 def test_non_task_branch_skips_recorded_check():
     """dev/ branches don't require recorded worktree_path."""
     git = _make_git_client(Path("/wt/dev/issue-1"))

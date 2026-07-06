@@ -7,6 +7,7 @@ from enum import StrEnum
 from typing import Any, Mapping
 
 from vibe3.services.shared.paths import check_ref_exists
+from vibe3.utils import try_parse_issue_number
 
 
 class FlowConsistencyCode(StrEnum):
@@ -89,6 +90,14 @@ def check_flow_consistency(
     for ref_field in ("spec_ref", "plan_ref", "report_ref", "audit_ref"):
         ref_value = flow_state.get(ref_field)
         if not ref_value:
+            continue
+        legacy_issue_spec = (
+            ref_field == "spec_ref"
+            and try_parse_issue_number(str(ref_value)) is not None
+        )
+        if legacy_issue_spec:
+            # New writes are canonical files, but historical ``#nnn`` values
+            # remain issue-backed read refs with no physical file to check.
             continue
         _, exists = check_ref_exists(
             str(ref_value),
