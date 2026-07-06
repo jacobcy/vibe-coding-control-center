@@ -433,8 +433,8 @@ code_limits:
         limit: 680
         reason: "Check service bridge issue 测试集，覆盖 9 个关键场景（bridge 创建、idempotency、API 失败保护、PR 编号精确匹配等），共享 mock setup，新增边缘情况测试后略微超标（#1895）；Issue #2329 rename handle_closed_pr → handle_pr_terminal_state 增加行数（长方法名需换行，2个超长函数名需 noqa 注释）；Issue #2432 新增 3 个测试覆盖 _transfer_dependencies 方法及其集成（+82 行）；PR #2667 删除 test_verify_branch_returns_warning_for_open_pr_with_running_worker 测试（-64 行），迁移至 qualify_gate 测试；PR #3058 follow-up 新增 test_transfer_dependencies_rejects_protected_branch 验证验证守卫功能（+42 行）"
       - path: "tests/vibe3/services/test_handoff_service.py"
-        limit: 650
-        reason: "Handoff service 测试集，覆盖 plan/report/audit/indicate 记录、artifact 解析、verdict 处理、next step 管理、passive artifact 记录等紧密耦合场景，共享 fixture 和 mock setup，拆分收益低；架构重构后新增 ref_field 参数验证测试略微超标（#1908）；Issue #3139 新增 handoff 事件排序、状态转换、current.md 初始化链等测试（+163 行）"
+        limit: 760
+        reason: "Handoff service 测试集，覆盖 plan/report/audit/indicate 记录、artifact 解析、verdict 处理、next step 管理、passive artifact 记录等紧密耦合场景，共享 fixture 和 mock setup，拆分收益低；架构重构后新增 ref_field 参数验证测试略微超标（#1908）；Issue #3139 新增 handoff 事件排序、状态转换、current.md 初始化链等测试（+163 行）；spec 012 Phase 2 新增 record_spec 规范写入测试 + 规范路径校验拒绝矩阵（issue-id/bare/URL/abs/non-canonical/wrong-filename/missing-slug 等 7 类 + 无部分变更 + 幂等，+123 行，#3310/#3311）"
       - path: "tests/vibe3/roles/test_run_command.py"
         limit: 420
         reason: "Run command 测试集，覆盖 skill resolution、dispatch async/sync、publish path detection（手动/自动通道）、commit_mode 类型验证、graceful degradation 等紧密耦合场景，新增 10 个测试验证 publish path detection 和 manual channel（#2028），拆分收益低"
