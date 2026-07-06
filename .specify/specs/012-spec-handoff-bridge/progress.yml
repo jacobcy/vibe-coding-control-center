@@ -21,8 +21,8 @@ phases:
   implementing:
     status: in_progress
     started_at: "2026-07-04"
-    note: "Phase 3 (US1 MVP spec writer) complete: T030-T035 done. (1) `handoff spec <canonical>` command added to handoff_write.py reusing _record_handoff_reference (FR-005). (2) `flow update --spec` now delegates to HandoffService.record_spec, bypassing legacy bind_spec (FR-006). (3) @spec alias resolution regression-locked (FR-004). (4) Removed TaskService.link_issue self-bind of spec_ref='#nnn' + spec_bound event (issue #3310 acceptance). Test evidence: 7 flow_update_spec/handoff_spec + 20 handoff_resolution + 192-test integration sweep (incl. 45 task/orchestrator/binding) all green; mypy clean. Paused at checkpoint before Phase 4 (US2 P1 recover)."
+    note: "Phase 3 (US1) T030-T035 done (#3311). Phase 4 (US2) T040-T044 done: FlowConsistencyCode.MISSING_ARTIFACT + RecoveryAction.ARTIFACT_BLOCKED — a missing historical artifact in a healthy worktree becomes a repair blocker, NEVER an auto-rebuild (SC-002); spec_ref joined the consistency ref loop (FR-010); no-op gate (FR-012) and FailedGate (FR-013) boundaries regression-locked. G1 cleanup: GP-1 `plan --spec` is now read-only (bind_spec calls removed, write_mixin deprecated); GP-2 unified spec writer entry to `handoff spec` (landed #3311). Phase 5 (US3) T050-T054 done: project-owned `.specify/extensions/vibe-spec-bridge/` (extension.yml + 4 lifecycle hooks + publish-artifact.sh adapter + EXIT_CONTRACT) publishes spec/plan/report/audit via public `vibe3 handoff` only (FR-015/016), external sources untouched (FR-014/SC-003), idempotent re-publish (FR-018). Test evidence: 16 bridge + 4 noop-gate + 2 failed-gate + 19 plan + 5 flow_update_spec + 56 handoff/consistency/recovery = 102-test targeted sweep all green."
   reviewing:
     status: pending
 
-last_updated: "2026-07-04"
+last_updated: "2026-07-06"
