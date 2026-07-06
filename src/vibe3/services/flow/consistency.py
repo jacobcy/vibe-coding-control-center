@@ -15,6 +15,11 @@ class FlowConsistencyCode(StrEnum):
     OK = "ok"
     MISSING_WORKTREE = "missing_worktree"
     MISSING_RECORDED_WORKTREE = "missing_recorded_worktree"
+    # A recorded spec/plan/report/audit whose file disappeared while the
+    # worktree stayed healthy. This is a repair blocker (FR-011), NOT
+    # physical scene damage — the flow waits for explicit rebind/regeneration
+    # and is never auto-rebuilt (spec 012 US2, SC-002).
+    MISSING_ARTIFACT = "missing_artifact"
     MISSING_REF = "missing_ref"
 
 
@@ -49,7 +54,8 @@ def check_flow_consistency(
     Classification:
     - MISSING_WORKTREE: physical worktree gone -> needs full rebuild
     - MISSING_RECORDED_WORKTREE: worktree exists but DB out of sync -> cheap fix
-    - MISSING_REF: artifact ref points to non-existent file -> needs rebuild
+    - MISSING_ARTIFACT: a recorded spec/plan/report/audit file disappeared in
+      an otherwise healthy worktree -> artifact repair blocker (NOT rebuild)
     - OK: scene is consistent
     """
     worktree_path = git_client.find_worktree_path_for_branch(branch)
@@ -78,7 +84,9 @@ def check_flow_consistency(
             worktree_path=str(worktree_path),
         )
 
-    for ref_field in ("plan_ref", "report_ref", "audit_ref"):
+    # FR-010: spec_ref shares one resolution contract with plan/report/audit
+    # (no special-casing). Order matters only for the reported ref_field.
+    for ref_field in ("spec_ref", "plan_ref", "report_ref", "audit_ref"):
         ref_value = flow_state.get(ref_field)
         if not ref_value:
             continue
@@ -88,11 +96,14 @@ def check_flow_consistency(
             git_client=git_client,
         )
         if not exists:
+            # The worktree is healthy (verified above); a missing recorded
+            # artifact is a repair blocker, NOT physical scene damage. The
+            # flow waits for explicit rebind/regeneration (FR-011, SC-002).
             return FlowConsistencyResult(
-                needs_rebuild=True,
-                code=FlowConsistencyCode.MISSING_REF,
+                needs_rebuild=False,
+                code=FlowConsistencyCode.MISSING_ARTIFACT,
                 reason=f"{ref_field} file not found: {ref_value}",
-                severity="critical",
+                severity="high",
                 ref_field=ref_field,
                 ref_value=str(ref_value),
             )
