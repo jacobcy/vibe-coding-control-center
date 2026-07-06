@@ -234,6 +234,15 @@ class FlowWriteMixin(FlowReadMixin):
     ) -> None:
         """Bind a spec to a flow.
 
+        .. deprecated:: spec 012 GP-1
+            The spec_ref write use case is retired from this method. The
+            canonical spec writer is now ``HandoffService.record_spec`` (used
+            by ``vibe3 handoff spec`` and the ``vibe3 flow update --spec``
+            forwarder), which enforces the G1 write contract (FR-001/002).
+            ``plan --spec`` is a read-only per-run input override and no longer
+            calls this method. Retained for internal/test compatibility only;
+            do NOT add new production callers.
+
         Args:
             branch: Branch name
             spec_ref: Spec file reference

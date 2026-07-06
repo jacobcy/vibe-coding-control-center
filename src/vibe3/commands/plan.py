@@ -179,16 +179,21 @@ def _plan_spec_impl(
         else:
             # Direct value: check if it's an issue number or a file path
             if spec_path.lstrip("#").isdigit():
+                # GP-1 (spec 012): --spec is a read-only per-run input override.
+                # Issue numbers feed this plan run only; they MUST NOT be written
+                # into spec_ref (G2 — issue identity belongs in task_issue_number).
+                # Bind a spec via `vibe3 flow update --spec` or `vibe3 handoff spec`.
                 spec_is_issue = True
-                flow_service.bind_spec(branch, f"#{spec_path.lstrip('#')}", actor=None)
-                typer.echo(f"Spec updated: #{spec_path.lstrip('#')} (issue)")
+                typer.echo(f"Using spec (read-only): #{spec_path.lstrip('#')} (issue)")
             else:
                 resolved_spec = Path(spec_path)
                 if not resolved_spec.exists() or not resolved_spec.is_file():
                     typer.echo(f"Error: Spec file not found: {spec_path}", err=True)
                     raise typer.Exit(1)
-                flow_service.bind_spec(branch, str(resolved_spec.resolve()), actor=None)
-                typer.echo(f"Spec updated: {resolved_spec}")
+                # GP-1 (spec 012): --spec is a read-only per-run input override.
+                # Bind a spec via `vibe3 flow update --spec` or `vibe3 handoff spec`
+                # (canonical writer, FR-001/002).
+                typer.echo(f"Using spec (read-only): {resolved_spec}")
                 spec_file = resolved_spec
     else:
         # No --spec parameter: default to flow's spec_ref

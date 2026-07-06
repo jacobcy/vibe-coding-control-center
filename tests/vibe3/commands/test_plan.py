@@ -271,6 +271,48 @@ def test_plan_spec_file_basic_flow(monkeypatch) -> None:
                     ["--spec", "docs/spec.md", "--branch", "42"],
                 )
     assert result.exit_code == 0
+    # GP-1 (spec 012): --spec is a read-only per-run input override — it MUST
+    # NOT bind the spec into flow_state.spec_ref. Binding goes through the
+    # canonical writer (`vibe3 handoff spec` / `flow update --spec`, FR-001/002).
+    mock_flow_service.bind_spec.assert_not_called()
+
+
+def test_plan_spec_issue_number_does_not_bind(monkeypatch) -> None:
+    """GP-1 (spec 012): `plan --spec #123` keeps the issue number as the plan
+    input but MUST NOT write it into spec_ref (G2 — issue identity stays in
+    task_issue_number, never copied into spec_ref)."""
+    _ensure_lazy_imports_populated()
+
+    mock_flow = _make_mock_flow()
+    mock_flow_service = MagicMock()
+    mock_flow_service.get_flow_status.return_value = mock_flow
+    mock_resolve = MagicMock()
+    mock_spec_input = MagicMock()
+    mock_spec_input.request = MagicMock()
+    mock_resolve.return_value = mock_spec_input
+
+    monkeypatch.setattr("vibe3.roles.execute_spec_plan_async", MagicMock())
+    monkeypatch.setattr("vibe3.roles.execute_spec_plan_sync", MagicMock())
+    monkeypatch.setattr("vibe3.roles.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_async", MagicMock())
+    monkeypatch.setattr("vibe3.roles.plan.execute_spec_plan_sync", MagicMock())
+    monkeypatch.setattr("vibe3.roles.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.resolve_spec_plan_input", mock_resolve)
+    monkeypatch.setattr("vibe3.commands.plan.FlowService", lambda: mock_flow_service)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_branch_arg",
+        lambda branch_arg, flow_service=None: "task/issue-42",
+    )
+    mock_config = MagicMock()
+    monkeypatch.setattr(
+        "vibe3.commands.plan.load_config_and_validate_model",
+        lambda *a, **kw: mock_config,
+    )
+    _patch_config_for_role(monkeypatch, mock_config)
+
+    result = runner.invoke(plan_app, ["--spec", "#123", "--branch", "42"])
+    assert result.exit_code == 0
+    mock_flow_service.bind_spec.assert_not_called()
 
 
 def test_plan_issue_subcommand_works(monkeypatch) -> None:
