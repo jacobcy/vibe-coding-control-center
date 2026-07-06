@@ -88,13 +88,21 @@ def test_extension_yml_commands_use_namespace_prefix() -> None:
 def test_extension_yml_additive_hooks_do_not_collide_with_superspec() -> None:
     """after_specify/after_plan are ADDITIVE — superspec only declares
     after_tasks/before_implement/after_implement. The bridge must not
-    redefine a hook superspec already owns."""
+    redefine a hook superspec already owns.
+
+    superspec is an externally-cloned extension (gitignored — absent in CI),
+    so its hook set is treated as a stable contract and hard-coded. When
+    superspec happens to be present locally, the on-disk manifest is
+    cross-checked against the contract.
+    """
     bridge = _load_extension_yml()["hooks"]
-    super_meta = yaml.safe_load(
-        (SUPER_SPEC_DIR / "extension.yml").read_text(encoding="utf-8")
-    )
-    super_hooks = set(super_meta["hooks"].keys())
     bridge_hooks = set(bridge.keys())
+    super_yml = SUPER_SPEC_DIR / "extension.yml"
+    if super_yml.is_file():
+        super_meta = yaml.safe_load(super_yml.read_text(encoding="utf-8"))
+        super_hooks = set(super_meta["hooks"].keys())
+    else:
+        super_hooks = {"after_tasks", "before_implement", "after_implement"}
     # after_implement is allowed to co-exist (bridge publishes report;
     # superspec runs review) as long as both stay optional. The other three
     # hooks are additive and MUST be bridge-only.
@@ -167,8 +175,9 @@ def test_exit_contract_document_describes_direct_superspec_path() -> None:
 
 def test_external_superspec_source_untouched() -> None:
     """FR-014: the bridge lives ONLY under vibe-spec-bridge/ — no file is
-    added into the external superspec/ source tree."""
-    assert SUPER_SPEC_DIR.is_dir()
+    added into the external superspec/ source tree. superspec itself is
+    gitignored and may be absent (CI); the guarantee checked here is that
+    NOTHING under vibe-spec-bridge/ leaks into the superspec namespace."""
     for root, _dirs, files in os.walk(EXT_DIR):
         for f in files:
             rel = Path(root).relative_to(EXT_DIR) / f
