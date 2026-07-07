@@ -57,3 +57,9 @@ No uncovered role-protocol implementation gap was found in this review. Changes 
 - Defining prompt content for individual roles.
 - Redesigning the orchestration state machine.
 - Expanding role output contracts.
+
+## spec 012 touchpoints
+
+Spec 012 (Spec Artifact Handoff Bridge) delivered by #3310-#3313:
+- planner role now consumes recorded spec_ref via SpecRefService, distinguishing absent from unreadable (FR-019)
+- ADR recall integrated at plan time per vibe-adr-recall low-code procedure (FR-020)

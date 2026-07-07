@@ -77,3 +77,9 @@ Flow completion and scene cleanup are separate. Cleanup may remove tmux/worktree
 - Defining the future manual/automatic resume API.
 - Implementing normalized dependency storage.
 - Changing flow lifecycle code as part of this archive correction.
+
+## spec 012 touchpoints
+
+Spec 012 (Spec Artifact Handoff Bridge) delivered by #3310-#3313:
+- consistency now covers spec_ref/plan_ref/report_ref/audit_ref through one shared resolution contract (FR-010)
+- missing-artifact classification distinguishes repair blockers from physical scene rebuild (FR-011)

@@ -144,6 +144,45 @@ def _build_plan_task_guidance(
             sections.append(f"## Spec Reference\nSpec Ref: {spec_info.display}")
         if spec_content:
             sections.append(f"## Spec Context\n{spec_content}")
+        elif spec_info.kind == "file":
+            # FR-019: spec_ref is set but the file is unreadable → blocker
+            sections.append(
+                "## Spec BLOCKED\n"
+                f"The recorded spec_ref ({spec_ref}) cannot be read. "
+                "Regenerate the spec file or rebind with "
+                "`vibe3 handoff spec <path>` before planning."
+            )
+
+    # ADR Recall (FR-020): planner policy instructs running vibe-adr-recall
+    # skill to produce ADR Consideration artifact. The low-code procedure
+    # (delivered by #3308) scans docs/decisions/ for status:accepted ADRs
+    # matching issue/spec semantics and records findings in the plan.
+
+    # Memory context (FR-021/022): advisory evidence — cannot override
+    # issue/spec/accepted-ADR/repository truth.
+    try:
+        import subprocess
+
+        result = subprocess.run(
+            ["claude-memory", "smart-search", "--limit", "5", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            sections.append(
+                "## Advisory Memory Context\n"
+                "[Advisory] The following is retrieved from long-term memory. "
+                "It cannot override issue requirements, spec, accepted ADRs, "
+                "or current repository facts.\n\n" + result.stdout.strip()
+            )
+    except Exception:
+        # FR-021: claude-memory unavailable → evidence limitation, not failure
+        sections.append(
+            "## Evidence Limitation\n"
+            "Long-term memory retrieval (claude-memory) is not available. "
+            "Planning proceeds with issue, spec, ADR, and repository evidence only."
+        )
 
     return "\n\n".join(sections) if sections else None
 

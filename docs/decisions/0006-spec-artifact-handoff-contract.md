@@ -2,7 +2,7 @@
 document_type: decision
 title: Spec Artifact 与 Handoff 统一契约
 adr_id: 0006
-status: proposed
+status: accepted
 decides: "正式 spec 必须是 `.specify/specs/<NNN-slug>/spec.md` 下的仓库 artifact；spec/plan/report/audit 只通过统一 Handoff ref 契约发布，外部 workflow 只能经 project-owned extension adapter 接入，不得把 issue identity 复用为 spec_ref。"
 scope:
   - .specify/specs/**

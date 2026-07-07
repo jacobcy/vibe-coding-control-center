@@ -62,3 +62,9 @@ No code gap is opened for “deny direct filesystem access”: that statement wa
 - Adding a filesystem sandbox.
 - Changing handoff storage formats.
 - Redesigning flow artifact refs.
+
+## spec 012 touchpoints
+
+Spec 012 (Spec Artifact Handoff Bridge) delivered by #3310-#3313:
+- canonical kind `spec -> spec_ref` added to Handoff artifact mapping (FR-004)
+- authoritative validation enforces canonical `.specify/specs/NNN-slug/spec.md` path on write (FR-001/002)
