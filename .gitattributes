@@ -11,3 +11,5 @@
 *.env text eol=lf
 *.json text eol=lf
 
+# Generated knowledge graph artifacts are tracked but collapsed in GitHub diffs.
+graphify-out/** linguist-generated
