@@ -329,7 +329,7 @@ code_limits:
 - **CI**: ✅ 阻断（最终合并前强制）
 - **pr ready**: ❌ 不再作为硬性门禁。`pr ready` 仅作为人类发起评审的信号，并自动生成 Reviewer Briefing 提供上下文。
 
-**配置**：`config/settings.yaml` → `coverage.threshold`
+**配置**：`config/v3/settings.yaml` → `coverage.threshold`
 
 **实现**：由 CI 执行或通过 `vibe3 review` 手动验证。
 

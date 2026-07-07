@@ -374,7 +374,7 @@ V3 使用 Python/Typer CLI，通过 `git_client.py` 进行 Git 操作：
 | CLI Framework | Zsh scripts | Typer (Python) |
 | Git Operations | Shell `git` commands | `git_client.py` (Pythonic) |
 | Flow State | JSON files | SQLite + Pydantic models |
-| Configuration | `.viberc` | `config/settings.yaml` |
+| Configuration | `.viberc` | `config/v3/settings.yaml` |
 | Command Prefix | `vibe` | `vibe3` |
 
 ### 12.2 Migration Path
