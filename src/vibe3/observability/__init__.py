@@ -109,5 +109,6 @@ __all__ = [
     "supervisor_log_dir",
     "tick_log_dir",
     "tick_log_path",
+    "trace_method",
     "write_prompt_provenance",
 ]
