@@ -96,7 +96,7 @@ Forbidden:
 ```bash
 ls -la skills/<skill-name>/
 cat skills/<skill-name>/SKILL.md
-python3 $HOME/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/<skill-name>
+uv run python $HOME/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/<skill-name>
 ```
 
 **真源现场**：
@@ -211,11 +211,11 @@ Steps:
 2. 执行 `check_skill_scope()` 识别应引用的标准
 3. 初始化 skill 结构：
    ```bash
-   python3 $HOME/.codex/skills/.system/skill-creator/scripts/init_skill.py <skill-name> --path skills --resources scripts,references --interface display_name="..." --interface short_description="..." --interface default_prompt="Use $<skill-name> ..."
+   uv run python $HOME/.codex/skills/.system/skill-creator/scripts/init_skill.py <skill-name> --path skills --resources scripts,references --interface display_name="..." --interface short_description="..." --interface default_prompt="Use $<skill-name> ..."
    ```
 4. 替换模板文本为 Vibe-specific guidance：精确描述触发时机、明确 Shell 边界、引用应引用的标准、枚举所有 `vibe3` 命令并逐一验证
 5. 添加必要的支持资源（优先一个 checklist/reference 文件）
-6. 验证结构：`python3 $HOME/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/<skill-name>`
+6. 验证结构：`uv run python $HOME/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/<skill-name>`
 7. skill 包含审计或确定性检查时添加自动化测试
 8. `exit()`
 
@@ -306,7 +306,7 @@ Steps:
    - 检查脚本路径是否使用 `$HOME` 或相对路径而非硬编码
 
 10. **工具推荐和执行流程检查**：
-    - Stable Reads 是否列出标准工具（ls, cat, python3, bash, git, uv）
+    - Stable Reads 是否列出标准工具（ls, cat, bash, git, uv）
     - 伪代码步骤是否清晰可执行，无含糊表述
     - Inputs / Steps / Exit 结构是否完整
     - 若 skill 使用伪代码，检查 Pseudocode Convention 节：`@` 伪代码函数 / `ToolName()` 真实 Tool / `$ cmd` Shell 命令 / `{variable}` 占位符 是否均已定义且实际使用一致

@@ -1,14 +1,39 @@
 ---
 name: vibe-skills-manager
 description: Use when installed skills are messy across IDEs, the user is unsure which skills exist globally vs project-level, needs to sync, clean, or recommend installed skills, is setting up a new worktree, or mentions "/vibe-skills-manager". Do not use for authoring or reviewing `skills/vibe-*` content.
-user-invocable: true
 ---
 
 # Vibe Skills Manager
 
+## Overview
+
 AI 驱动的 skills 体系梳理、差距分析与安装建议工具。
 
 这个 skill 的目标不是自动安装所有东西，而是先把本项目当前的 skills 生态分层说清楚，再根据用户实际启用的 agent 和需求给建议。
+
+## When to Use
+
+用于 skills inventory、安装形态、全局/项目级分布和 symlink 健康检查；不处理一般机器环境或 repo 配置。
+
+## Required Reading
+
+- `docs/standards/v3/skill-standard.md`
+- `docs/standards/plugin-setup-standard.md`
+
+## 职责边界
+
+- **负责**：skills 安装形态、全局与项目级分布、symlink 健康、期望配置 vs 实际状态、缺失/冗余分析
+- **不负责**：项目导览、机器级安装诊断、repo 配置补全、hooks/MCP/claude-mem 运行态故障
+
+分流规则：
+
+- 机器级安装、CLI、doctor、keys、Claude/Codex 外部工具链问题 → `skills/vibe-onboard/SKILL.md`
+- 当前 repo 的工具与环境 readiness → `skills/vibe-project-check/SKILL.md`
+- 仅需项目结构/命令索引 → `skills/vibe-instruction/SKILL.md`
+
+如用户讨论的是 Claude / Codex 外部工具链兼容性，而不是 skills inventory，本 skill 只做边界说明，真源应回到：
+
+- `docs/standards/plugin-setup-standard.md`
 
 ## 当前 skill 体系
 
@@ -43,10 +68,11 @@ cd ~/.claude/skills/gstack
 
 - 默认不要求安装，只有用户明确需要这些增强能力时才建议启用
 
-## 工作流程
+## Execution Flow（工作流程）
 
 ```
-期望配置 (YAML)  →  声明人类期望
+安装期望 (JSON)  →  声明自动安装集合
+可选建议 (YAML)  →  声明非自动增强
 实际状态 (JSON)  →  扫描实际安装
 Skill 分析      →  对比差距，生成建议
 ```
@@ -66,7 +92,7 @@ bash skills/vibe-skills-manager/scan-skills.sh
 直接对话：`/vibe-skills-manager`
 
 Skill 会：
-1. 读取期望配置：[skills-expected.yaml](skills-expected.yaml)
+1. 读取安装期望真源：`config/v3/skills.json`
 2. 读取实际状态：`.agent/reports/skills-state-*.json`
 3. 对比分析，生成差距报告
 4. 按 skill 体系给建议（plugin / `npx skills` / `scripts/init.sh` / 可选增强）
@@ -74,7 +100,7 @@ Skill 会：
 
 ## 期望配置
 
-文件：[skills-expected.yaml](skills-expected.yaml)
+安装期望真源是 `config/v3/skills.json`；`scripts/install.sh` 将其同步到 `~/.vibe/skills.json`，`scripts/init.sh` 消费 repo-local 或全局副本。`skills-expected.yaml` 仅保留人类可读的可选增强建议，不得覆盖 manifest。
 
 ### 配置格式
 
@@ -90,26 +116,25 @@ global:
 
 # 项目级期望
 project:
-  managed:
-    - openspec   # OpenSpec 独立工具链
-    - vibe-star  # 本项目原生 vibe-*
-  optional:
-    - gstack     # 用户可选增强
+  agents:
+    - codex
+    - claude-code
+  packages: []  # 项目自有 vibe-* 由 scripts/init.sh 建立 symlink
 ```
 
 ### 添加期望
 
-如果项目以后要增加新的“可选增强技能包”，优先写到 `optional`，不要直接写进必需集合。
+需要自动安装的第三方 skill 包写入 `config/v3/skills.json`；仅供推荐、不自动安装的增强能力才写入 `skills-expected.yaml`。
 
 ```yaml
-project:
-  optional:
-    some-cool-tool:
-      description: 项目可选增强能力
-      install: npx skills add namespace/skill-name
+global:
+  packages:
+    - source: namespace/package
+      skills:
+        - some-cool-tool
 ```
 
-然后由 `/vibe-skills-manager` 在用户需要时再建议启用。
+更新 manifest 后运行 `scripts/init.sh` 安装，并用 `/vibe-skills-manager` 对比实际状态；YAML 中的可选项只在用户需要时建议启用。
 
 ## 架构说明
 
@@ -121,19 +146,16 @@ project:
 | `~/.claude/plugins/` | Claude 官方 plugin 生态 | Claude Code 使用 |
 | `~/.claude/skills/` | Claude 本地扩展目录 | 可承载 gstack 等增强层 |
 | `.agents/skills/` | 项目级第三方 | 应避免重复全局已有的 |
-| `.agent/skills/` | 项目级 Agents 可见 | ✅ symlink 指向全局或 vibe-* |
+| `.agent/skills/` | Legacy 项目级入口 | symlink 指向项目自有 vibe-* |
+| `.codex/skills/` | Codex 项目级入口 | symlink 指向项目自有 vibe-* |
 | `skills/` | Native vibe-* | 本项目原生 skills |
 
 ### 正确架构
 
-```
-.agent/skills/
-├── brainstorming -> ~/.agents/skills/brainstorming  # ✅ symlink
-├── vibe-check -> ../../skills/vibe-check           # ✅ symlink
-└── openspec-*                                       # OpenSpec 管理
-
-.claude/skills/
-└── vibe-check -> ../../skills/vibe-check           # ✅ symlink
+```text
+.claude/skills/vibe-check -> ../../skills/vibe-check
+.codex/skills/vibe-check  -> ../../skills/vibe-check
+.agent/skills/vibe-check  -> ../../skills/vibe-check  # Legacy
 ```
 
 ### 使用策略
@@ -148,7 +170,7 @@ project:
 
 当用户调用 `/vibe-skills-manager` 时：
 
-1. **读取期望配置**：`skills-expected.yaml`
+1. **读取安装期望**：`config/v3/skills.json`
 2. **读取实际状态**：最新的 `.agent/reports/skills-state-*.json`
 3. **对比分析**：
    - 冗余检测：重复安装的
@@ -162,11 +184,17 @@ project:
    - 用户可选增强（如 gstack）
 6. **等待人工确认**：不自动执行，需用户确认后手动处理
 
+## Guardrails
+
+- 只管理 skills 配置、安装建议与同步状态，不接管机器安装或项目配置检查。
+- 删除、重装或修改全局配置前必须取得用户确认。
+- Claude plugin、第三方 Markdown skills、项目自有 `vibe-*` 必须按各自安装形态判断，不能只比较名称。
+
 ## 常见问题
 
 ### 如何添加新的期望 skill？
 
-编辑 `skills-expected.yaml`，添加到对应位置。下次运行 Skill 分析时会检测到缺失。
+自动安装项编辑 `config/v3/skills.json`；仅推荐项编辑 `skills-expected.yaml`。下次扫描与分析时检查 manifest 和实际状态的差距。
 
 ### 如何修复冗余？
 
@@ -194,7 +222,8 @@ cd ~/.claude/skills/gstack
 
 ## 文件说明
 
-- **[skills-expected.yaml](skills-expected.yaml)** - 期望配置（YAML，易读易编辑）
+- `config/v3/skills.json` - 自动安装期望真源
+- **[skills-expected.yaml](skills-expected.yaml)** - 可选增强建议
 - **[scan-skills.sh](scan-skills.sh)** - 实际状态扫描脚本
 - **SKILL.md** - 本文档
 - `.agent/reports/skills-state-*.json` - 实际状态报告（自动生成）

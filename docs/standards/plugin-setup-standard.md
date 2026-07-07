@@ -15,7 +15,7 @@ related_docs:
 
 # Plugin Setup Standard
 
-本文件定义本项目使用的全部 Claude Code 工具链的安装配置流程。
+本文件定义本项目使用的 Claude Code / Codex 外部工具链安装、兼容和本机规避策略。
 
 ## 目录
 
@@ -35,8 +35,8 @@ related_docs:
 
 | 工具 | 类型 | 版本 | Codex 兼容 | 安装方式 | 状态 |
 |------|------|------|------------|---------|------|
-| claude-mem | plugin | 13.10.2 | ✅ | `npx claude-mem install` / `claude plugin install` | ✅ |
-| rtk | CLI | 0.43.0 | N/A (独立 CLI) | brew/npm/cargo | ✅ |
+| claude-mem | plugin + hooks + MCP | 13.10.2 | ✅ 原生 Codex hooks；需保留本机去重补丁 | `npx claude-mem@latest install --ide codex-cli` | ✅ |
+| rtk | CLI | 0.43.0 | ⚠️ CLI 可用；Claude `PreToolUse` hook 不可复用 | brew/npm/cargo | ✅ |
 | caveman | plugin | 0.1.0 | ✅ | `npx skills add JuliusBrussee/caveman -a codex` | ✅ |
 | graphify | CLI + skill | 0.9.8 | ✅ | `uv tool install graphifyy` | ✅ |
 | spec-kit (specify) | CLI + skill | 0.12.4 | ✅ | `uv tool install specify-cli` | ✅ |
@@ -44,22 +44,31 @@ related_docs:
 | codex | plugin | 1.0.2 | - | `claude plugin install` | ✅ |
 | claude-hud | plugin | 0.3.0 | ❌ Claude Code only | `claude plugin install` | ✅ |
 | openspec/opsx | npm + skills | - | ✅ | `npm install -g @fission-ai/openspec` | ✅ |
-| vibe skills | skills | - | ❌ 项目特有 | `scripts/init.sh` | ✅ |
+| vibe skills | skills | - | ✅ 项目内兼容 | `scripts/init.sh` 同步到 `.claude/skills/` 和 `.codex/skills/` | ✅ |
 | exa search | MCP server | 3.3.9 | ✅ | `mcpServers` config | ✅ |
-| context7 | plugin | unknown | ❌ Claude Code only | `claude plugin install` | ✅ |
+| context7 | plugin / MCP server | unknown | ✅ 通过 MCP | Claude plugin / `codex mcp add` | ✅ |
 
 ---
 
 ## Codex 兼容说明
 
-Codex CLI 使用 `$` 前缀而非 `/` 调用命令。安装技能时需要指定 `-a codex`。
+本标准追求**功能对齐**，不是复制 Claude Code 的安装形态。CLI、skill、hook、MCP 和 UI plugin 是不同能力层；某个 skill 可被 Codex 发现，不代表其 Claude hooks 或 statusline 也能复用。
+
+Codex 显式调用 skill 时使用 `$skill-name`。部分 skill 也支持自然语言或自动触发，不应把所有 Claude `/namespace:skill` 命令机械替换为同名 `$namespace:skill`。安装第三方 skill 时需选择 Codex 目标；安装后以 Codex 实际 skill 列表为准。
 
 | 安装方式 | Claude Code | Codex |
 |---------|-------------|-------|
 | 调用技能前缀 | `/skill-name` | `$skill-name` |
 | npx skills add | `-a claude-code` | `-a codex` |
 | MCP server 配置 | `mcpServers` in settings.json | `codex mcp add <name>` |
-| 多 agent 安装 | 自动发现 | `npx skills add <repo> -a codex` |
+| skill 安装 | Claude plugin 或 `-a claude-code` | Codex plugin 或 `-a codex` |
+| hooks | `~/.claude/settings.json` | `~/.codex/hooks.json`，schema 不同 |
+
+以下 Claude Code 能力不要求在 Codex 中复制：
+
+- `claude-hud`：依赖 Claude Code `statusLine`，无 Codex 对等目标。
+- Claude 内的 `codex` plugin：它是 Claude 调用 Codex 的桥，不是 Codex 自身功能。
+- Claude Agent Teams 专用流程：依赖 `TeamCreate`、`SendMessage` 等 Claude 工具；skill 文件可见不代表 Codex 可执行该流程。
 
 ---
 
@@ -93,16 +102,94 @@ thedotmack: { source: "github", repo: "thedotmack/claude-mem" }
 ### Codex 兼容
 
 ```bash
-npx claude-mem install --ide codex-cli
+npx claude-mem@latest install --ide codex-cli
 ```
-支持下全部查询命令，前缀从 `/` 改为 `$`（如 `$claude-mem:mem-search "query"`）。
+
+该命令安装 Codex hooks，并注册 claude-memory MCP。Codex 中实际可用的记忆 skills 以运行时发现结果为准，例如 `$mem-search`、`$timeline-report`；不要假设 Claude plugin namespace 会原样保留。
+
+#### Codex SessionStart 重复输出修复
+
+`claude-mem` 的 Codex `SessionStart` 结果可能同时返回 `systemMessage` 与 `hookSpecificOutput.additionalContext`。两者内容相同或前者以后一者开头时，Codex 会显示重复 history/context。
+
+本机手工修复文件：
+
+```text
+~/.codex/hooks/claude-mem-codex-hook.cjs
+```
+
+在 `safeHookResult()` 返回解析结果前应用以下去重：
+
+```javascript
+function dedupeCodexSessionContext(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  const additionalContext = value.hookSpecificOutput?.additionalContext;
+  if (
+    typeof value.systemMessage === "string" &&
+    typeof additionalContext === "string" &&
+    (value.systemMessage.trim() === additionalContext.trim() ||
+      value.systemMessage.trim().startsWith(additionalContext.trim()))
+  ) {
+    const { systemMessage, ...rest } = value;
+    return rest;
+  }
+
+  return value;
+}
+```
+
+调用点必须保留字段清理，并包裹解析结果：
+
+```javascript
+return dedupeCodexSessionContext(stripUnsupportedFields(parsed));
+```
+
+> `npx claude-mem@latest install --ide codex-cli` 会重建 Codex hook wrapper，可能覆盖手工修改。每次重装或升级后都必须重新检查并按需恢复上述补丁。不要用 `npx claude-mem@latest install --help` 探测帮助；当前安装器可能仍进入安装流程。
 
 ### 验证
 
 ```bash
 claude plugin list | grep claude-mem
-# 版本: 13.8.1
+npx claude-mem@latest status
+
+# Codex hooks 根对象只能包含 hooks
+jq -e 'keys == ["hooks"]' ~/.codex/hooks.json
+
+# 确认手工去重仍存在
+grep -n 'dedupeCodexSessionContext' ~/.codex/hooks/claude-mem-codex-hook.cjs
 ```
+
+最后新建一次 Codex session，确认 history/context 只显示一次，且记忆上下文仍然存在。静态检查不能替代此可见行为验证。
+
+#### `doctor` 端口漂移说明（上游问题，等待修复）
+
+截至 `claude-mem` `13.10.2`，`npx claude-mem@latest doctor` 在某些路径上仍会直接使用每用户默认端口公式 `37700 + (uid % 100)`，而不是优先读取 `~/.claude-mem/settings.json` 中持久化的 `CLAUDE_MEM_WORKER_PORT`。当 settings 固定为其他端口时，`status` / `/api/health` 可能正常，但 `doctor` 会误报 `Worker daemon no response`。
+
+本项目当前采用**规避策略**，不修改上游代码：
+
+- 将 `CLAUDE_MEM_WORKER_PORT` 设为当前用户公式端口，使 `doctor`、worker 和 hooks 对齐。
+- 本机 `uid=501`，因此公式端口为 `37701`。
+- 等上游修复 `doctor` 端口解析后，再评估是否恢复自定义端口。
+
+验证当前用户公式端口：
+
+```bash
+id -u
+node -p '37700 + ((process.getuid ? process.getuid() : 77) % 100)'
+jq -r '.CLAUDE_MEM_WORKER_PORT' ~/.claude-mem/settings.json
+```
+
+当前工作约定：
+
+```bash
+npx claude-mem@latest status
+npx claude-mem@latest doctor
+curl -fsS http://127.0.0.1:37701/api/health
+```
+
+如果三者不一致，先检查是否存在旧端口残留 worker，再决定是否迁移端口；不要把 `doctor` 单独视为绝对真源。
 
 ---
 
@@ -164,15 +251,19 @@ claude plugin marketplace add JuliusBrussee/caveman
 claude plugin install caveman
 ```
 
-Codex 安装：
+Codex CLI 安装：
 
 ```bash
 npx skills add JuliusBrussee/caveman -a codex
 ```
 
+Codex 不使用 Claude plugin 的 SessionStart hook。上游安装矩阵把 Codex 标为 per-session 激活：安装 skill 后，在新 session 中输入 `/caveman`，或直接说 `use caveman` / `talk like caveman`。Codex 支持 `$` skill mention 时也可显式调用 `$caveman`。
+
+本仓库的 manifest 将 Caveman 作为 Codex 全局第三方 skill 安装到 `~/.agents/skills/`。`scripts/init.sh` 只把项目自有的 `skills/vibe-*` 链接到 `.codex/skills/`，不会为 Caveman 创建 repo-local namespaced 副本。
+
 ### 激活
 
-Session 中通过 `/caveman` 启用：
+Claude Code 和 Codex 均可在 session 中通过 `/caveman` 启用；Codex 不依赖 Claude statusline/hook：
 
 | 命令 | 模式 | 说明 |
 |------|------|------|
@@ -189,6 +280,17 @@ Session 中通过 `/caveman` 启用：
 | `/caveman:caveman-review` | 一行式代码审查 |
 | `/caveman:caveman-stats` | Token 节省统计 |
 | `/caveman:cavecrew` | 压缩 subagent 分配指南 |
+
+Codex 验证建议：
+
+```bash
+test -f ~/.agents/skills/caveman/SKILL.md
+```
+
+然后在新 Codex session 中验证以下任一入口可用：
+
+- `/caveman`
+- `$caveman`
 
 ### Statusline Badge
 
@@ -259,7 +361,7 @@ graphify hook status
 ### Codex 兼容
 
 - Codex 使用 `$graphify` 而非 `/graphify`
-- 需在 `~/.codex/config.toml` 的 `[features]` 中设置 `multi_agent = true`（支持并行提取）
+- 需要并行 agent 能力时，在 `~/.codex/config.toml` 的 `[features]` 中设置 `multi_agent = true`
 - 技能前缀：`$graphify query "..."`
 
 ### 验证
@@ -528,13 +630,13 @@ openspec update
 
 ## vibe-* 项目技能
 
-项目自有技能，由 `scripts/init.sh` symlink 到 `.claude/skills/`。
+项目自有技能，由 `scripts/init.sh` 同时 symlink 到 `.claude/skills/` 与 `.codex/skills/`。
 
 ### 安装
 
 ```bash
 scripts/init.sh
-# Symlink skills/vibe-* → .claude/skills/vibe-*
+# Symlink skills/vibe-* → .claude/skills/vibe-* 和 .codex/skills/vibe-*
 ```
 
 ### 技能列表
@@ -646,11 +748,19 @@ MCP server 启动后，tools 列表中应出现 `web_search_exa` 和 `web_fetch_
 
 ### context7
 
-编程库文档查询。通过 Claude Code plugin 激活。
+编程库文档查询。Claude Code 通过 plugin 激活；Codex 通过 MCP 使用。
 
 #### 配置
 
 已在 `enabledPlugins` 中启用 `context7@claude-plugins-official`。
+
+Codex：
+
+```bash
+codex mcp add context7 --env CONTEXT7_API_KEY="$CONTEXT7_API_KEY" -- \
+  npx -y @upstash/context7-mcp
+codex mcp get context7
+```
 
 #### 使用
 

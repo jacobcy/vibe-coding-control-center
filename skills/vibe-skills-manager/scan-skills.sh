@@ -144,6 +144,30 @@ cat >> "$REPORT_FILE" << EOF
       ],
       "count": $(ls -1 ".claude/skills" 2>/dev/null | wc -l | tr -d ' ')
     },
+    "codex_local": {
+      "path": ".codex/skills/",
+      "skills": [
+EOF
+
+# 扫描项目级 .codex/skills
+if [ -d ".codex/skills" ]; then
+    FIRST=true
+    for skill in ".codex/skills"/*; do
+        [ -e "$skill" ] || continue
+        name=$(basename "$skill")
+        is_symlink="false"
+        target=""
+        [ -L "$skill" ] && { is_symlink="true"; target=$(readlink "$skill"); }
+        [ "$FIRST" = true ] && FIRST=false || echo "," >> "$REPORT_FILE"
+        echo -n "        {\"name\": \"$name\", \"symlink\": $is_symlink, \"target\": \"$target\"}" >> "$REPORT_FILE"
+    done
+fi
+
+cat >> "$REPORT_FILE" << EOF
+
+      ],
+      "count": $(ls -1 ".codex/skills" 2>/dev/null | wc -l | tr -d ' ')
+    },
     "vibe_skills": {
       "path": "skills/",
       "skills": [

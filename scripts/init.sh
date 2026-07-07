@@ -79,7 +79,7 @@ fi
 # ── 1. Install approved third-party skills from ~/.vibe/skills.json ──────────
 # IMPORTANT: Skills installation should NOT be blocked by openspec/pre-commit issues
 if [ -f "$VIBE_SKILLS_CONFIG" ] && command -v jq &> /dev/null; then
-  echo "📦 Installing approved third-party skills from ~/.vibe/skills.json..."
+  echo "📦 Installing approved third-party skills from $VIBE_SKILLS_CONFIG..."
 
   global_agents=$(jq -r '.global.agents // [] | join(" ")' "$VIBE_SKILLS_CONFIG")
   jq -c '.global.packages[]?' "$VIBE_SKILLS_CONFIG" | while read -r pkg; do

@@ -5,7 +5,35 @@ description: Use when you need an overview of the Vibe Center project, its imple
 
 # /vibe-instruction - 项目导览
 
+## Overview
+
 这是所有 agent 的入口导览技能。用于快速了解项目结构、可用命令和开发工作流。
+
+## When to Use
+
+用于首次进入项目、需要定位命令或工作流入口、或者不知道应调用哪个 Vibe skill 的场景。
+
+## Required Reading
+
+- `AGENTS.md`
+- `docs/standards/v3/skill-trigger-standard.md`
+
+## 职责边界
+
+- **负责**：项目索引、命令分层说明、把用户路由到正确 workflow / skill / 标准文档
+- **不负责**：安装诊断、项目配置补全、skills 盘点、运行态故障排查
+
+分流规则：
+
+- 机器级安装、CLI / hooks / MCP / keys / doctor 检查 → `skills/vibe-onboard/SKILL.md`
+- 当前 repo 的工具、配置、prompt readiness 检查 → `skills/vibe-project-check/SKILL.md`
+- skills 安装、symlink、全局/项目级对齐 → `skills/vibe-skills-manager/SKILL.md`
+
+如果用户问题涉及 **Claude / Codex 外部工具链、skills、hooks、MCP、claude-mem、安装兼容性或环境对齐**，在继续前先读取：
+
+- `docs/standards/plugin-setup-standard.md`
+
+这份标准是当前项目关于两类 agent 工具链对齐、已知上游问题和本机规避策略的真源。
 
 ---
 
@@ -47,7 +75,7 @@ V2 提供底层 alias 和环境工具。
 ```bash
 bin/vibe check          # 验证环境 (V2 版)
 bin/vibe tool           # 工具管理
-bin/vibe keys <list|set|get|init>  # 密钥管理
+bin/vibe keys <check|get|init>  # 密钥管理
 ```
 
 ---
@@ -242,7 +270,7 @@ vibe3 ask "问题内容"  # 询问关于项目的问题
 
 ---
 
-## 标准开发工作流
+## Execution Flow（标准开发工作流）
 
 完整的 vibe3 工作流由 `/vibe-continue` 定义。以下是核心步骤：
 
@@ -278,7 +306,7 @@ vibe3 run --publish --branch <branch>           # 8. 提交并创建 PR
 
 ---
 
-## 核心边界与误区
+## Guardrails（核心边界与误区）
 
 1. **flow ≠ branch**：flow 是绑定在 branch 上的逻辑上下文；branch 生命周期优先由 git / gh 管理。
 2. **真源在 `.git/vibe3/handoff.db`**：所有 worktree 共享该 SQLite 数据库，由主仓库的 `git common dir` 承载。
@@ -301,4 +329,4 @@ vibe3 run --publish --branch <branch>           # 8. 提交并创建 PR
 - **代码总量 / 单文件超限**：先看 `config/v3/loc_limits.yaml` 的阈值与 exceptions，再决定是否进入质量复查或 exception 处理。
 - **环境配置**：查看 `config/v3/settings.yaml`。
 - **调用追踪**：任何命令加 `--trace` 可查看内部调用栈。
-- **权限/API 错误**：运行 `bin/vibe keys list` 检查 Token 有效性。
+- **权限/API 错误**：运行 `bin/vibe keys check` 检查 Token 状态。

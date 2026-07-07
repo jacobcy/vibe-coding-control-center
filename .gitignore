@@ -193,3 +193,4 @@ alias
 # Roadmap analysis cache (local only)
 .agent/context/memory.md
 package-lock.json
+.continue/

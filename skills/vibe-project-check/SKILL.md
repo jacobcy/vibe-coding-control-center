@@ -1,11 +1,39 @@
 ---
 name: vibe-project-check
-description: Use after `vibe init` to verify project configuration completeness. Interactively prompts user to fill missing items. Orchestrates existing commands without adding Python code. Supports cross-project vibe3 readiness verification (Phase 5-8). Do not use for system-level installation issues (use vibe-onboard instead).
+description: Use after `vibe init` to verify target-project configuration completeness, tool availability, and environment readiness. Interactively prompts user to fill missing items. Orchestrates existing commands without adding Python code. Supports cross-project vibe3 readiness verification (Phase 5-8). Do not use for system-level installation issues (use vibe-onboard instead).
 ---
 
 # /vibe-project-check - 项目配置检查与补全
 
+## Overview
+
 检查 vibe3 生态项目的配置是否完整、正确，发现缺失项时交互式询问用户是否补全。
+
+## When to Use
+
+用于目标 repo 已执行 `vibe init` 后的配置、工具、adapter 和 prompt readiness 检查。
+
+## Required Reading
+
+- `docs/standards/plugin-setup-standard.md`
+- `docs/standards/v3/skill-trigger-standard.md`
+
+## 职责边界
+
+- **负责**：当前 repo / 目标项目的配置完整性、工具可用性、adapter 对应 CLI、prompt readiness、被 orchestra 管理所需的本地条件
+- **不负责**：机器级安装修复、全局 CLI 安装、claude-mem worker 运维、skills inventory 审计
+
+分流规则：
+
+- 全局安装、doctor、keys、Claude/Codex 外部工具链上游问题 → `skills/vibe-onboard/SKILL.md`
+- skills 安装、symlink、全局/项目级差距分析 → `skills/vibe-skills-manager/SKILL.md`
+- 仅需项目导览 / 命令索引 → `skills/vibe-instruction/SKILL.md`
+
+如检查项涉及 Claude / Codex adapter、hooks、MCP、claude-mem 或已知兼容性，先读取：
+
+- `docs/standards/plugin-setup-standard.md`
+
+该标准是当前项目关于外部 agent 工具链、安装形态、已知上游问题和本机规避策略的真源。
 
 **前提**：
 - 已经在某个项目中
@@ -24,7 +52,9 @@ description: Use after `vibe init` to verify project configuration completeness.
 
 ---
 
-## Phase 1: vibe init 产物验证
+## Execution Flow
+
+### Phase 1: vibe init 产物验证
 
 **Step 1.1: 检查 .vibe/config.yaml**
 
@@ -33,8 +63,8 @@ description: Use after `vibe init` to verify project configuration completeness.
 test -f .vibe/config.yaml || echo "missing"
 
 # 检查 YAML 格式（容错处理）
-if command -v python3 >/dev/null 2>&1; then
-  python3 -c "import sys; yaml_available = False
+if command -v uv >/dev/null 2>&1; then
+  uv run python -c "import sys; yaml_available = False
 try:
     import yaml
     yaml_available = True
@@ -56,10 +86,11 @@ grep -q "^profile:" .vibe/config.yaml && echo "profile found" || echo "profile m
 grep -q "^adapter:" .vibe/config.yaml && echo "adapter found" || echo "adapter missing"
 ```
 
-**Step 1.2: 检查 .claude/settings.json**
+**Step 1.2: 检查项目内 agent 配置覆盖（如存在）**
 
 ```bash
-test -f .claude/settings.json && echo "exists" || echo "missing"
+test -f .claude/settings.json && echo ".claude/settings.json exists" || echo ".claude/settings.json not present (optional)"
+test -f .codex/config.toml && echo ".codex/config.toml exists" || echo ".codex/config.toml not present (optional)"
 ```
 
 **Step 1.3: 检查 .agent/ 目录结构**
@@ -71,7 +102,7 @@ test -d .agent/workflows && echo "workflows exists" || echo "workflows missing"
 
 ---
 
-## Phase 2: 配置补全检查
+### Phase 2: 配置补全检查
 
 **Step 2.1: 检查 .gitignore 条目**
 
@@ -110,7 +141,7 @@ done
 
 ---
 
-## Phase 3: Orchestra 管理配置
+### Phase 3: Orchestra 管理配置
 
 **Step 3.1: 检查 vibe-manager GitHub token**
 
@@ -204,12 +235,12 @@ fi
 
 ---
 
-## Phase 4: 运行时验证
+### Phase 4: 运行时验证
 
 **Step 4.1: 验证 vibe3 scan**
 
 ```bash
-vibe3 scan --dry-run
+vibe3 scan all --dry-run
 ```
 
 **Step 4.2: 检查 Python 环境**
@@ -238,7 +269,7 @@ vibe keys check
 
 ---
 
-## Phase 5: Global Runtime Asset Completeness
+### Phase 5: Global Runtime Asset Completeness
 
 检查 `~/.vibe/` 运行时资产是否完整（由 `vibe update run` 分发）。
 
@@ -311,7 +342,7 @@ Agent: 已停止检查。请切换到 vibe-center repo 运行：
 
 ---
 
-## Phase 6: Target Repo Init State
+### Phase 6: Target Repo Init State
 
 检查目标 repo（当前工作目录）是否已正确初始化。
 
@@ -330,8 +361,8 @@ grep -q "^profile:" .vibe/config.yaml && echo "profile: ok" || echo "MISSING: pr
 ```bash
 # 检查 YAML 格式（容错处理）
 if test -f .vibe/settings.yaml; then
-  if command -v python3 >/dev/null 2>&1; then
-    python3 -c "import sys; yaml_available = False
+  if command -v uv >/dev/null 2>&1; then
+    uv run python -c "import sys; yaml_available = False
 try:
     import yaml
     yaml_available = True
@@ -377,7 +408,7 @@ git rev-parse --abbrev-ref HEAD >/dev/null 2>&1 || echo "MISSING: cannot determi
 
 ---
 
-## Phase 7: Agent/Toolchain Availability
+### Phase 7: Agent/Toolchain Availability
 
 检查 agent 运行所需的工具链是否就绪。
 
@@ -425,6 +456,8 @@ case "$ADAPTER" in
 esac
 ```
 
+如 adapter 对应 Claude / Codex，且用户问题涉及 hooks、MCP、记忆、已知兼容性、手工补丁或安装差异，进一步检查与解释应以 `docs/standards/plugin-setup-standard.md` 为准；不要在本 skill 内重新定义外部工具链安装矩阵。
+
 **修复操作**：
 
 根据失败项提供具体指导：
@@ -437,7 +470,7 @@ esac
 
 ---
 
-## Phase 8: Core Command Prompt Readiness
+### Phase 8: Core Command Prompt Readiness
 
 测试核心命令（`plan`, `run`, `review`）是否能正确渲染 prompt。
 
@@ -496,7 +529,7 @@ fi
 
 ---
 
-## 交互原则
+## Guardrails（交互原则）
 
 1. **渐进式检查**：一个检查接一个检查，不会"停止"
 2. **交互式修复**：每发现一个问题都询问用户是否修复
