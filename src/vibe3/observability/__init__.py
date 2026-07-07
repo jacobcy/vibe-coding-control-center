@@ -3,7 +3,6 @@
 This module provides unified management of logging and tracing:
 - logger.py: Structured logging configuration
 - trace_method.py: Method-level tracing via @trace_method decorator
-- audit.py: Audit logging (future use)
 - orchestra_log.py: Orchestra event logging (filesystem-backed)
 
 Design Principles:
@@ -18,7 +17,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from vibe3.observability.audit import AuditEntry, AuditLogger
     from vibe3.observability.degraded_mode import (
         DegradedModeManager,
         DegradedModeReason,
@@ -51,8 +49,6 @@ if TYPE_CHECKING:
 
 # Lazy imports (using absolute module paths)
 _LAZY_IMPORTS = {
-    "AuditEntry": "vibe3.observability.audit",
-    "AuditLogger": "vibe3.observability.audit",
     "DegradedModeManager": "vibe3.observability.degraded_mode",
     "DegradedModeReason": "vibe3.observability.degraded_mode",
     "get_degraded_manager": "vibe3.observability.degraded_mode",
@@ -91,8 +87,6 @@ def __getattr__(name: str) -> object:
 
 
 __all__ = [
-    "AuditEntry",
-    "AuditLogger",
     "DegradedModeManager",
     "DegradedModeReason",
     "append_governance_event",
@@ -115,5 +109,6 @@ __all__ = [
     "supervisor_log_dir",
     "tick_log_dir",
     "tick_log_path",
+    "trace_method",
     "write_prompt_provenance",
 ]
