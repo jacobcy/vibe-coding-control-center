@@ -4,8 +4,6 @@ Import paths:
     # Recommended (explicit source)
     from vibe3.clients.protocols.github import GitHubClientProtocol, PRReadPort
 
-    # Backward compatible (package re-export)
-    from vibe3.clients.protocols import GitHubClientProtocol, PRReadPort
 """
 
 from typing import Any, Protocol

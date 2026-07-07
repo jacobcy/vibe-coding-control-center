@@ -4,8 +4,6 @@ Import paths:
     # Recommended (explicit source)
     from vibe3.clients.protocols.pr import BaseResolver
 
-    # Backward compatible (package re-export)
-    from vibe3.clients.protocols import BaseResolver
 """
 
 from typing import Protocol
