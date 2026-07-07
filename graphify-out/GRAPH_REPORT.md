@@ -1,16 +1,16 @@
-# Graph Report - vibe-coding-control-center  (2026-07-07)
+# Graph Report - issue-3313  (2026-07-07)
 
 ## Corpus Check
-- 1390 files · ~822,354 words
+- 1388 files · ~820,442 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 24063 nodes · 36187 edges · 1401 communities (1044 shown, 357 thin omitted)
-- Extraction: 80% EXTRACTED · 20% INFERRED · 0% AMBIGUOUS · INFERRED: 7305 edges (avg confidence: 0.74)
+- 23982 nodes · 36076 edges · 1379 communities (1024 shown, 355 thin omitted)
+- Extraction: 80% EXTRACTED · 20% INFERRED · 0% AMBIGUOUS · INFERRED: 7278 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ac84042e`
+- Built from commit: `237034ac`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -977,13 +977,10 @@
 - [[_COMMUNITY_Quickstart ADR Recall Acceptance Scenarios|Quickstart: ADR Recall Acceptance Scenarios]]
 - [[_COMMUNITY_Feature Specification Low-Code ADR Recall|Feature Specification: Low-Code ADR Recall]]
 - [[_COMMUNITY__build_review_task_section|_build_review_task_section]]
-- [[_COMMUNITY__compute_material_hash|_compute_material_hash]]
-- [[_COMMUNITY_format_dry_run_header|format_dry_run_header]]
 - [[_COMMUNITY_has_execution_state|has_execution_state]]
 - [[_COMMUNITY_test_audit_blocked_flows_script.py|test_audit_blocked_flows_script.py]]
 - [[_COMMUNITY_test_sqlite_fd_exhaustion.py|test_sqlite_fd_exhaustion.py]]
 - [[_COMMUNITY_test_scan_combined.py|test_scan_combined.py]]
-- [[_COMMUNITY_TestClearAllSessions|TestClearAllSessions]]
 - [[_COMMUNITY_test_cli_bootstrap.py|test_cli_bootstrap.py]]
 - [[_COMMUNITY_TestConstraintDefinitions|TestConstraintDefinitions]]
 - [[_COMMUNITY_Contributing|Contributing]]
@@ -1000,8 +997,6 @@
 - [[_COMMUNITY_doctor_plugins.sh|doctor_plugins.sh]]
 - [[_COMMUNITY_update.sh|update.sh]]
 - [[_COMMUNITY_Tasks Low-Code ADR Recall|Tasks: Low-Code ADR Recall]]
-- [[_COMMUNITY_setup_logging|setup_logging]]
-- [[_COMMUNITY_TestMCPServerIntegration|TestMCPServerIntegration]]
 - [[_COMMUNITY_Utils|Utils]]
 - [[_COMMUNITY_`docs` - 人类文档区|`docs/` - 人类文档区]]
 - [[_COMMUNITY_Project Knowledge Guide|Project Knowledge Guide]]
@@ -1015,11 +1010,6 @@
 - [[_COMMUNITY_TestOverrideRulesRegistry|TestOverrideRulesRegistry]]
 - [[_COMMUNITY_test_noop_gate_artifact_boundary.py|test_noop_gate_artifact_boundary.py]]
 - [[_COMMUNITY_test_loc_settings.py|test_loc_settings.py]]
-- [[_COMMUNITY_TestMergeBehavior|TestMergeBehavior]]
-- [[_COMMUNITY_test_ensure_flow_for_dev_branch_initializes_issue_context|test_ensure_flow_for_dev_branch_initializes_issue_context]]
-- [[_COMMUNITY_test_issue_flow_init_caches_issue_title_without_mutating_spec_ref|test_issue_flow_init_caches_issue_title_without_mutating_spec_ref]]
-- [[_COMMUNITY_TestGetHandoffDir|TestGetHandoffDir]]
-- [[_COMMUNITY_TestEnsureCurrentHandoff|TestEnsureCurrentHandoff]]
 - [[_COMMUNITY_TestCloseoutIntegration|TestCloseoutIntegration]]
 - [[_COMMUNITY_test_barrel_import_tracking.py|test_barrel_import_tracking.py]]
 - [[_COMMUNITY__detect_cycles_dfs|_detect_cycles_dfs]]
@@ -1064,6 +1054,7 @@
 - [[_COMMUNITY_文档索引|文档索引]]
 - [[_COMMUNITY_roadmap_issue_dependency.sh|roadmap_issue_dependency.sh]]
 - [[_COMMUNITY_Phase 1 修复审计问题 (立即，1-2天)|Phase 1: 修复审计问题 (立即，1-2天)]]
+- [[_COMMUNITY_强制规则（不可违反）|强制规则（不可违反）]]
 - [[_COMMUNITY_vibe.sh|vibe.sh]]
 - [[_COMMUNITY_Project Context|Project Context]]
 - [[_COMMUNITY_inject-vibe-env.sh|inject-vibe-env.sh]]
@@ -1078,8 +1069,6 @@
 - [[_COMMUNITY_test_cli_error_handling.py|test_cli_error_handling.py]]
 - [[_COMMUNITY_test_handoff_spec.py|test_handoff_spec.py]]
 - [[_COMMUNITY_test_inspect_files.py|test_inspect_files.py]]
-- [[_COMMUNITY_TestManagerDryRunResultDisplay|TestManagerDryRunResultDisplay]]
-- [[_COMMUNITY_test_task_status_json.py|test_task_status_json.py]]
 - [[_COMMUNITY_test_data_source.py|test_data_source.py]]
 - [[_COMMUNITY_TestRemoteLabelCheck|TestRemoteLabelCheck]]
 - [[_COMMUNITY_TestPlannerNoOpGate|TestPlannerNoOpGate]]
@@ -1094,9 +1083,6 @@
 - [[_COMMUNITY_2.4.0 - 2026-04-08|[2.4.0] - 2026-04-08]]
 - [[_COMMUNITY_Unreleased|[Unreleased]]]
 - [[_COMMUNITY_开发流分支语义标准|开发流分支语义标准]]
-- [[_COMMUNITY_Protocol-based Dependency Injection|Protocol-based Dependency Injection]]
-- [[_COMMUNITY_DomainEvent 与 FlowEvent 分层边界及投影关系|DomainEvent 与 FlowEvent 分层边界及投影关系]]
-- [[_COMMUNITY_PromptPolicySkill 审计证据模型|Prompt/Policy/Skill 审计证据模型]]
 - [[_COMMUNITY_Architecture Decision Records|Architecture Decision Records]]
 - [[_COMMUNITY_Handoff Indicate Issue 3189 — Publish Instructions|Handoff Indicate: Issue #3189 — Publish Instructions]]
 - [[_COMMUNITY_Skill Loop Memo|Skill Loop Memo]]
@@ -1124,7 +1110,6 @@
 - [[_COMMUNITY_CHECKLIST TYPE Checklist FEATURE NAME|[CHECKLIST TYPE] Checklist: [FEATURE NAME]]]
 - [[_COMMUNITY_Commands|Commands]]
 - [[_COMMUNITY_test_audit_cleanup_script.py|test_audit_cleanup_script.py]]
-- [[_COMMUNITY_cache|cache]]
 - [[_COMMUNITY_test_scope_guard_policy.py|test_scope_guard_policy.py]]
 - [[_COMMUNITY_test_vibe_new_alignment.py|test_vibe_new_alignment.py]]
 - [[_COMMUNITY_test_config_no_adapters_import.py|test_config_no_adapters_import.py]]
@@ -1150,7 +1135,6 @@
 - [[_COMMUNITY_Analysis|Analysis]]
 - [[_COMMUNITY__extract_latest_verdict|_extract_latest_verdict]]
 - [[_COMMUNITY_create_global_dispatch_coordinator|create_global_dispatch_coordinator]]
-- [[_COMMUNITY_branch_resolution.py|branch_resolution.py]]
 - [[_COMMUNITY_🤖 AI Workspace Directories (AI 工作区)|🤖 AI Workspace Directories (AI 工作区)]]
 - [[_COMMUNITY_`.gitvibe3`、`.gitvibe`、`~.vibe` - 数据存储|`.git/vibe3/`、`.git/vibe/`、`~/.vibe/` - 数据存储]]
 - [[_COMMUNITY_🎯 设计原则|🎯 设计原则]]
@@ -1158,12 +1142,11 @@
 - [[_COMMUNITY_test_inspect_cli.py|test_inspect_cli.py]]
 - [[_COMMUNITY_test_public_api_type_exports.py|test_public_api_type_exports.py]]
 - [[_COMMUNITY_test_global_dispatch_coordinator_adapter.py|test_global_dispatch_coordinator_adapter.py]]
-- [[_COMMUNITY_test_block_flow_raises_when_no_issue|test_block_flow_raises_when_no_issue]]
-- [[_COMMUNITY_test_check_sync_rules.py|test_check_sync_rules.py]]
 - [[_COMMUNITY_test_vibe_project_check_readiness.py|test_vibe_project_check_readiness.py]]
 - [[_COMMUNITY_TestKnownExceptions|TestKnownExceptions]]
 - [[_COMMUNITY_2.1.5 - 2026-03-07|[2.1.5] - 2026-03-07]]
 - [[_COMMUNITY_3.0.0 - 2026-06-14|[3.0.0] - 2026-06-14]]
+- [[_COMMUNITY_vibe3-command-standard|vibe3-command-standard.md]]
 - [[_COMMUNITY_十、性能与监控|十、性能与监控]]
 - [[_COMMUNITY_十一、与其他标准的关系|十一、与其他标准的关系]]
 - [[_COMMUNITY_init_help.sh|init_help.sh]]
@@ -1266,7 +1249,6 @@
 - [[_COMMUNITY_Low-Code ADR Recall Feature|Low-Code ADR Recall Feature]]
 - [[_COMMUNITY_Spec Handoff Bridge Implementation Plan|Spec Handoff Bridge Implementation Plan]]
 - [[_COMMUNITY_Spec Artifact Handoff Bridge Feature|Spec Artifact Handoff Bridge Feature]]
-- [[_COMMUNITY_Spec Handoff Bridge Tasks|Spec Handoff Bridge Tasks]]
 - [[_COMMUNITY_Plan Template with ADR Consideration Section|Plan Template with ADR Consideration Section]]
 - [[_COMMUNITY_Artifact Blocker Recovery Pattern|Artifact Blocker Recovery Pattern]]
 - [[_COMMUNITY_ADR Candidate Selection Semantic OR Scope Relevance|ADR Candidate Selection: Semantic OR Scope Relevance]]
@@ -1291,14 +1273,10 @@
 - [[_COMMUNITY_Spec 007 Checklist Analysis Intelligence Requirements|Spec 007 Checklist: Analysis Intelligence Requirements]]
 - [[_COMMUNITY_Spec 008 Checklist Client Layer Requirements|Spec 008 Checklist: Client Layer Requirements]]
 - [[_COMMUNITY_Spec-Kit Constitution v1.0.0|Spec-Kit Constitution v1.0.0]]
-- [[_COMMUNITY_Read-Compatible Write-Strict Spec Ref Migration Stance|Read-Compatible Write-Strict Spec Ref Migration Stance]]
 - [[_COMMUNITY_Exit Contract for Direct Superspec Paths (FR-017FR-018)|Exit Contract for Direct Superspec Paths (FR-017/FR-018)]]
-- [[_COMMUNITY_Spec 001 Flow Lifecycle Baseline|Spec 001: Flow Lifecycle Baseline]]
 - [[_COMMUNITY_Spec 002 Dispatch Execution Baseline|Spec 002: Dispatch Execution Baseline]]
-- [[_COMMUNITY_Spec 003 Role Protocol Baseline|Spec 003: Role Protocol Baseline]]
 - [[_COMMUNITY_Spec 004 Environment Isolation Baseline|Spec 004: Environment Isolation Baseline]]
 - [[_COMMUNITY_Spec 005 Governance Chain Baseline|Spec 005: Governance Chain Baseline]]
-- [[_COMMUNITY_Spec 006 Handoff Protocol Baseline|Spec 006: Handoff Protocol Baseline]]
 - [[_COMMUNITY_Spec 007 Analysis Intelligence Baseline|Spec 007: Analysis Intelligence Baseline]]
 - [[_COMMUNITY_Spec 008 Client Layer Baseline|Spec 008: Client Layer Baseline]]
 - [[_COMMUNITY_Project-Owned Spec-Kit Extension Bridge|Project-Owned Spec-Kit Extension Bridge]]
@@ -1404,18 +1382,20 @@
 - [[_COMMUNITY_vibe-adr-recall Skill|vibe-adr-recall Skill]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `SQLiteClient` - 586 edges
-2. `OrchestraConfig` - 292 edges
+1. `SQLiteClient` - 584 edges
+2. `OrchestraConfig` - 287 edges
 3. `GitClient` - 236 edges
-4. `IssueInfo` - 191 edges
-5. `GitHubClient` - 164 edges
+4. `IssueInfo` - 187 edges
+5. `GitHubClient` - 163 edges
 6. `IssueState` - 115 edges
 7. `FlowStatusResponse` - 109 edges
 8. `PRResponse` - 105 edges
-9. `FlowService` - 105 edges
-10. `VibeConfig` - 92 edges
+9. `FlowService` - 103 edges
+10. `UserError` - 92 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `test_agents_sync_models_json_importable()` --indirect_call--> `sync_models_json()`  [INFERRED]
+  tests/vibe3/test_public_api_exports.py → src/vibe3/agents/backends/codeagent_config.py
 - `db()` --calls--> `SQLiteClient`  [INFERRED]
   tests/vibe3/services/test_flow_events.py → src/vibe3/clients/sqlite_client.py
 - `db()` --calls--> `SQLiteClient`  [INFERRED]
@@ -1424,8 +1404,6 @@
   tests/vibe3/hooks/test_loc_settings.py → src/vibe3/config/settings.py
 - `test_fourth_observed_pair_is_recorded_then_blocks()` --calls--> `apply_unified_noop_gate()`  [INFERRED]
   tests/vibe3/execution/test_noop_gate_single_step_limit.py → src/vibe3/execution/noop_gate.py
-- `test_third_existing_pair_allows_one_observed_transition()` --calls--> `apply_unified_noop_gate()`  [INFERRED]
-  tests/vibe3/execution/test_noop_gate_single_step_limit.py → src/vibe3/execution/noop_gate.py
 
 ## Import Cycles
 - None detected.
@@ -1433,83 +1411,83 @@
 ## Hyperedges (group relationships)
 - **Spec-Kit Six-Phase SDD Cycle** — _specify_workflows_speckit_workflow_speckitworkflow, _specify_templates_plan_template_plantemplatewithadr, _specify_templates_spec_template_spectemplate, _specify_templates_tasks_template_taskstemplate, _specify_templates_checklist_template_checklisttemplate, _specify_templates_constitution_template_constitutiontemplate [EXTRACTED 1.00]
 
-## Communities (1401 total, 357 thin omitted)
+## Communities (1379 total, 355 thin omitted)
 
 ### Community 0 - "Flow Blocked State and Issue Body"
-Cohesion: 0.08
-Nodes (24): FlowStateProjection, Issue body managed section models., Check if projection has any meaningful data., 托管 flow-state section 数据结构.      用于在 GitHub issue body 中投影当前协作状态。, Clear blocked state from issue body projection.          Raises:             Run, Write complete flow-state projection to issue body., Write blocked state to issue body projection.          Raises:             Runti, merge_projection() (+16 more)
+Cohesion: 0.05
+Nodes (43): FlowStateProjection, Issue body managed section models., Check if projection has any meaningful data., 托管 flow-state section 数据结构.      用于在 GitHub issue body 中投影当前协作状态。, Clear blocked state from issue body projection.          Raises:             Run, Write complete flow-state projection to issue body., Write blocked state to issue body projection.          Raises:             Runti, Clear block status by invoking reconcile_blocked. (+35 more)
 
 ### Community 1 - "PR Cache and Error Classification"
-Cohesion: 0.14
-Nodes (14): parse_linked_issues(), Parse issue numbers from PR body using GitHub closing keywords.      Recognises:, _ErrorRecorder, Any, Exception, Build reverse index from issue_number to pr_number.          Args:             p, Save cache to file.          Args:             data: Cache data structure, Get merged PR for an issue from cache.          Args:             issue_number: (+6 more)
+Cohesion: 0.11
+Nodes (19): parse_linked_issues(), Parse issue numbers from PR body using GitHub closing keywords.      Recognises:, _ErrorRecorder, MergedPRCache, Any, Exception, Persistent cache for merged PR status.  This module provides a file-based cache, Build reverse index from issue_number to pr_number.          Args:             p (+11 more)
 
 ### Community 2 - "Domain Dispatch Coordination"
 Cohesion: 0.03
-Nodes (69): CapacityServiceProtocol, FlowManagerProtocol, IssueCollectionServiceProtocol, LabelDispatchCallable, GlobalDispatchCoordinator, CheckServiceProtocol, FlowServiceProtocol, ThreadPoolExecutor (+61 more)
+Nodes (64): CapacityServiceProtocol, FlowManagerProtocol, IssueCollectionServiceProtocol, LabelDispatchCallable, GlobalDispatchCoordinator, CheckServiceProtocol, FlowServiceProtocol, ThreadPoolExecutor (+56 more)
 
 ### Community 3 - "Git Client Infrastructure"
-Cohesion: 0.06
-Nodes (20): find_repo_root(), GitClientProtocol, ChangeSource, Path, Git client - 封装 git 命令，提供统一改动获取接口., Resolve the main repository root deterministically.      Delegates to vibe3.util, 初始化 GitClient.          Args:             github_client: 可选的 GitHubClient 实例，用于处, Get the shared .git directory path (for worktrees). (+12 more)
+Cohesion: 0.04
+Nodes (29): find_repo_root(), GitClientProtocol, ChangeSource, Path, Git client - 封装 git 命令，提供统一改动获取接口., Resolve the main repository root deterministically.      Delegates to vibe3.util, 初始化 GitClient.          Args:             github_client: 可选的 GitHubClient 实例，用于处, 执行 git 命令，统一错误处理.          Args:             args: git 子命令及参数列表             cwd: (+21 more)
 
 ### Community 4 - "PR Service and Response Models"
-Cohesion: 0.03
-Nodes (76): _fetch_pr_or_raise(), Load PR or raise a command-facing lookup error., PRResponse, Response model for PR operations., Centralized heuristic: is an aborted flow eligible for done transition?, PRService, Convert cached JSON data back to PRResponse., Project recent PR facts into flow_context_cache. (+68 more)
+Cohesion: 0.04
+Nodes (54): PRService, Convert cached JSON data back to PRResponse., Project recent PR facts into flow_context_cache., Refresh recent PR cache if stale and return branch -> PR mapping., Return open/draft PRs after ensuring recent PR cache is fresh., Return branch PR status from recent cache with fallback on miss.          Bypass, Return the current open/draft PR for a branch, if any., Create a pull request. (+46 more)
 
 ### Community 5 - "GitHub Issue Admin Operations"
 Cohesion: 0.10
 Nodes (12): IssueAdminMixin, Any, GitHub issue admin operations mixin., Mixin for advanced issue operations used by orchestra., Close a GitHub issue, optionally adding a closing comment.          Args:, Add a comment to a GitHub issue.          Args:             issue_number: Issue, Remove one or more assignees from a GitHub issue., Close a GitHub issue with pre-check for already-closed state.          Handles t (+4 more)
 
 ### Community 6 - "Issue Orchestration State Machine"
-Cohesion: 0.10
-Nodes (12): Read the authoritative issue state label., Confirm target issue state with minimum action.          Only short-circuits whe, Normalize remote state labels to exactly one target state., Directly set state (internal method, atomically replace state/* labels)., Get all state/* labels of an issue., [Internal] Add label to issue., [Internal] Remove label from issue., Get current orchestration state of an issue.          When multiple state/* labe (+4 more)
+Cohesion: 0.06
+Nodes (31): Any, QualifyGateService, Domain service for qualify gate logic., Domain service for qualify gate logic., _service_symbol(), mock_config(), qualify_gate_service(), Tests for QualifyGate GitHub closed issue detection (Step 0).  Covers run_qualif (+23 more)
 
 ### Community 7 - "Check Cleanup Service"
-Cohesion: 0.08
-Nodes (30): ExpiredResourceCleanupService, Service for cleaning up expired resources.      Handles cleanup of:     - Agent, Lazy-initialized PR service., Should call all cleanup methods when enabled., test_clean_residual_branches_integrates_all_cleanups(), mock_git_client(), mock_store(), Tests for ExpiredResourceCleanupService. (+22 more)
+Cohesion: 0.05
+Nodes (42): ExpiredResourceCleanupService, _is_protected_worktree(), datetime, Path, Expired resource cleanup service - handles cleanup of old worktrees and branches, Clean expired remote non-protected branches older than max_age_days.          Sa, Return True when the worktree's directory name is reserved.      A worktree is c, Clean local branches that have no active/blocked flow record.          The safet (+34 more)
 
 ### Community 8 - "Config and Sync Rules"
 Cohesion: 0.05
-Nodes (60): BaseModel, AgentConfig, AIConfig, CheckCleanupSettings, Check cleanup configuration models., Check cleanup configuration for expired resource cleanup., CodeLimitsConfig, CodePathsConfig (+52 more)
+Nodes (54): BaseModel, AgentConfig, AgentPromptConfig, AIConfig, CheckCleanupSettings, Check cleanup configuration models., Check cleanup configuration for expired resource cleanup., CodeLimitsConfig (+46 more)
 
 ### Community 9 - "Domain Protocols and Capacity"
-Cohesion: 0.05
-Nodes (33): CapacityServiceProtocol, DispatchCoordinatorProtocol, FlowManagerProtocol, FlowServiceProtocol, IssueCollectionServiceProtocol, LabelDispatchCallable, LabelServiceProtocol, Domain types and protocols for the KERNEL layer.  This module is the canonical h (+25 more)
+Cohesion: 0.09
+Nodes (18): CapacityServiceProtocol, FlowServiceProtocol, LabelDispatchCallable, Protocol for flow service lifecycle operations., Mark flow as blocked., Protocol for label dispatch event builder callable., Build dispatch intent event for a role., Protocol for capacity service operations. (+10 more)
 
 ### Community 10 - "Flow Transition Management"
 Cohesion: 0.09
 Nodes (19): FlowTransitionMixin, Self, Flow transition operations mixin.  Inherits from FlowWriteMixin to access: - _is, Initialize issue flow context cache for issue branches.          This method is, Return explicit name or derive slug from current branch.          Args:, Reactivate a flow, recording a 'flow_reactivated' event.          Used when a ca, Mixin providing flow transition operations.      Inherits FlowWriteMixin and Flo, Ensure flow exists for branch, creating if needed.          Args:             br (+11 more)
 
 ### Community 11 - "Data Source and Command Types"
-Cohesion: 0.07
-Nodes (34): Enum, ActorStatus, Lightweight actor abstraction for command-job supervision.  This module provides, Lifecycle status for a JobActor.      Status transitions:         queued → runni, ChangeSourceType, DataSource provenance tracking enum.  Tracks where flow/status/task data origina, VersionBumpType, Worktree requirement types for role execution. (+26 more)
+Cohesion: 0.08
+Nodes (32): Enum, ActorStatus, Lightweight actor abstraction for command-job supervision.  This module provides, Lifecycle status for a JobActor.      Status transitions:         queued → runni, ChangeSourceType, DataSource provenance tracking enum.  Tracks where flow/status/task data origina, PRState, VersionBumpType (+24 more)
 
 ### Community 12 - "Store Context and Governance"
-Cohesion: 0.06
-Nodes (45): Run governance scan in background tmux session (async).      Builds a CLI self-i, run_governance_async(), build_issue_async_cli_request(), build_issue_sync_prompt_request(), build_task_flow_branch_resolver(), Any, Path, Shared helpers for issue-scoped role execution. (+37 more)
+Cohesion: 0.04
+Nodes (55): Run governance scan in background tmux session (async).      Builds a CLI self-i, run_governance_async(), build_issue_async_cli_request(), build_issue_sync_prompt_request(), build_task_flow_branch_resolver(), Any, Path, Shared helpers for issue-scoped role execution. (+47 more)
 
 ### Community 13 - "Governance Scan Service"
-Cohesion: 0.06
-Nodes (47): all(), _display_execution_results(), _display_supervisor_candidates(), governance(), _publish_and_wait_governance_event(), Any, _ASYNC_OPT, count (+39 more)
+Cohesion: 0.05
+Nodes (40): all(), governance(), _ASYNC_OPT, count, help, Option, Execute governance scan in dry-run mode via run_governance_sync.      Uses real-, Execute supervisor scan in dry-run mode, displaying scan plan.      Shows scan p (+32 more)
 
 ### Community 14 - "Codeagent Execution Lifecycle"
 Cohesion: 0.08
 Nodes (26): ExecutionLifecycleEvent, _format_agent_error_metadata(), Path, Sync codeagent execution utilities for command-mode role entrypoints., Check for unauthorized commits by planner.          Planner should only create d, Prepare execution context before agent run., Finalize sync execution: handoff, lifecycle, gate., Build event type suffix based on error severity. (+18 more)
 
 ### Community 15 - "get_convention"
-Cohesion: 0.10
-Nodes (21): build_role_async_request(), build_role_sync_request(), Any, Path, Modular factories for creating role-specific execution requests., Unified factory for building role-specific async CLI requests., Unified factory for building role-specific sync prompt requests., discover_project_scope_overlays() (+13 more)
+Cohesion: 0.17
+Nodes (10): build_prompt_meta(), Derive prompt routing metadata from refs + session state., Should use custom mode strings., Should pass refs through to PromptMeta., Tests for build_prompt_meta factory function., First run with no session should use default mode and bootstrap., Retry with no session should use retry mode and bootstrap., Retry with session should use retry mode and resume. (+2 more)
 
 ### Community 16 - "._has_tmux_session"
 Cohesion: 0.04
-Nodes (53): BackendProtocol, BackendProtocol — Protocol for backend operations (tmux, execution).  Import pat, Protocol for backend operations (tmux, execution).      Used for dependency inje, Check if tmux session exists.          Args:             session_name: Exact tmu, build_session_name(), Shared session naming conventions for runtime roles., Unified naming rule: vibe3-{role}-{target_type}-{target_id}., _now_iso() (+45 more)
+Nodes (51): CoordinatorFactory, Initialize facade with tick counter.          Args:             tick_count: Init, build_session_name(), Shared session naming conventions for runtime roles., Unified naming rule: vibe3-{role}-{target_type}-{target_id}., _now_iso(), Any, datetime (+43 more)
 
 ### Community 17 - "ErrorSeverity"
-Cohesion: 0.06
-Nodes (33): ErrorSeverity, Canonical error severity levels for Orchestra runtime.      Severity answers: "D, Enable severity comparison based on numeric level., Enable severity comparison based on numeric level., Enable severity comparison based on numeric level., Enable severity comparison based on numeric level., Return numeric level for comparison (higher = more severe)., AgentPresetNotFoundError (+25 more)
+Cohesion: 0.04
+Nodes (46): Any, Narrow wrapper around the two Serena tools inspect symbols needs., Execute one Serena tool without contaminating structured stdout., Find a symbol definition constrained to one source file., Find static referencing symbols for an exact definition identity., SerenaClient, ErrorSeverity, Canonical error severity levels for Orchestra runtime.      Severity answers: "D (+38 more)
 
 ### Community 18 - "start"
-Cohesion: 0.03
-Nodes (78): Run MCP server in stdio mode (for MCP client integration).      This runs the Or, run(), FailedGate, FailedGate: global freeze signal based on persistent error tracking.  Migrated f, Check global error thresholds.          Rules:         - CRITICAL severity → imm, Activate failed gate.          Args:             reason: Reason for activation, Orchestra failed state gate.      State machine:     - OPEN: normal operation, c, Clear failed gate (manual resume).          Args:             cleared_by: Who cl (+70 more)
+Cohesion: 0.07
+Nodes (43): logs(), Context, count, help, Option, vibe3 server - HTTP server for orchestra status and CLI management., Start Orchestra server (heartbeat polling + HTTP status endpoints).      Default, Stop Orchestra server via SIGTERM. (+35 more)
 
 ### Community 19 - "update"
 Cohesion: 0.07
@@ -1517,55 +1495,55 @@ Nodes (48): ActorOption, BindBranchOption, BindRoleOption, BranchArg, IssueArg, 
 
 ### Community 20 - "IssueFlowService"
 Cohesion: 0.03
-Nodes (63): InvalidBranchLinkError, Base branch illegally linked to issue in flow_issue_links., BranchConvention, Branch naming convention models for profile-based configuration.  Implements the, Branch naming convention for a project profile.      Immutable configuration tha, Return canonical task branch name.          Args:             issue_number: GitH, Return development branch name.          Args:             issue_number: GitHub, Extract issue number from task or dev branch.          Args:             branch: (+55 more)
+Nodes (65): InvalidBranchLinkError, Base branch illegally linked to issue in flow_issue_links., IssueFlowService, Check if branch is an issue branch (task/issue-N or dev/issue-N).          Args:, Check if branch is a task branch (starts with task prefix).          Args:, Check if branch is the canonical task branch for a given issue.          Args:, Find active flow for an issue with deterministic selection.          Priority or, Resolve best flow from pre-fetched list with deterministic selection.          P (+57 more)
 
 ### Community 21 - "._check_branch"
 Cohesion: 0.16
 Nodes (8): check_lock(), Branch-level lock for vibe3 check operations.  Prevents concurrent check operati, Acquire branch-level lock for vibe3 check. Non-blocking.      Args:         bran, Verify current branch flow consistency., Verify a specific branch flow consistency.          Args:             branch: Br, Run all consistency checks for a single branch., Run consistency checks for flows in the store.          Args:             status, Initialize PR cache with batch fetch (1 API call instead of N).          Safe to
 
 ### Community 22 - "orchestra_log.py"
-Cohesion: 0.05
-Nodes (52): IO, Minimal Serena client for validated definition/reference evidence., Heartbeat polling -> publish governance + supervisor events.          Called by, append_governance_event(), append_orchestra_event(), append_orchestra_run_separator(), append_supervisor_event(), _ensure_events_handle() (+44 more)
+Cohesion: 0.07
+Nodes (46): IO, Minimal Serena client for validated definition/reference evidence., Heartbeat polling -> publish governance + supervisor events.          Called by, append_governance_event(), append_orchestra_event(), append_orchestra_run_separator(), append_supervisor_event(), _ensure_events_handle() (+38 more)
 
 ### Community 23 - "SystemError"
-Cohesion: 0.03
-Nodes (59): BranchSource, PRSource, 改动源抽象模型 - 统一 PR/Commit/Branch/Uncommitted 四种改动场景., Branch 改动源（与 base 分支对比）., UncommittedSource, _enrich_changed_files(), Enrich file list with LOC info from git diff for AI context., get_changed_files 统一接口测试. (+51 more)
+Cohesion: 0.02
+Nodes (102): GitClient, Git client，封装 git 命令操作., Get current HEAD commit SHA., Get the worktree-specific safe branch name., Check whether any worktree already has this branch checked out., Return paths of worktrees that have the given branch checked out., Get all tracked files from git, optionally filtered by pathspec.          Args:, Check if working directory is dirty. (+94 more)
 
 ### Community 24 - "SQLiteFlowStateRepo"
 Cohesion: 0.06
 Nodes (22): Any, SQLite repository methods for flow state and issue-link persistence., Update flow state fields. Raises ValueError for invalid fields., Flow state, issue link, and dependent-scene operations., Remove a specific issue link relation., Get task issue number for a branch from flow_issue_links.          Args:, Get branch name for a task issue number from flow_issue_links.          This is, Get all flows (excludes soft-deleted flows). (+14 more)
 
 ### Community 25 - "get_highest_priority_state"
-Cohesion: 0.16
-Nodes (8): Check for multiple state/* labels and auto-fix the anomaly.          An issue sh, get_conflicting_states(), get_highest_priority_state(), Return highest-priority state/* label from labels, or None.      Purely static p, Return lower-priority state/* labels that should be removed., Tests for label utility functions., TestGetConflictingStates, TestGetHighestPriorityState
+Cohesion: 0.04
+Nodes (38): Check for multiple state/* labels and auto-fix the anomaly.          An issue sh, Scan remote open issues for label constraint violations and auto-fix.          T, State label recovery predicates for local check., Whether check may restore a missing state label from local flow refs., should_recover_missing_state_label(), classify_dispatch_eligibility(), get_conflicting_states(), get_highest_priority_state() (+30 more)
 
 ### Community 26 - "SQLiteClient"
-Cohesion: 0.01
-Nodes (227): SQLite client facade composed from focused repository mixins., Facade preserving the existing SQLiteClient API over focused repos., SQLiteClient, HandoffService, Any, Handoff service implementation., Service for managing handoff records., # NOTE: blocked_reason management is handled by BlockedStateService. (+219 more)
+Cohesion: 0.02
+Nodes (125): SQLite client facade composed from focused repository mixins., Facade preserving the existing SQLiteClient API over focused repos., SQLiteClient, Confirmed state transition persistence and loop budget queries., Counts produced by persisting one real state transition., Persist confirmed transitions without selecting business targets., Return whether one more code-owned transition would exceed a limit., Atomically record one already-confirmed state transition. (+117 more)
 
 ### Community 27 - ".run"
-Cohesion: 0.09
-Nodes (19): diagnose_backend_error(), Any, Helper functions for Codeagent backend.  Pure utility functions — no config depe, Read from stream in chunks, accumulate, and write to output., Diagnose known backend error patterns and return suggested fix., Remove ANSI escape sequences from backend output., Build a short, readable summary from backend stdout/stderr., stream_reader() (+11 more)
+Cohesion: 0.08
+Nodes (20): diagnose_backend_error(), Any, Helper functions for Codeagent backend.  Pure utility functions — no config depe, Read from stream in chunks, accumulate, and write to output., Diagnose known backend error patterns and return suggested fix., Remove ANSI escape sequences from backend output., Build a short, readable summary from backend stdout/stderr., stream_reader() (+12 more)
 
 ### Community 28 - "status_query.py"
-Cohesion: 0.05
-Nodes (41): parse_blocked_by(), Parse issue numbers from 'Blocked by' or 'Depends on' lines in issue body., Backward compatibility: return first blocking issue if any., Aggregate issues into sorted IssueStatusEntry tuples.          Args:, extract_issue_labels(), extract_milestone_title(), extract_primary_assignee_login(), extract_queue_metadata() (+33 more)
+Cohesion: 0.08
+Nodes (28): parse_blocked_by(), Parse issue numbers from 'Blocked by' or 'Depends on' lines in issue body., Backward compatibility: return first blocking issue if any., Aggregate issues into sorted IssueStatusEntry tuples.          Args:, extract_issue_labels(), extract_milestone_title(), extract_primary_assignee_login(), extract_queue_metadata() (+20 more)
 
 ### Community 29 - "inspect_python_file"
-Cohesion: 0.06
-Nodes (37): AsyncFunctionDef, ClassDef, FunctionDef, Import, ImportFrom, DeclarationEvidence, _EvidenceVisitor, FileInspectionResult (+29 more)
+Cohesion: 0.09
+Nodes (29): AsyncFunctionDef, ClassDef, FunctionDef, Import, ImportFrom, DeclarationEvidence, _EvidenceVisitor, FileInspectionResult (+21 more)
 
 ### Community 30 - "inspect_symbol"
-Cohesion: 0.08
-Nodes (41): inspect_symbol(), _is_symbol_record(), _matches_symbol(), _normalize_record(), ProviderProvenance, ProviderSymbol, Any, Path (+33 more)
+Cohesion: 0.07
+Nodes (45): inspect_symbol(), _is_symbol_record(), _matches_symbol(), _normalize_record(), ProviderProvenance, ProviderSymbol, Any, Path (+37 more)
 
 ### Community 31 - "IssueDispatchPolicy"
-Cohesion: 0.15
-Nodes (13): DispatchExclusion, Dispatch-related data models., Structured reason why an issue should not be auto-dispatched., IssueDispatchPolicy, Shared issue dispatch eligibility policy., Evaluate whether an issue may enter automatic dispatch., classify_dispatch_eligibility(), Unified dispatch exclusion logic. Single source of truth.      Returns list of r (+5 more)
+Cohesion: 0.16
+Nodes (11): DispatchExclusion, Dispatch-related data models., Structured reason why an issue should not be auto-dispatched., IssueDispatchPolicy, Shared issue dispatch eligibility policy., Evaluate whether an issue may enter automatic dispatch., _issue(), Tests for shared issue dispatch policy. (+3 more)
 
 ### Community 32 - ".load"
-Cohesion: 0.04
-Nodes (64): _parse_section_specs(), _parse_variable_source(), PromptManifest, PromptRecipeDefinition, PromptRecipeVariant, Any, Path, PromptProvider (+56 more)
+Cohesion: 0.06
+Nodes (51): _parse_section_specs(), _parse_variable_source(), PromptManifest, PromptRecipeDefinition, PromptRecipeVariant, Any, Path, PromptProvider (+43 more)
 
 ### Community 33 - "Spec-Kit 6-Phase Workflow"
 Cohesion: 0.40
@@ -1580,28 +1558,28 @@ Cohesion: 0.07
 Nodes (33): is_api_error(), is_model_error(), Error code definitions for orchestra error classification.  Error categories: -, Check if error is a model configuration error., Check if error is an API error., get_all_errors_status(), get_api_and_exec_error_count(), get_api_error_count() (+25 more)
 
 ### Community 36 - "ReviewScope"
-Cohesion: 0.05
-Nodes (51): _filter_unified_diff_by_paths(), _get_branch_files(), get_changed_files(), _get_commit_files(), get_diff(), get_name_status(), get_numstat(), get_tracked_files() (+43 more)
+Cohesion: 0.07
+Nodes (19): Review data models - Unified models for review pipeline contract.  This module d, Identifies what is being reviewed.      Attributes:         kind: Type of review, Validate scope has required fields based on kind., Encapsulates all information needed for a code review.      This model unifies t, ReviewRequest, ReviewScope, Tests for review data models., Should create base scope with base_branch. (+11 more)
 
 ### Community 37 - "OrchestraConfig"
 Cohesion: 0.04
-Nodes (80): Root configuration model., VibeConfig, OrchestraConfig, Orchestra daemon configuration.      Shared configuration model for orchestra, m, get_flow_context_bulk(), Batch get flow context (branch and state) for multiple issues.      Reduces N+1, Test get_manager_usernames reads config (env overrides applied at load time)., Test that config value is returned directly. (+72 more)
+Nodes (64): Root configuration model., VibeConfig, Get full gate status for display.          Returns:             GateStatus datac, Resolve command agent options with CLI override support.      Priority: CLI para, resolve_command_agent_options(), GateStatus, Full status of FailedGate for display., _build_async_serve_command() (+56 more)
 
 ### Community 38 - "RecoveryAction"
-Cohesion: 0.10
-Nodes (23): KernelImpact, How deeply a change touches repository-owned review kernel files., Minimum review policy selected from explicit repository rules., ReviewDepth, apply_consistency_fix(), FlowConsistencyCode, FlowConsistencyResult, Any (+15 more)
+Cohesion: 0.11
+Nodes (19): KernelImpact, How deeply a change touches repository-owned review kernel files., apply_consistency_fix(), FlowConsistencyCode, FlowConsistencyResult, Any, Shared flow/worktree/ref consistency checks., Apply a cheap fix identified by check_flow_consistency.      Returns True if fix (+11 more)
 
 ### Community 39 - "ReviewObservation"
-Cohesion: 0.07
-Nodes (42): _changed_path_sources(), _collect_changes(), GitMetadataParseError, _nul_tokens(), _parse_changed_files(), _parse_numstat(), _partition_summary(), Build the evidence-only branch observation used by inspect base. (+34 more)
+Cohesion: 0.11
+Nodes (26): _changed_path_sources(), _collect_changes(), GitMetadataParseError, _nul_tokens(), _parse_changed_files(), _parse_numstat(), _partition_summary(), Build the evidence-only branch observation used by inspect base. (+18 more)
 
 ### Community 40 - "FlowCleanupService"
 Cohesion: 0.07
 Nodes (22): Delete remote branch., FlowCleanupService, LiveSessionsDetectedError, Flow cleanup service - unified scene cleanup for terminal flows.  This service p, Complete cleanup of a flow scene.          This method performs all cleanup step, Remove worktree if exists, with prune fallback for orphan metadata., Delete local branch if exists.          Note: Uses skip_if_worktree=False to for, Delete remote branch if exists.          DEFENSIVE LAYER 3: Skip remote branch d (+14 more)
 
 ### Community 41 - "default"
-Cohesion: 0.07
-Nodes (34): ensure_flow_for_current_branch(), load_config_and_validate_model(), Shared CLI option definitions for all agent commands., Auto-ensure flow for non-main branches.      Returns:         Tuple of (flow_ser, Validate that --model requires backend (CLI or config).      Args:         model, Load runtime config and validate --model requires backend.      Combines config, validate_model_backend_dependency(), _handle_codeagent_result() (+26 more)
+Cohesion: 0.10
+Nodes (27): _handle_codeagent_result(), Common utilities for command layer., Display CodeagentResult and exit with error if execution failed.      Shared hel, default(), issue_command(), _plan_for_branch(), _plan_spec_impl(), _AGENT_OPT (+19 more)
 
 ### Community 42 - "QueueEntry"
 Cohesion: 0.05
@@ -1609,31 +1587,31 @@ Nodes (23): mock_coordinator(), Tests for GlobalDispatchCoordinator actionable-t
 
 ### Community 43 - "ExecutionLaunchResult"
 Cohesion: 0.03
-Nodes (80): CommandAdapterRegistry, Registry for lazy loading of command job handlers.      Maps command job types t, ExecutionLifecycleService, Unified execution lifecycle recording for all roles., JobExecutor, IssueRoleSyncSpec, Job executor service for isolated async command execution.  This module provides, Execute a job from its envelope.          Manages actor lifecycle (create → laun (+72 more)
+Nodes (76): CommandAdapterRegistry, Registry for lazy loading of command job handlers.      Maps command job types t, ExecutionLifecycleService, Unified execution lifecycle recording for all roles., JobExecutor, IssueRoleSyncSpec, Job executor service for isolated async command execution.  This module provides, Execute a job from its envelope.          Manages actor lifecycle (create → laun (+68 more)
 
 ### Community 44 - "CheckResult"
-Cohesion: 0.09
-Nodes (43): CheckResult, Check result data model., Result of consistency check for a single branch., CheckContext, Any, Individual check rules extracted from _check_branch.  Each rule receives a Check, Reconcile aborted flows: transition to done when all phases complete     and PR, Report a blocked-cache/active-label mismatch without inferring state. (+35 more)
+Cohesion: 0.10
+Nodes (37): CheckResult, Check result data model., Result of consistency check for a single branch., CheckContext, Any, Individual check rules extracted from _check_branch.  Each rule receives a Check, Reconcile aborted flows: transition to done when all phases complete     and PR, Report a blocked-cache/active-label mismatch without inferring state. (+29 more)
 
 ### Community 45 - "JobActor"
 Cohesion: 0.06
-Nodes (40): JobType, Type of job being supervised by the actor., ActiveJob, _job_identity_key(), _job_status_value(), JobMonitorService, JobMonitorSnapshot, Any (+32 more)
+Nodes (45): get_actor_registry(), JobType, Get the module-level actor registry singleton.      Returns:         The singlet, Type of job being supervised by the actor., ActiveJob, _job_identity_key(), _job_status_value(), JobMonitorService (+37 more)
 
 ### Community 46 - "DomainEvent"
-Cohesion: 0.04
-Nodes (64): ControlPlaneEventPublished, DomainEvent, ExecutorDispatchIntent, FlowBlocked, FlowCompleted, IssueResolvedDependency, PRMerged, Domain events shared across orchestration layers.  Pure frozen dataclasses repre (+56 more)
+Cohesion: 0.03
+Nodes (76): ControlPlaneEventPublished, DomainEvent, ExecutorDispatchIntent, FlowBlocked, FlowCompleted, IssueResolvedDependency, PlannerDispatchIntent, PolicyChanged (+68 more)
 
 ### Community 47 - "governance_utils.py"
-Cohesion: 0.07
-Nodes (41): build_audit_decision_context(), build_audit_observation_context(), build_audit_report_context(), build_audit_suggestion_context(), build_broader_repo_entries(), build_code_auditor_context(), build_issue_context(), _build_scope_note() (+33 more)
+Cohesion: 0.09
+Nodes (36): build_governance_snapshot_context(), Convert runtime observations into the governance prompt context dict., build_audit_decision_context(), build_audit_observation_context(), build_audit_report_context(), build_audit_suggestion_context(), build_broader_repo_entries(), build_code_auditor_context() (+28 more)
 
 ### Community 48 - "base"
-Cohesion: 0.09
-Nodes (36): Validate that --show-prompt is only used with --dry-run.      Args:         dry_, validate_show_prompt_dependency(), base(), _check_report_ref(), default(), _emit_review_result(), issue_command(), _AGENT_OPT (+28 more)
+Cohesion: 0.07
+Nodes (43): ensure_flow_for_current_branch(), load_config_and_validate_model(), Shared CLI option definitions for all agent commands., Auto-ensure flow for non-main branches.      Returns:         Tuple of (flow_ser, Validate that --show-prompt is only used with --dry-run.      Args:         dry_, Validate that --model requires backend (CLI or config).      Args:         model, Load runtime config and validate --model requires backend.      Combines config, validate_model_backend_dependency() (+35 more)
 
 ### Community 49 - "control_plane.py"
 Cohesion: 0.10
-Nodes (24): ApiResponse, DispatchRequest, EventEntry, EventPublishRequest, EventsResponse, IdempotencyStore, list_events(), publish_event() (+16 more)
+Nodes (22): ApiResponse, DispatchRequest, EventEntry, EventPublishRequest, EventsResponse, IdempotencyStore, list_events(), publish_event() (+14 more)
 
 ### Community 50 - "._fetch_and_cache_title"
 Cohesion: 0.18
@@ -1641,71 +1619,71 @@ Nodes (7): Get titles for multiple branches with cache-first strategy.          
 
 ### Community 51 - "GitPathProtocol"
 Cohesion: 0.12
-Nodes (25): GitPathProtocol, Path, GitPathProtocol — Protocol for Git path-related operations.  Import paths:     #, Protocol for Git path-related operations., Normalize a reference value (path) relative to branch worktree., check_ref_exists(), find_worktree_path_for_branch(), _get_git_client() (+17 more)
+Nodes (25): GitPathProtocol, Path, GitPathProtocol — Protocol for Git path-related operations.  Import paths:     #, Protocol for Git path-related operations., Initialize flow service.          Args:             store: SQLiteClient instance, check_ref_exists(), find_worktree_path_for_branch(), _get_git_client() (+17 more)
 
 ### Community 52 - "run_command"
-Cohesion: 0.21
-Nodes (16): default(), _AGENT_OPT, Argument, _ASYNC_OPT, _BACKEND_OPT, BranchOption, Context, _DRY_RUN_OPT (+8 more)
+Cohesion: 0.05
+Nodes (31): JobActor, Record an event to the event_log.          Args:             event_type: Event t, Record that the job has launched.          Args:             pid: Optional proce, Record that the job has completed successfully.          Args:             detai, Record that the job has failed.          Args:             error: Error message, Record that the job has died (cancelled or unexpected termination).          Arg, Notify the module-level registry of terminal state for TTL tracking., Create a new actor in QUEUED state.          Args:             job_type: Type of (+23 more)
 
 ### Community 53 - "VerdictRecord"
 Cohesion: 0.06
-Nodes (30): DataSource, Data source provenance for flow/status reads.      Attributes:         LOCAL_SQL, CloseTargetDecision, CreateDecision, FlowState, _migrate_execution_status_value(), _migrate_flow_status_value(), Flow and Task data models. (+22 more)
+Nodes (30): DataSource, Data source provenance for flow/status reads.      Attributes:         LOCAL_SQL, CloseTargetDecision, CreateDecision, FlowState, MainBranchProtectedError, _migrate_execution_status_value(), _migrate_flow_status_value() (+22 more)
 
 ### Community 54 - "append_orchestra_event"
-Cohesion: 0.08
-Nodes (19): CleanupServiceProtocol, Protocol for expired resource cleanup service., Clean expired agent worktrees., Clean expired local branches., Clean expired remote branches., execute_expired_resource_cleanup(), Cleanup executor for expired resources (worktrees, branches)., Execute expired resource cleanup (worktrees, local/remote branches).      Args: (+11 more)
+Cohesion: 0.04
+Nodes (63): PeriodicCheckConfig, Configuration for periodic consistency checks via vibe3 check.      Runs two pha, CleanupServiceProtocol, Protocol for expired resource cleanup service., Clean expired agent worktrees., Clean expired local branches., Clean expired remote branches., execute_expired_resource_cleanup() (+55 more)
 
 ### Community 55 - "OrchestraStatusService"
-Cohesion: 0.06
-Nodes (32): JobActor, Record an event to the event_log.          Args:             event_type: Event t, Record that the job has launched.          Args:             pid: Optional proce, Record that the job has completed successfully.          Args:             detai, Record that the job has failed.          Args:             error: Error message, Record that the job has died (cancelled or unexpected termination).          Arg, Notify the module-level registry of terminal state for TTL tracking., Record the terminal timestamp for an actor.          Called by JobActor after tr (+24 more)
+Cohesion: 0.07
+Nodes (21): OrchestraStatusService, Attempt to fetch live snapshot from the running HTTP server., Build current status snapshot for the assignee issue pool.          The snapshot, Get manager usernames for orchestra operations.          This is a static method, Aggregate read-only status from multiple data sources.      Data sources:     -, IssueStatusAggregator, Build branch→path worktree mapping from GitClient.          Uses GitClient.list_, Aggregates issue status from GitHub, Git, and Flow data sources.      Encapsulat (+13 more)
 
 ### Community 56 - "load_config"
-Cohesion: 0.10
-Nodes (29): _deep_merge(), _expand_variables(), find_config_file(), find_install_root(), get_config(), get_config_with_env_override(), load_config(), load_keys_env_fallback() (+21 more)
+Cohesion: 0.08
+Nodes (33): _deep_merge(), find_config_file(), find_install_root(), get_config(), get_config_with_env_override(), load_config(), load_keys_env_fallback(), load_runtime_config() (+25 more)
 
 ### Community 57 - "ExecutionRequest"
 Cohesion: 0.04
-Nodes (67): ExecutionCoordinator, Exception, Path, Unified execution coordinator., Lazy-initialized registry service., Resolve execution cwd from explicit request or environment policy., Resolve the repository root used for worktree operations.          Delegates to, Resolve the main repository root deterministically.          Delegates to the si (+59 more)
+Nodes (65): ExecutionCoordinator, Exception, Path, Unified execution coordinator., Lazy-initialized registry service., Resolve execution cwd from explicit request or environment policy., Resolve the repository root used for worktree operations.          Delegates to, Resolve the main repository root deterministically.          Delegates to the si (+57 more)
 
 ### Community 58 - "IssueLink"
 Cohesion: 0.11
 Nodes (18): IssueLink, Any, Migrate legacy issue role values.          - repo -> related (legacy classificat, Resolve the primary task issue number from links.          Truth: any issue with, Build a hydrated response from state and links., FlowReadMixin, Any, FlowState (+10 more)
 
 ### Community 59 - "._reset_issue_after_pr_closed"
-Cohesion: 0.05
-Nodes (30): CapacityServiceProtocol, FlowContextResolverProtocol, IssueCollectionServiceProtocol, IssueLoaderProtocol, LabelDispatchCallable, QueuePersistenceServiceProtocol, QueueSelectorProtocol, Protocol definitions for dispatch coordination. (+22 more)
+Cohesion: 0.09
+Nodes (16): CheckPRService, Check PR service - handles PR state changes during consistency checks.  This ser, Mark flow as aborted and clean up physical resources.          Args:, Transfer dependency links from old issue to bridge issue.          Args:, Handle PR state changes detected during check.          Args:             branch, Handle merged PR: mark flow done, auto-close linked issues.          Returns:, Service for handling PR state changes during consistency checks.      Responsibi, Handle closed PR (without merge): reset issue, clean up.          Returns: (+8 more)
 
 ### Community 60 - "HandoffService"
-Cohesion: 0.07
-Nodes (17): handoff_svc(), Tests for HandoffService external event recording., Should skip comments already recorded., Create HandoffService with mocked dependencies., Should handle both general and review comments., Should handle empty comment lists., Should truncate comment body to 200 characters., Should handle comments with missing fields gracefully. (+9 more)
+Cohesion: 0.03
+Nodes (94): FlowTimelineService, Flow timeline event and comment coordination service., Build timeline comment with [flow] marker.          Args:             event_type, Check if latest timeline comment has same event_type.          Args:, Unified service for recording flow timeline events.      Coordinates:     1. Eve, Record timeline event with configurable comment policy.          Args:, HandoffService, Any (+86 more)
 
 ### Community 61 - "get_adapter"
-Cohesion: 0.05
-Nodes (46): _build_github_flow_manifest(), Path, GitHub Flow adapter — lightweight skill distribution from global runtime., Build GitHub Flow adapter manifest from global ~/.vibe/skills resources.      Ar, get_adapter(), Adapter registry for vibe3 distributions., Register an adapter manifest.      Args:         manifest: Adapter manifest to r, Get a registered adapter by name with lazy loading.      Lazily imports built-in (+38 more)
+Cohesion: 0.04
+Nodes (54): _build_github_flow_manifest(), Path, GitHub Flow adapter — lightweight skill distribution from global runtime., Build GitHub Flow adapter manifest from global ~/.vibe/skills resources.      Ar, get_adapter(), Adapter registry for vibe3 distributions., Register an adapter manifest.      Args:         manifest: Adapter manifest to r, Get a registered adapter by name with lazy loading.      Lazily imports built-in (+46 more)
 
 ### Community 62 - "check.py"
-Cohesion: 0.14
-Nodes (29): check(), _emit(), _emit_agent_worktree_details(), _emit_check_details(), _emit_clean_branch_details(), _emit_failures(), _emit_list(), _emit_local_branch_details() (+21 more)
+Cohesion: 0.23
+Nodes (18): _emit(), _emit_agent_worktree_details(), _emit_check_details(), _emit_clean_branch_details(), _emit_failures(), _emit_list(), _emit_local_branch_details(), _emit_remote_branch_details() (+10 more)
 
 ### Community 63 - "enable_method_trace"
 Cohesion: 0.16
 Nodes (31): enable_method_trace(), Enable method-level tracing via @trace_method decorator.      Sets VIBE3_TRACE=1, append(), audit(), indicate(), init(), next_step(), plan() (+23 more)
 
 ### Community 64 - ".resolve_bootstrap_worktree_context"
-Cohesion: 0.20
-Nodes (7): Path, Shared core: find existing or create new worktree for branch.          Delegates, Resolve manager cwd for orchestra execution.          Uses shared abstraction wi, Resolve manager cwd for role execution., Align auto task scenes to configured base ref when safe., Resolve worktree context for vibe-new bootstrap.          Uses shared abstractio, Initialize WorktreeManager.          Args:             config: Orchestra configu
+Cohesion: 0.29
+Nodes (5): Path, Resolve manager cwd for orchestra execution.          Uses shared abstraction wi, Resolve manager cwd for role execution., Align auto task scenes to configured base ref when safe., Initialize WorktreeManager.          Args:             config: Orchestra configu
 
 ### Community 65 - "cli.py"
 Cohesion: 0.08
 Nodes (26): show_default, help(), main(), main_callback(), _NoBorderPanel, Argument, _ASYNC_OPT, BranchOption (+18 more)
 
 ### Community 66 - "QualifyGateService"
-Cohesion: 0.03
-Nodes (83): CoordinationTruth, Self, Coordination truth table model for remote-first reads., Remote-first coordination state with provenance.      Truth table for orchestra/, Ensure source fields are set when corresponding values are provided., Compute blocked state from projection state and blocked payload.          Remote, Tests for multi-dependency blocked state handling., Test that blocked issue unblocks when ALL dependencies are satisfied. (+75 more)
+Cohesion: 0.04
+Nodes (62): CoordinationTruth, Self, Coordination truth table model for remote-first reads., Remote-first coordination state with provenance.      Truth table for orchestra/, Ensure source fields are set when corresponding values are provided., Compute blocked state from projection state and blocked payload.          Remote, Tests for multi-dependency blocked state handling., Test that blocked issue unblocks when ALL dependencies are satisfied. (+54 more)
 
 ### Community 67 - "FlowQueryProtocol"
-Cohesion: 0.08
-Nodes (30): block_executor_noop_issue(), block_manager_noop_issue(), block_planner_noop_issue(), block_reviewer_noop_issue(), fail_executor_issue(), fail_manager_issue(), fail_planner_issue(), fail_reviewer_issue() (+22 more)
+Cohesion: 0.06
+Nodes (38): block_executor_noop_issue(), block_manager_noop_issue(), block_planner_noop_issue(), block_reviewer_noop_issue(), fail_executor_issue(), fail_manager_issue(), fail_planner_issue(), fail_reviewer_issue() (+30 more)
 
 ### Community 68 - ".resolve_base"
 Cohesion: 0.19
@@ -1713,59 +1691,59 @@ Nodes (8): BaseDefaultPolicy, Resolve base branch using unified policy tokens.  
 
 ### Community 69 - "StatusQueryService"
 Cohesion: 0.05
-Nodes (29): Aggregates GitHub/Git data for the status dashboard.      Fetches issues, builds, Lazy-initialized title cache service., Get worktree branch-to-directory mapping.          Returns:             Dict map, StatusQueryService, _format_resume_failure_reason(), Any, Exception, Task resume operations.  `task resume` only clears blocked state and restores th (+21 more)
+Nodes (30): ProgressCallback, Aggregates GitHub/Git data for the status dashboard.      Fetches issues, builds, Lazy-initialized title cache service., Get worktree branch-to-directory mapping.          Returns:             Dict map, StatusQueryService, _format_resume_failure_reason(), Any, Exception (+22 more)
 
 ### Community 70 - "status"
 Cohesion: 0.07
-Nodes (30): _analyze_orchestra_config_sources(), _compute_effective_server_running(), _fetch_system_snapshot(), FormatOption, help, hidden, Option, TraceMinMsOption (+22 more)
+Nodes (31): _analyze_orchestra_config_sources(), _compute_effective_server_running(), _fetch_system_snapshot(), FormatOption, help, hidden, Option, TraceMinMsOption (+23 more)
 
 ### Community 71 - "WorktreeLifecycle"
-Cohesion: 0.10
-Nodes (17): _is_auto_task_branch(), _NullFlowService, FlowState, Path, Worktree lifecycle implementation details.  Extracted from worktree.py to keep f, Persist worktree path to flow_state for canonical tracking.          Args:, Check if branch follows auto-managed task naming convention., Check that worktree's HEAD branch matches expected branch.          Uses git rev (+9 more)
+Cohesion: 0.11
+Nodes (17): _is_auto_task_branch(), _NullFlowService, FlowState, Path, Worktree lifecycle implementation details.  Extracted from worktree.py to keep f, Create a temporary worktree.          Args:             wt_path: Target path for, Persist worktree path to flow_state for canonical tracking.          Args:, Clean up stale worktree references. (+9 more)
 
 ### Community 72 - "BlockedStateService"
-Cohesion: 0.07
-Nodes (41): BlockedStateService, Unified blocked state management service.  This service provides a single entry, Single entry point for blocked state management.      Coordinates writes across, Write blocked state to database cache only (no body/label update).          Use, Clear blocked markers after rebuild.          Post-rebuild: consistency is guara, End-to-end tests: blocked resume preserves transition evidence.  This test verif, test_resume_preserves_history_and_records_recovery(), test_resume_retains_block_when_transition_budget_is_exhausted() (+33 more)
+Cohesion: 0.04
+Nodes (83): BlockedStateIO, Low-level I/O operations for blocked state management.  This module handles read, Write blocked state to database cache., Clear blocked state from database cache.          Transition evidence belongs to, Handles low-level read/write operations for blocked state., BlockedStateService, Unified blocked state management service.  This service provides a single entry, Check if flow is blocked (reads from authoritative truth). (+75 more)
 
 ### Community 73 - "TraceOutput"
 Cohesion: 0.09
 Nodes (26): ExecutionStep, Trace output data models.  This module provides data models for structured trace, Convert to JSON string.          Returns:             JSON formatted string, A single execution step in the trace.      Attributes:         time: Timestamp o, Trace output model for structured trace data.      Attributes:         command:, Convert to YAML string.          Returns:             YAML formatted string, TraceOutput, Tests for trace output models. (+18 more)
 
 ### Community 74 - "IssueInfo"
-Cohesion: 0.03
-Nodes (78): GitHubClientProtocol, Composite protocol for GitHub client combining all narrow ports.      This proto, is_transient_git_error(), Git transient error patterns and classification utilities.  This module centrali, Check if error message matches known transient Git error patterns.      Args:, IssueInfo, GitHub issue information used during orchestration dispatch., Generate a URL-safe slug from the issue title. (+70 more)
+Cohesion: 0.05
+Nodes (56): IssueInfo, GitHub issue information used during orchestration dispatch., Generate a URL-safe slug from the issue title., FlowOrchestratorService, Any, Flow orchestrator service - 编排逻辑下沉到Service层., Return the number of currently active flows., Create or reactivate a standardized flow scene for an issue.          This is th (+48 more)
 
 ### Community 75 - "EventPublisher"
 Cohesion: 0.05
-Nodes (37): EventPublisher, publish(), publish_and_wait(), Any, PublishHook, Global event bus for domain events.  Defined here (models layer L6) rather than, Publish an event using the global publisher., Publish event and wait for first handler result (synchronous).      Args: (+29 more)
+Nodes (35): EventPublisher, publish(), PublishHook, Global event bus for domain events.  Defined here (models layer L6) rather than, Publish an event using the global publisher., Subscribe to an event type using the global publisher., Central event publisher with handler registry (singleton)., Reset the singleton instance (for testing). (+27 more)
 
 ### Community 76 - "HandoffStorage"
 Cohesion: 0.03
-Nodes (52): ExternalEventRecorder, Any, External event recording service for handoff system., Record PR comments as external events.          Only records comments not alread, Records external events (CI status, PR comments) as handoff events., Query handoff events using injected function., Record CI status as external event.          Only records if status changed from, Initialize handoff service.          Args:             store: SQLite client for (+44 more)
+Nodes (51): ExternalEventRecorder, Any, External event recording service for handoff system., Record PR comments as external events.          Only records comments not alread, Records external events (CI status, PR comments) as handoff events., Query handoff events using injected function., Record CI status as external event.          Only records if status changed from, _get_handoff_template() (+43 more)
 
 ### Community 77 - "PRResponse"
-Cohesion: 0.07
-Nodes (25): CICheck, Tests for CICheck model and PRResponse.ci_checks field., Test CICheck model instantiation., Test that ci_checks is properly serialized in model_dump()., Test CICheck model serialization excludes None fields., Test CICheck model serialization keeps failure metadata., Test suite for PRResponse.ci_checks field., Test that ci_checks defaults to empty list. (+17 more)
+Cohesion: 0.05
+Nodes (51): _build_failure_command(), _classify_failed_job(), _classify_failed_step_name(), _enrich_failed_check(), _extract_actions_run_details(), PRReadMixin, Any, GitHub client PR read operations. (+43 more)
 
 ### Community 78 - "init_schema"
-Cohesion: 0.06
-Nodes (21): ActorRegistry, Registry for tracking active and recently completed actors.      This is a modul, Initialize the registry.          Args:             ttl_seconds: How long termin, Create a new actor in QUEUED state.          Args:             job_type: Type of, Get an actor by ID.          Args:             actor_id: Actor ID          Retur, Get all non-terminal actors.          Returns:             List of actors in QUE, Get terminal actors still within the TTL window.          Returns:             L, Remove terminal actors whose TTL has expired.          Returns:             List (+13 more)
+Cohesion: 0.03
+Nodes (68): init_schema(), Connection, SQLite schema definitions and migration helpers., Create all tables and run migrations., CheckService, Invalidate PR cache to force refresh on next check.          Clears the cached P, Count how many commits the branch is behind origin/main.          Returns None i, Service for verifying handoff store consistency and auto-fixing issues. (+60 more)
 
 ### Community 79 - "FlowStatePort"
-Cohesion: 0.14
-Nodes (9): FlowStatePort, Any, FlowState, Flow protocols — interfaces for flow state access.  Defines Protocol interfaces, Return the active flow record for the given issue, or None., Minimal protocol for flow state read/write used by environment layer.      Decou, Return FlowState for the given branch, or None if not found., Update flow metadata fields for the given branch. (+1 more)
+Cohesion: 0.07
+Nodes (19): FlowReader, FlowStatePort, Any, FlowState, Flow protocols — interfaces for flow state access.  Defines Protocol interfaces, Read-only protocol for flow state queries used by orchestra services., Return the active flow record for the given issue, or None., Return the PR number associated with the issue's flow, or None. (+11 more)
 
 ### Community 80 - "IssueRoleSyncSpec"
-Cohesion: 0.07
-Nodes (26): GovernanceEventLogger, GovernanceFunctions, IssueRoleSyncSpec, Any, SessionRole, Protocol interfaces for role functions injected into execution runners.  These p, Protocol for governance role functions injected into runners., Build snapshot context for governance execution. (+18 more)
+Cohesion: 0.04
+Nodes (43): IssueRoleSyncSpec, Generic sync/async runner for issue-scoped roles., Run a role synchronously (direct execution without tmux wrapper).      Orchestra, Run a role asynchronously via tmux wrapper.      Launches tmux session and retur, run_issue_role_async(), run_issue_role_sync(), GovernanceEventLogger, GovernanceFunctions (+35 more)
 
 ### Community 81 - "PlanRequest"
-Cohesion: 0.09
-Nodes (34): PlanPromptMode, _build_plan_exit_contract_section(), _build_plan_output_contract_section(), build_plan_prompt_body(), _build_plan_prompt_providers(), _build_plan_task_section(), describe_plan_sections(), make_plan_context_builder() (+26 more)
+Cohesion: 0.08
+Nodes (39): PlanPromptMode, _build_plan_exit_contract_section(), _build_plan_output_contract_section(), build_plan_prompt_body(), _build_plan_prompt_providers(), _build_plan_task_section(), describe_plan_sections(), make_plan_context_builder() (+31 more)
 
 ### Community 82 - "PromptVariableSource"
-Cohesion: 0.08
-Nodes (27): ProviderCallable, Any, Builtin variable source resolvers for the prompt assembly layer., Resolve a single variable source to its string value., Resolve skill SKILL.md content through profile.      Args:         skill_name: S, Resolve file source with optional project-specific overlay.      For governance, _resolve_command(), _resolve_file() (+19 more)
+Cohesion: 0.07
+Nodes (28): ProviderCallable, Any, Builtin variable source resolvers for the prompt assembly layer., Resolve a single variable source to its string value., Resolve file source with optional project-specific overlay.      For governance, _resolve_command(), _resolve_file(), _resolve_literal() (+20 more)
 
 ### Community 83 - "start_async_command"
 Cohesion: 0.08
@@ -1773,91 +1751,91 @@ Nodes (29): allocate_log_path(), allocate_tmux_session_name(), build_tmux_log_fi
 
 ### Community 84 - "make_coordinator"
 Cohesion: 0.03
-Nodes (93): callable, QueueEntry, Queue entry data contract., Frozen queue entry tracked only by issue identity and wait state.      Attribute, install_issue_loader(), make_capacity(), make_coordinator(), make_issue() (+85 more)
+Nodes (91): callable, QueueEntry, Queue entry data contract., Frozen queue entry tracked only by issue identity and wait state.      Attribute, install_issue_loader(), make_capacity(), make_coordinator(), make_issue() (+83 more)
 
 ### Community 85 - "git_worktree_ops.py"
-Cohesion: 0.11
-Nodes (24): find_worktree_path_for_branch(), get_current_branch(), get_current_commit(), get_git_common_dir(), get_safe_main_branch_name(), get_worktree_root(), get_worktrees_for_branch(), is_branch_occupied_by_worktree() (+16 more)
+Cohesion: 0.03
+Nodes (70): _filter_unified_diff_by_paths(), _get_branch_files(), get_changed_files(), _get_commit_files(), get_diff(), get_name_status(), get_numstat(), get_tracked_files() (+62 more)
 
 ### Community 86 - "GhIssueLabelPort"
-Cohesion: 0.08
-Nodes (17): GhIssueLabelPort, IssueLabelPort, GitHub label operations — issue label CRUD via gh CLI., Port for issue label read/write operations., Return issue labels; None means labels cannot be fetched., Add one label to issue., Remove one label from issue., Ensure a repository label exists. (+9 more)
+Cohesion: 0.03
+Nodes (67): GitHubClient, GitHub client implementation., GitHub client for interacting with GitHub via gh CLI.      This class combines a, GhIssueLabelPort, IssueLabelPort, GitHub label operations — issue label CRUD via gh CLI., Port for issue label read/write operations., Return issue labels; None means labels cannot be fetched. (+59 more)
 
 ### Community 87 - "execute_check_mode"
-Cohesion: 0.08
-Nodes (19): GitError, Git operation failed., Path, 测试 PR source 但未注入 GitHubClient 时抛出错误., 测试 PR diff 但未注入 GitHubClient 时抛出错误., check_merge_conflicts 测试., merge 成功但无 merge state 时，abort 失败也应视为无冲突., merge 冲突且 abort 失败时，不应抛异常，应返回有冲突. (+11 more)
+Cohesion: 0.04
+Nodes (44): execute_check_mode(), execute_remote_check(), Shared command-layer helpers for check mode routing., Wire remote label check to CLI.      This is a thin command-layer wrapper around, Run verify_all_flows with Rich Progress display.      Args:         service: Che, Run command-oriented check modes     using CheckService primitives.      Args:, _run_with_progress(), Run the full check shortcut used by status-style commands.      The status dashb (+36 more)
 
 ### Community 88 - "status"
-Cohesion: 0.07
-Nodes (36): _format_relative_time(), _get_yaml(), Argument, datetime, FormatOption, help, ModuleType, Option (+28 more)
+Cohesion: 0.11
+Nodes (23): _format_relative_time(), _get_yaml(), Argument, datetime, FormatOption, help, ModuleType, Option (+15 more)
 
 ### Community 89 - "run_issue_role_async"
-Cohesion: 0.09
-Nodes (18): Resolve command agent options with CLI override support.      Priority: CLI para, resolve_command_agent_options(), Tests for resolve_command_agent_options.  Tests the resolution priority logic fo, Missing config should raise ValueError., Empty agent_config should raise ValueError., Custom timeout should be preserved through resolution., Default timeout (3600s) should be used when not configured., Tests for resolve_command_agent_options priority logic. (+10 more)
+Cohesion: 0.08
+Nodes (20): Any, Create IssueInfo from a raw GitHub webhook issue payload.          Handles both, Hard rebuild through the canonical rebuild usecase., IssueCollectionService, Shared issue collection service., Collect open GitHub issues once and normalize them for consumers., load_issue_info(), Load issue information from GitHub.      Args:         issue_number: GitHub issu (+12 more)
 
 ### Community 90 - "fetch_serve_status_data"
 Cohesion: 0.21
 Nodes (13): config(), _enter_patches(), Tests for fetch_serve_status_data API function., Verify fetch_serve_status_data returns expected top-level keys., Daemon status reflects running server correctly., Returns valid structure even when events.log doesn't exist., Create a minimal OrchestraConfig for testing., Setup mock dependency instances shared across tests. (+5 more)
 
 ### Community 91 - "TaskService"
-Cohesion: 0.03
-Nodes (61): Any, Task service implementation., Link an issue to a flow., Reclassify an existing issue link without deleting flow history., Demote superseded task flows to related role., Get or create LabelService instance., Fetch issue data including comments from GitHub.          Args:             issu, Resolve explicit or current branch for task commands.          Args: (+53 more)
+Cohesion: 0.04
+Nodes (50): Any, Task service implementation., Link an issue to a flow., Reclassify an existing issue link without deleting flow history., Demote superseded task flows to related role., Get or create LabelService instance., Fetch issue data including comments from GitHub.          Args:             issu, Resolve explicit or current branch for task commands.          Args: (+42 more)
 
 ### Community 92 - "_convert_to_event"
 Cohesion: 0.04
-Nodes (56): Request, Published when a GitHub issue is opened or edited., Published when a GitHub pull request is merged., Published when a GitHub PR review is submitted., Published when a GitHub issue is closed., Published when a GitHub issue label is added or removed., WebhookIssueClosed, WebhookIssueUpdated (+48 more)
+Nodes (54): Request, Published when a GitHub issue is opened or edited., Published when a GitHub PR review is submitted., Published when a GitHub issue is closed., Published when a GitHub issue label is added or removed., WebhookIssueClosed, WebhookIssueUpdated, WebhookLabelChanged (+46 more)
 
 ### Community 93 - "load_review_kernel"
 Cohesion: 0.12
-Nodes (36): classify_review_kernel(), _hit(), is_architecture_path(), load_review_kernel(), _max_depth(), Path, Repository-owned Review Kernel manifest and deterministic classifier., Return whether a repo-relative path belongs to strict runtime kernel. (+28 more)
+Nodes (37): classify_review_kernel(), _hit(), is_architecture_path(), load_review_kernel(), _max_depth(), Path, Repository-owned Review Kernel manifest and deterministic classifier., Return whether a repo-relative path belongs to strict runtime kernel. (+29 more)
 
 ### Community 94 - "_full_status_dashboard"
-Cohesion: 0.08
-Nodes (30): _full_status_dashboard(), Render task status dashboard with issue progress panels., Status dashboard UI rendering functions.  Filtering rules: docs/v3/orchestra/tas, Render Remote Tasks (no local flow) section., Render Supervisor Issues section., Render Human Collaboration Flows section (dev/issue-N branches)., Render Flows with PRs section., Render Blocked Issues section. (+22 more)
+Cohesion: 0.15
+Nodes (17): _full_status_dashboard(), Render task status dashboard with issue progress panels., Status dashboard UI rendering functions.  Filtering rules: docs/v3/orchestra/tas, Render Remote Tasks (no local flow) section., Render Supervisor Issues section., Render Human Collaboration Flows section (dev/issue-N branches)., Render Flows with PRs section., Render Roadmap RFC section (issues needing human design input). (+9 more)
 
 ### Community 95 - "ErrorTrackingService"
-Cohesion: 0.01
-Nodes (184): Path, T, Connection/bootstrap layer shared by focused SQLite repositories., Create a SQLiteClient resolved from a repository root path.          Centralizes, Initialize schema and run migrations (idempotent).          Uses a migration ver, SQLiteClientBase, init_schema(), Connection (+176 more)
+Cohesion: 0.02
+Nodes (140): ErrorTrackingService, Any, Error tracking service for threshold detection.  Implements sliding window track, Clear instance(s) for testing.          Args:             db_path: If provided,, Initialize error tracking service.          Args:             store: SQLiteClien, Record error and check if threshold reached.          Args:             error_co, Get current error counts from error_log., Check if there are any CRITICAL severity errors. (+132 more)
 
 ### Community 96 - "FlowStatusResponse"
 Cohesion: 0.05
 Nodes (58): FlowEvent, FlowStatusResponse, Normalize legacy event refs loaded from SQLite.          Older events may store, Response model for flow status.      Session tracking is now handled by runtime_, classify_flow(), Classify flow by branch pattern and issue binding.      Auto-task branches: task, Return only successful artifact handoff events (plan/report/audit).          Inc, Get task (flow) details. (+50 more)
 
 ### Community 97 - "raise_gh_pr_error"
-Cohesion: 0.08
-Nodes (28): NoReturn, raise_gh_pr_error(), Normalize gh pr command failure into unified error types., PRWriteMixin, Any, GitHub client PR write operations., Mark PR as ready for review., Mixin for PR write operations. (+20 more)
+Cohesion: 0.14
+Nodes (8): PRWritePort, Port for PR write operations., Create a pull request., Update a pull request., Mark PR as ready for review., Merge a pull request., Close a pull request.          Args:             pr_number: PR number to close, Test PRWritePort is a Protocol.
 
 ### Community 98 - "GitHubClient"
-Cohesion: 0.01
-Nodes (213): GitClientProtocol, LabelResume, GitClient, Git client，封装 git 命令操作., Get current HEAD commit SHA., Get the worktree-specific safe branch name., Check whether any worktree already has this branch checked out., Return paths of worktrees that have the given branch checked out. (+205 more)
+Cohesion: 0.03
+Nodes (60): load_sync_rules(), LocalSyncRules, Sync rules configuration for remote/local label alignment.  This module provides, Complete sync rules configuration., Load sync rules from YAML config file.      Args:         config_path: Path to s, Individual sync rule configuration., Remote domain sync rules (label anomaly detection)., Local domain sync rules (flow alignment checks). (+52 more)
 
 ### Community 99 - "ExternalEventRecorder"
-Cohesion: 0.10
-Nodes (21): Path, Regression tests for blocked-state event boundary invariants.  Guards the three-, Assert FlowBlocked is published after BlockedStateService writes state.      The, Assert registered FlowBlocked handlers never write blocked state., Assert timeline is audit-only, not the sole state source., Assert blocked_by_issue accumulates in issue body projection., Assert service-layer repeated blocks preserve body dependencies., Stub GitHub client for testing. (+13 more)
+Cohesion: 0.05
+Nodes (28): ActorRegistry, Registry for tracking active and recently completed actors.      This is a modul, Initialize the registry.          Args:             ttl_seconds: How long termin, Get an actor by ID.          Args:             actor_id: Actor ID          Retur, Get terminal actors still within the TTL window.          Returns:             L, Remove terminal actors whose TTL has expired.          Returns:             List, Remove an actor from the registry.          Args:             actor_id: Actor ID, Test ActorRegistry methods. (+20 more)
 
 ### Community 100 - "FileLoader"
-Cohesion: 0.36
-Nodes (5): FileLoader, T, Generic dispatch-time loader that scans a directory for files matching     given, Load all matching files. Returns empty tuple if dir is missing/empty., Load a single file by relative name.
+Cohesion: 0.07
+Nodes (25): CapacityServiceProtocol, FlowContextResolverProtocol, IssueCollectionServiceProtocol, IssueLoaderProtocol, LabelDispatchCallable, QueueSelectorProtocol, Protocol definitions for dispatch coordination., Select ready issues from collected issues.          Args:             issues: Co (+17 more)
 
 ### Community 101 - "Server Module"
 Cohesion: 0.67
 Nodes (3): Orchestra Serve Web Dashboard, Server Module, Task Status Web Dashboard
 
 ### Community 102 - "SessionManager"
-Cohesion: 0.09
-Nodes (21): CodeagentSessionContext, Path, Session management for process persistence., Attach to a tmux session (for human intervention).          Args:             co, Kill a tmux session immediately.          Args:             context: TmuxSession, Create a codeagent session (L2 supervisor execution).          Args:, Pure tmux session context (no codeagent dependency)., Return a non-colliding tmux session name.          Mimics the behavior of codeag (+13 more)
+Cohesion: 0.05
+Nodes (35): Path, Initialize cache with repository path.          Args:             repo_path: Pat, CodeagentSessionContext, Path, Session management for process persistence., Attach to a tmux session (for human intervention).          Args:             co, Kill a tmux session immediately.          Args:             context: TmuxSession, Create a codeagent session (L2 supervisor execution).          Args: (+27 more)
 
 ### Community 103 - "test_command_adapter.py"
 Cohesion: 0.05
 Nodes (55): build_default_registry(), CommandAdapterEntry, CommandAdapterError, Command adapter registry for lazy loading of command job handlers.  This module, List all registered job types.          Returns:             List of registered, Build and return a registry with all canonical vibe3 commands.      This functio, Registry entry for a command adapter.      Attributes:         job_type: The com, Error raised when adapter resolution fails. (+47 more)
 
 ### Community 104 - "PromptMeta"
-Cohesion: 0.11
-Nodes (13): PromptMeta, PromptContextMode, Derived routing metadata for sync prompt assembly., Tests for PromptMeta computed properties., Default configuration should include global notice., Retry with resume should not include global notice., Retry with bootstrap should still include global notice., Resume mode should fallback to bootstrap. (+5 more)
+Cohesion: 0.08
+Nodes (19): PromptMeta, PromptContextMode, Derived routing metadata for sync prompt assembly., Unit tests for prompt_meta module., Tests for PromptMeta computed properties., Default configuration should include global notice., Retry with resume should not include global notice., Retry with bootstrap should still include global notice. (+11 more)
 
 ### Community 105 - "HeartbeatServer"
-Cohesion: 0.06
-Nodes (49): PeriodicCheckConfig, Configuration for periodic consistency checks via vibe3 check.      Runs two pha, HeartbeatServer, Register a callback to run when the server stops.          Called exactly once d, Whether the heartbeat server is currently running., Manages the orchestra event loop.      Primary event source: periodic polling ti, _config(), _MockService (+41 more)
+Cohesion: 0.07
+Nodes (32): ErrorHandlingContract, Error severity classification for Orchestra runtime., Registry-backed handling metadata for each error code.      This replaces prefix, Test error severity enum and registry structure., Test that invalid issue_action values are rejected., Test that invalid gate_action values are rejected., Test that missing required fields are rejected., Test that description field is optional with default empty string. (+24 more)
 
 ### Community 106 - "QueuePersistenceService"
 Cohesion: 0.14
@@ -1868,76 +1846,76 @@ Cohesion: 0.06
 Nodes (27): Spec reference service for handling file and issue-based spec references., Get spec content suitable for prompt injection.          Args:             info:, Parsed spec reference information., Validate a spec reference.          Args:             spec_ref: Spec reference t, Resolve a spec reference to its canonical form.          Args:             spec_, Get display string for spec reference.          Args:             spec_ref: Spec, Get GitHub repo owner from git config., Get GitHub repo name from git config. (+19 more)
 
 ### Community 108 - "build_review_prompt_body"
-Cohesion: 0.08
-Nodes (20): BlockedStateIO, Low-level I/O operations for blocked state management.  This module handles read, Write blocked state to database cache., Clear blocked state from database cache.          Transition evidence belongs to, Write state to issue labels.          Args:             issue_number: Issue numb, Handles low-level read/write operations for blocked state., Tests for blocked_state_io module., write_database_cache should store blocked_reason and flow_status. (+12 more)
+Cohesion: 0.05
+Nodes (47): ReviewPromptMode, _build_output_contract_section(), _build_review_observation_section(), build_review_prompt_body(), _build_review_prompt_providers(), describe_review_sections(), make_review_context_builder(), Path (+39 more)
 
 ### Community 109 - "pr_query.py"
-Cohesion: 0.08
-Nodes (28): _build_missing_pr_message(), _build_pr_output_payload(), _load_local_review_observation(), PrQueryTarget, Any, Typer, PR query commands.  Public commands: - show: Show PR details with change analysi, Build a command-facing not-found message. (+20 more)
+Cohesion: 0.09
+Nodes (26): _build_missing_pr_message(), _build_pr_output_payload(), _fetch_and_record_external_events(), _fetch_pr_or_raise(), _load_local_review_observation(), Any, Typer, PR query commands.  Public commands: - show: Show PR details with change analysi (+18 more)
 
 ### Community 110 - "resolve_repo_agent_preset"
-Cohesion: 0.07
-Nodes (34): configured_backends(), find_missing_backend_commands(), has_agent_env_override(), Any, Path, Agent preset resolution for vibe3.  Handles reading repo-local agent presets and, Resolve agent preset entry with vibe- prefix fallback.      Args:         agents, Resolve agent preset from repo-local config/v3/models.json with env override. (+26 more)
+Cohesion: 0.06
+Nodes (40): Config resolution for codeagent backend.  Handles syncing effective backend/mode, Sync effective backend/model and agents presets to ~/.codeagent/models.json., sync_models_json(), configured_backends(), find_missing_backend_commands(), has_agent_env_override(), Any, Path (+32 more)
 
 ### Community 111 - "select_ready_issues_from_collected_issues"
-Cohesion: 0.11
-Nodes (15): Any, Create IssueInfo from a raw GitHub webhook issue payload.          Handles both, IssueCollectionService, Shared issue collection service., Collect open GitHub issues once and normalize them for consumers., Tests for Orchestra models., test_from_github_payload_basic(), test_from_github_payload_derives_state_from_labels() (+7 more)
+Cohesion: 0.09
+Nodes (20): get_flow_context(), get_flow_context_bulk(), is_auto_task_branch(), load_issue(), Issue loading and flow context utilities for dispatch coordination., Load the current issue snapshot for an already-frozen issue., Check if branch is an auto-task branch.      Args:         branch: Branch name t, Get flow context (branch and state) for an issue.      Args:         issue_numbe (+12 more)
 
 ### Community 112 - "FlowService"
 Cohesion: 0.02
-Nodes (99): Resolve ready target PR number from arg or current flow context., _resolve_ready_pr_number(), MainBranchProtectedError, Cannot create flow on protected main branches.      Main branches (main, master,, _build_plan_task_guidance(), Build plan task guidance from flow and issue context., Validate flow exists and return flow status with issue number.      Args:, validate_run_prerequisites() (+91 more)
+Nodes (82): finalize_review_output(), _load_existing_audit_ref(), _load_existing_verdict(), Audit artifact helpers for reviewer role., Load existing verdict from flow state if agent already wrote it., Read audit_ref and verdict from flow state after review completes.      This is, Convenience wrappers for branch resolution that auto-create FlowService.  These, Resolve --branch argument and extract issue number in one call.      Convenience (+74 more)
 
 ### Community 113 - "ServeStatusService"
-Cohesion: 0.08
-Nodes (21): Display the orchestra events log path., Display configuration summary., Display recent tick activity from events.log., Display FailedGate status., Display error tracking status with severity breakdown., Service for displaying Orchestra server status and diagnostics., Initialize status service.          Args:             config: Orchestra config (, Display complete server status.          Args:             pid: Process ID from (+13 more)
+Cohesion: 0.09
+Nodes (18): Show Orchestra server status, FailedGate state, and recent activity., status(), Display the orchestra events log path., Display configuration summary., Display recent tick activity from events.log., Display FailedGate status., Display error tracking status with severity breakdown., Service for displaying Orchestra server status and diagnostics. (+10 more)
 
 ### Community 115 - "TestPathsConfig"
-Cohesion: 0.05
-Nodes (30): get_commands_root(), _merge_prompt_fields(), Path, Merge LOC limits and prompt content from their migrated config files., Expand variable references like ${paths.policies_root} in config values., Load configuration from YAML file., Get the configured commands root directory.      Returns configured path or defa, Merge prompt content from prompts.yaml into VibeConfig-compatible sections. (+22 more)
+Cohesion: 0.10
+Nodes (18): _merge_prompt_fields(), Path, Merge LOC limits and prompt content from their migrated config files., Expand variable references like ${paths.policies_root} in config values., Load configuration from YAML file., Merge prompt content from prompts.yaml into VibeConfig-compatible sections., MonkeyPatch, Path (+10 more)
 
 ### Community 116 - "RecentPRCache"
 Cohesion: 0.07
 Nodes (29): Any, Path, Persistent cache for recent PR status snapshots.  This cache stores the most rec, Replace cache with latest recent PR snapshot from GitHub., Upsert a single branch PR entry without forcing full resync., Persistent cache for recent PR status by branch., Save cache atomically using temp file + rename.          This prevents cache cor, Whether the recent PR snapshot is still fresh enough to reuse. (+21 more)
 
 ### Community 117 - "ask"
-Cohesion: 0.33
-Nodes (5): ask(), BranchOption, Context, Ask command for project knowledge queries., Ask a question about project knowledge and get an answer from a code agent.
+Cohesion: 0.08
+Nodes (16): DispatchQueueMaintenanceService, CheckServiceProtocol, Frozen-queue maintenance service for GlobalDispatchCoordinator.  Extracted from, Promote state-changed entries to front; remove terminal entries.          Return, Re-sort existing queue entries without full collection.          Lightweight que, Run scheduled full queue refresh if tick matches interval.          Returns:, Check paused state and re-qualify blocked entries.          Returns:, Rebuild queue when actionable candidates are exhausted after dispatch. (+8 more)
 
 ### Community 118 - "FlowStatusResolver"
-Cohesion: 0.04
-Nodes (33): FlowStatusResolver, FlowStatusResolver service - source-aware flow status reads., Read complete remote state from GitHub.          Fetches issue body projection A, Resolver for source-aware flow status reads.      Implements source strategy:, Initialize resolver with SQLite client.          Args:             store: SQLite, Resolve flow status with source strategy.          Args:             branch: Bra, Read from local SQLite only.          Args:             branch: Branch name, CoordinationResolver (+25 more)
+Cohesion: 0.10
+Nodes (13): FlowStatusResolver, FlowStatusResolver service - source-aware flow status reads., Read complete remote state from GitHub.          Fetches issue body projection A, Resolver for source-aware flow status reads.      Implements source strategy:, Initialize resolver with SQLite client.          Args:             store: SQLite, Resolve flow status with source strategy.          Args:             branch: Bra, Read from local SQLite only.          Args:             branch: Branch name, Initialize resolver.          Args:             store: SQLiteClient for database (+5 more)
 
 ### Community 119 - "CheckServiceProtocol"
 Cohesion: 0.10
 Nodes (12): CheckResultProtocol, CheckServiceProtocol, Verify branch flow consistency., Run consistency checks for flows in the store., Invalidate PR cache to force refresh on next check., Remove orchestra-scanned label from issues with assignee.          Returns:, Scan remote open issues for label constraint violations and auto-fix.          R, Protocol for check result objects. (+4 more)
 
 ### Community 120 - "HandoffStatusResult"
-Cohesion: 0.14
-Nodes (11): HandoffStatusResult, HandoffStatusService, Handoff status aggregation service., Aggregate handoff status from multiple sources.          Args:             branc, Aggregated handoff status from multiple sources.      Return type for ``HandoffS, Return truly live runtime sessions from the registry for a branch.          This, Service for aggregating handoff status from multiple sources.      This service, mock_status_result() (+3 more)
+Cohesion: 0.08
+Nodes (27): diagnose_profile(), get_convention(), get_resolver(), ConventionResolver service for centralized convention lookup.  This module provi, Get current profile name for diagnostic context.      Returns:         Profile n, Return cached ProfileConvention for the current repo.      Safe to call repeated, Return cached ConventionResolver for the current repo.      Use when you need re, get_handoff_state_label() (+19 more)
 
 ### Community 121 - "create.py"
 Cohesion: 0.29
 Nodes (5): BranchMaterial, PRCreateResult, Usecase layer for pr create command orchestration., Structured result from the pr create usecase., Branch analysis material for AI suggestions.
 
 ### Community 122 - "CheckCleanupService"
-Cohesion: 0.04
-Nodes (51): CheckCleanupService, Any, Check cleanup service - handles --clean-branch logic for terminal flows.  This s, Clean terminal flows (done/aborted).          Both done and aborted flows have t, Batch query all live sessions and return branches with active sessions., Service for cleaning up terminal flow resources.      Handles the --clean-branch, Check if branch name is invalid (e.g., HEAD, HEAD~1)., Remove invalid flow record from database.          Returns:             True if (+43 more)
+Cohesion: 0.03
+Nodes (68): BackendProtocol, BackendProtocol — Protocol for backend operations (tmux, execution).  Import pat, Protocol for backend operations (tmux, execution).      Used for dependency inje, Check if tmux session exists.          Args:             session_name: Exact tmu, CheckCleanupService, Any, Check cleanup service - handles --clean-branch logic for terminal flows.  This s, Clean terminal flows (done/aborted).          Both done and aborted flows have t (+60 more)
 
 ### Community 123 - "resolve_repo_root_from_common_dir"
 Cohesion: 0.13
 Nodes (20): find_repo_root(), get_commit_message(), get_current_branch(), get_git_common_dir(), get_remote_url(), _layout_error(), Path, Git helper utilities. (+12 more)
 
 ### Community 124 - "make_context_builder"
-Cohesion: 0.09
-Nodes (19): Clear block status by invoking reconcile_blocked., Rebuild database flow_state and flow_issue_links cache from body truth., Authoritatively reconcile blocked state across body, labels, and cache., Authoritatively block flow by writing body truth, then reconcile.          Calle, parse_projection(), Parse flow-state projection from issue body.      Args:         body: Full issue, test_parse_projection_merges_legacy_dependencies(), Tests for issue body managed section service. (+11 more)
+Cohesion: 0.08
+Nodes (16): GovernanceConfig, Configuration for periodic governance scan service., Tests for OrchestrationFacade., Test that on_governance_decision posts a GitHub comment directly., Test that on_supervisor_scan publishes SupervisorIssueIdentified events., Create a sample IssueInfo for testing., Test that on_supervisor_scan skips issues without both required labels., on_supervisor_scan dispatches at most max_dispatch_per_tick events per tick. (+8 more)
 
 ### Community 125 - "git_branch_ops.py"
 Cohesion: 0.14
 Nodes (19): branch_exists(), check_merge_conflicts(), create_branch(), create_branch_ref(), delete_branch(), delete_remote_branch(), get_merge_base(), Git branch operations.  This module provides branch-related git operations extra (+11 more)
 
 ### Community 126 - "TestProtocolStructuralTyping"
-Cohesion: 0.04
-Nodes (32): GitHubAuthPort, IssueReadPort, PRDiffPort, PRReadPort, PRWritePort, GitHub client protocols — narrow port protocols for GitHub operations.  Import p, Port for PR diff operations., Get list of files changed in PR.          Args:             pr_number: PR number (+24 more)
+Cohesion: 0.05
+Nodes (33): GitHubAuthPort, GitHubClientProtocol, IssueReadPort, PRDiffPort, PRReadPort, GitHub client protocols — narrow port protocols for GitHub operations.  Import p, Port for PR diff operations., Get list of files changed in PR.          Args:             pr_number: PR number (+25 more)
 
 ### Community 127 - "SQLiteTransitionHistoryRepo"
 Cohesion: 0.14
@@ -1956,16 +1934,16 @@ Cohesion: 0.06
 Nodes (31): CoverageReport, LayerCoverage, Coverage models for layer-based coverage checking., Check if coverage meets threshold., Calculate coverage gap to threshold., Aggregated coverage report for all layers., Total covered lines across all layers., Total lines across all layers. (+23 more)
 
 ### Community 131 - "ProviderNotFoundError"
-Cohesion: 0.20
-Nodes (5): ContextBuilderError, PromptAssemblyError, Exceptions for the prompt assembly layer.  All exceptions inherit from VibeError, Base class for prompt assembly errors (non-recoverable by default)., Prompt context build failed (non-recoverable by default).
+Cohesion: 0.18
+Nodes (7): ContextBuilderError, PromptAssemblyError, ProviderNotFoundError, Exceptions for the prompt assembly layer.  All exceptions inherit from VibeError, Base class for prompt assembly errors (non-recoverable by default)., Raised when a named provider is not registered., Prompt context build failed (non-recoverable by default).
 
 ### Community 132 - "FlowTimelineService"
-Cohesion: 0.20
-Nodes (7): FlowTimelineService, Flow timeline event and comment coordination service., Build timeline comment with [flow] marker.          Args:             event_type, Check if latest timeline comment has same event_type.          Args:, Unified service for recording flow timeline events.      Coordinates:     1. Eve, Initialize timeline service., Record timeline event with configurable comment policy.          Args:
+Cohesion: 0.18
+Nodes (23): _build_plan_task_guidance(), Build plan task guidance from flow and issue context., _make_config(), _make_flow(), _make_issue(), Any, Path, Tests for plan prompt spec consumption (spec 012 US4, issue #3313).  Covers FR-0 (+15 more)
 
 ### Community 133 - "show"
-Cohesion: 0.15
-Nodes (18): ActorFilterOption, AllOption, RemoteOption, Argument, FormatOption, help, Option, TraceMinMsOption (+10 more)
+Cohesion: 0.08
+Nodes (19): mock_config(), mock_flow_manager(), mock_github(), mock_store(), qualify_gate_service(), Unit tests for QualifyGateService domain logic.  Tests for core run_qualify_gate, Create a mock orchestra config., Create a mock GitHub client. (+11 more)
 
 ### Community 134 - "_utcnow_iso"
 Cohesion: 0.12
@@ -1976,8 +1954,8 @@ Cohesion: 0.08
 Nodes (29): build_dispatch_context(), DispatchContext, handle_manager_dispatch_intent(), _lazy_github_client(), Manager dispatch-intent handler., Pre-configured services for manager dispatch., Construct all dispatch services from base dependencies., Dispatch manager from an authoritative dispatch-intent event. (+21 more)
 
 ### Community 136 - "resolve_issue_branch_input"
-Cohesion: 0.08
-Nodes (23): mock_flow_service(), mock_store(), Tests for issue_branch_resolver conflict detection., Test error when all flows are aborted., Test error when no binding but unbound candidates exist., Test error when no flows exist at all., Create mock FlowService with store., Test allow_no_flow=True returns None when no flows exist at all. (+15 more)
+Cohesion: 0.04
+Nodes (70): User input error that can be fixed by adjusting parameters.      These errors ar, UserError, is_log_like_path(), Path, Validation utilities for handoff service., Check if path points to execution logs., Validate that authoritative ref points to valid location.      Raises:         U, Validate that spec_ref is a canonical spec document path.      The spec_ref MUST (+62 more)
 
 ### Community 137 - "GovernanceConfig"
 Cohesion: 0.13
@@ -1988,8 +1966,8 @@ Cohesion: 0.08
 Nodes (33): build_governance_recipe(), build_governance_request(), _build_runtime_registry(), Any, Path, Governance role definition and request builders., Build a provider registry with snapshot values for prompt rendering., Build the PromptRecipe for governance dispatch. (+25 more)
 
 ### Community 139 - "read_instance_info"
-Cohesion: 0.10
-Nodes (27): __getattr__(), Runtime package.  Public interface for runtime components including circuit brea, Lazy import for all symbols to avoid circular dependencies.      All symbols are, OrchestraInstanceInfo, Path, Orchestra instance information management.  Moved from runtime/ to utils/ to bre, Serve instance information stored in global PID file., Serialize instance info to JSON-compatible dict. (+19 more)
+Cohesion: 0.12
+Nodes (20): Path, Orchestra instance information management.  Moved from runtime/ to utils/ to bre, Serialize instance info to JSON-compatible dict., Deserialize instance info from JSON dict., Read instance info from PID file.      Returns None if:     - File doesn't exist, Write instance info to PID file.      Creates parent directories if needed., read_instance_info(), write_instance_info() (+12 more)
 
 ### Community 140 - "_resolve_shared_artifact"
 Cohesion: 0.18
@@ -1997,43 +1975,43 @@ Nodes (16): Path, Handoff target resolution utilities.  This module handles the 
 
 ### Community 141 - "AgentOptions"
 Cohesion: 0.04
-Nodes (53): CodeagentBackend, Path, Codeagent backend - execute agents via codeagent-wrapper.  Core execution logic, Allocate a non-colliding sync log path with numeric suffix., Run subprocess with streaming output and capture return value., Start codeagent-wrapper in tmux and return the async handle., Run codeagent-wrapper synchronously., 基于 codeagent-wrapper 二进制的 agent 执行后端。 (+45 more)
+Nodes (51): CodeagentBackend, Path, Codeagent backend - execute agents via codeagent-wrapper.  Core execution logic, Allocate a non-colliding sync log path with numeric suffix., Run subprocess with streaming output and capture return value., Start codeagent-wrapper in tmux and return the async handle., Run codeagent-wrapper synchronously., 基于 codeagent-wrapper 二进制的 agent 执行后端。 (+43 more)
 
 ### Community 142 - "CoverageService"
 Cohesion: 0.08
 Nodes (31): CoverageService, Path, Coverage service for running pytest with coverage analysis., Service for running and analyzing test coverage by architectural layer., Initialize coverage service.          Args:             thresholds: Custom cover, Load coverage thresholds from configuration.          Returns:             Dict, Path, Tests for CoverageService. (+23 more)
 
 ### Community 143 - "flow_status_helpers.py"
-Cohesion: 0.11
-Nodes (20): _collect_timeline_issue_numbers(), _fetch_issue_titles_for_status(), _fetch_pr_map(), _fetch_worktree_map(), _get_yaml(), _parse_remote_issue_number(), Any, ModuleType (+12 more)
+Cohesion: 0.07
+Nodes (38): ActorFilterOption, AllOption, RemoteOption, _collect_timeline_issue_numbers(), _fetch_issue_titles_for_status(), _fetch_pr_map(), _fetch_worktree_map(), _get_yaml() (+30 more)
 
 ### Community 144 - "internal_manager_dispatch"
-Cohesion: 0.09
-Nodes (21): CoordinatorFactory, _RequestBuilder, get_store(), SQLiteClient context manager for dependency injection., Provide SQLiteClient instance with automatic cleanup.      Yields:         SQLit, _dispatch_role_intent(), handle_executor_dispatch_intent(), handle_reviewer_dispatch_intent() (+13 more)
+Cohesion: 0.19
+Nodes (17): internal_apply_dispatch(), internal_bootstrap(), internal_governance_dispatch(), internal_manager_dispatch(), Argument, _ASYNC_OPT, _DRY_RUN_OPT, help (+9 more)
 
 ### Community 145 - "PrReadyUsecase"
-Cohesion: 0.12
-Nodes (19): _build_pr_ready_usecase(), Typer, PR lifecycle commands (ready).  Note: merge command has been removed from public, Construct PR ready usecase with command-local dependencies., Register pr lifecycle commands., register_lifecycle_commands(), PrReadyAbortedError, PrReadyUsecase (+11 more)
+Cohesion: 0.11
+Nodes (21): _build_pr_ready_usecase(), Typer, PR lifecycle commands (ready).  Note: merge command has been removed from public, Construct PR ready usecase with command-local dependencies., Resolve ready target PR number from arg or current flow context., Register pr lifecycle commands., register_lifecycle_commands(), _resolve_ready_pr_number() (+13 more)
 
 ### Community 146 - "show"
-Cohesion: 0.11
-Nodes (25): _build_resume_usecase(), intake(), Argument, FormatOption, help, hidden, metavar, Option (+17 more)
+Cohesion: 0.18
+Nodes (16): _build_resume_usecase(), intake(), Argument, FormatOption, help, hidden, metavar, Option (+8 more)
 
 ### Community 147 - "CodeagentResult"
-Cohesion: 0.03
-Nodes (84): CodeagentResult, Result of codeagent execution., load_config_for_role(), Config loading utilities for non-CLI contexts (domain handlers, etc).  These fun, Load runtime config for a role without CLI dependencies.      This is a non-type, handle_manual_plan_intent(), handle_manual_run_intent(), Handle ManualRunIntent event by delegating to execute_manual_run.      Reconstru (+76 more)
+Cohesion: 0.05
+Nodes (40): CodeagentResult, Result of codeagent execution., handle_manual_plan_intent(), handle_manual_run_intent(), Handle ManualRunIntent event by delegating to execute_manual_run.      Reconstru, Handle ManualPlanIntent event by delegating to execute_spec_plan functions., ManualPlanIntent, ManualRunIntent (+32 more)
 
 ### Community 148 - "DispatchLifecycle"
-Cohesion: 0.07
-Nodes (22): DispatchLifecycle, DispatchLifecycleConfig, DispatchState, Dispatch lifecycle FSM for queue sleep/wake cycling.  Two-state finite state mac, Whether tick_id triggers a scheduled full-queue collect.          The coordinato, Two-state FSM for the dispatch queue lifecycle., Configuration for the DispatchLifecycle FSM., Track dispatch queue activity as a two-state FSM.      ACTIVE:   dispatch loop r (+14 more)
+Cohesion: 0.13
+Nodes (10): DispatchLifecycle, Whether tick_id triggers a scheduled full-queue collect.          The coordinato, Track dispatch queue activity as a two-state FSM.      ACTIVE:   dispatch loop r, Consecutive idle ticks (dispatched_count == 0) seen so far., True when the FSM is in SLEEPING state., idle_ticks is the consecutive idle count; keeps growing in SLEEPING., ACTIVE-state behavior: idle counting and sleep transition., SLEEPING-state behavior: wake on dispatch, persist otherwise. (+2 more)
 
 ### Community 149 - "FlowManager"
-Cohesion: 0.05
-Nodes (34): FlowManager, Flow dispatch support for role execution.  This module owns issue->flow orchestr, Upgrade a placeholder (blocked, no branch) flow to a real flow.          Creates, Manage issue-to-flow mapping and flow scene creation for execution., Return the PR number associated with the issue's flow, or None.          Impleme, Find the latest flow for an issue, regardless of active status.          This su, Resolve best flow from pre-fetched list.          Delegates to IssueFlowService., __getattr__() (+26 more)
+Cohesion: 0.03
+Nodes (68): FlowManager, Flow dispatch support for role execution.  This module owns issue->flow orchestr, Upgrade a placeholder (blocked, no branch) flow to a real flow.          Creates, Manage issue-to-flow mapping and flow scene creation for execution., Return the PR number associated with the issue's flow, or None.          Impleme, Find the latest flow for an issue, regardless of active status.          This su, Resolve best flow from pre-fetched list.          Delegates to IssueFlowService., OrchestraConfig (+60 more)
 
 ### Community 150 - "test_provenance.py"
-Cohesion: 0.05
-Nodes (54): Records where a rendered prompt section came from., SectionSourceProvenance, detect_anomalies(), Provenance collection for dry-run prompt rendering., Rough token count: chars / 4., Detect audit anomalies from provenance data., token_estimate(), Section source with only key. (+46 more)
+Cohesion: 0.04
+Nodes (75): Load prompt recipes from the repository config directory., Records where a rendered prompt section came from., SectionSourceProvenance, collect_dry_run_provenance(), detect_anomalies(), Provenance collection for dry-run prompt rendering., Rough token count: chars / 4., Build a PromptRenderProvenance record after rendering completes. (+67 more)
 
 ### Community 151 - "classify_task_issues_for_rendering"
 Cohesion: 0.10
@@ -2048,32 +2026,32 @@ Cohesion: 0.12
 Nodes (21): ChangedFileScope, classify_changed_files(), count_changed_lines(), is_hook_file(), is_test_file(), is_v3_source_file(), is_v3_test_file(), Path (+13 more)
 
 ### Community 154 - "AIClient"
-Cohesion: 0.06
-Nodes (31): AIClient, Any, AI client using litellm for multi-provider support., Client for AI text generation using litellm.      Supports 100+ models: DeepSeek, Initialize AI client.          Args:             api_key: API key for the AI ser, Generate text using AI.          Args:             system_prompt: System prompt, AISuggestionClient, Path (+23 more)
+Cohesion: 0.15
+Nodes (12): AIClient, AI client using litellm for multi-provider support., Client for AI text generation using litellm.      Supports 100+ models: DeepSeek, Initialize AI client.          Args:             api_key: API key for the AI ser, AISuggestionClient, Path, AI suggestion client for higher-level text generation workflows., Higher-level AI text suggestion client built on top of AIClient. (+4 more)
 
 ### Community 155 - "glossary.md"
-Cohesion: 0.07
-Nodes (8): 代码智能与执行 (Agent 模式), Vibe3 State Sync Standard, Deprecated Directory: vibe3-command-standard, 📖 现行真源 (Current Truth), [DEPRECATED] Vibe 3.0 User Guide, V3 推荐操作模型 (Quick Reference), 📖 现行真源 (Current Truth), Roadmap JSON Standard (v3) - 已废弃
+Cohesion: 0.09
+Nodes (4): 代码智能与执行 (Agent 模式), 失败条件, 执行不变性（强制）, 目标
 
 ### Community 156 - "test_github_client_prs.py"
 Cohesion: 0.03
-Nodes (68): ProgressCallback, User input error that can be fixed by adjusting parameters.      These errors ar, UserError, Path, Append a lightweight update block to current.md for a branch.          Args:, Internal helper to record an active handoff reference.          Args:, Record plan handoff reference.          Args:             plan_ref: Plan documen, Record spec handoff reference.          The spec_ref MUST be a canonical reposit (+60 more)
+Nodes (65): CalledProcessError, NoReturn, raise_gh_pr_error(), Normalize gh pr command failure into unified error types., CommentMixin, _generate_ai_review_mention_body(), Any, GitHub client comment operations. (+57 more)
 
 ### Community 157 - "SQLiteSessionRepo"
 Cohesion: 0.16
 Nodes (8): Any, SQLite repository methods for runtime session persistence., Runtime session CRUD operations., List recent terminal runtime sessions for status surfaces., List truly live sessions for a specific worktree path.          Args:, Return subset of target_ids that have terminal-state sessions for role., Return the most recent session for branch+role with a backend_session_id., SQLiteSessionRepo
 
 ### Community 158 - "PRReviewBriefingService"
-Cohesion: 0.18
+Cohesion: 0.19
 Nodes (12): PRReviewBriefingService, Any, Service for publishing an evidence-only PR reviewer briefing., Publish a singleton briefing backed by exact local review evidence., Return evidence only when the PR head is the active worktree., Render Git facts and Review Kernel policy without impact claims., _observation(), _pr() (+4 more)
 
 ### Community 159 - "pr_create.py"
-Cohesion: 0.12
-Nodes (16): _emit_pr_result(), Typer, PR creation commands., Render PR creation result in the requested format., Normalize detached HEAD in CI to PR head branch when available., Register pr create command., register_create_command(), _resolve_branch_for_ai_context() (+8 more)
+Cohesion: 0.29
+Nodes (6): Typer, PR creation commands., Normalize detached HEAD in CI to PR head branch when available., Register pr create command., register_create_command(), _resolve_branch_for_ai_context()
 
 ### Community 160 - "test_public_api_exports.py"
 Cohesion: 0.08
-Nodes (10): get_role_output_contract(), get_role_section(), Centralized role policy mapping for execution roles.  This module provides a sin, Declarative contract for what a role must produce after execution.      Used by, Get the config section for a given role., Return the output contract for a given role name.      Falls back to an empty co, RoleOutputContract, Tests for public API exports across all packages. (+2 more)
+Nodes (11): get_role_output_contract(), get_role_section(), Centralized role policy mapping for execution roles.  This module provides a sin, Declarative contract for what a role must produce after execution.      Used by, Get the config section for a given role., Return the output contract for a given role name.      Falls back to an empty co, RoleOutputContract, Tests for public API exports across all packages. (+3 more)
 
 ### Community 161 - "DispatchQueueCollectionService"
 Cohesion: 0.14
@@ -2081,7 +2059,7 @@ Nodes (11): DispatchQueueCollectionService, _is_executor_shutdown_error(), Runti
 
 ### Community 162 - ".create_issue_worktree"
 Cohesion: 0.09
-Nodes (24): Shared worktree context types., Context for a git worktree resource., WorktreeContext, Create a temporary worktree.          Args:             wt_path: Target path for, Clean up stale worktree references., Create an issue-bound worktree.          Args:             wt_path: Target path, Release an issue worktree (optional, typically kept for flow lifecycle)., Acquire a temporary worktree for L2 supervisor/apply execution.          This cr (+16 more)
+Nodes (24): Shared worktree context types., Context for a git worktree resource., WorktreeContext, Create an issue-bound worktree.          Args:             wt_path: Target path, Release an issue worktree (optional, typically kept for flow lifecycle)., Acquire a temporary worktree for L2 supervisor/apply execution.          This cr, Release a temporary worktree immediately after use.          Temporary worktrees, Shared core: find existing or create new worktree for branch.          Delegates (+16 more)
 
 ### Community 163 - "StateVerificationService"
 Cohesion: 0.15
@@ -2092,28 +2070,28 @@ Cohesion: 0.08
 Nodes (26): PromptValidationResult, PromptValidationService, Any, Path, Prompt recipe validation and sample rendering.  Public API: - ``PromptValidation, Resolve a variable source for sample rendering., A single validation error or warning., Result of validating a template key or rendering a recipe sample. (+18 more)
 
 ### Community 165 - "binding_guard.py"
-Cohesion: 0.15
-Nodes (15): Require current flow to have task bound unless bypassed by --yes., build_bind_task_hint(), build_missing_task_issue_message(), ensure_task_issue_bound(), get_role_block_function(), has_task_issue(), MissingTaskIssueError, Any (+7 more)
+Cohesion: 0.18
+Nodes (14): build_bind_task_hint(), build_missing_task_issue_message(), ensure_task_issue_bound(), get_role_block_function(), has_task_issue(), MissingTaskIssueError, Any, Shared guard and helper utilities for flow execution.  This module combines: - T (+6 more)
 
 ### Community 166 - "CircuitBreaker"
-Cohesion: 0.08
-Nodes (19): CircuitBreaker, Dispatch-level circuit breaker.      Tracks consecutive failures from Dispatcher, Reset to CLOSED on any successful dispatch., Check if dispatch is allowed.          Returns:             True if dispatch sho, Manually reset the circuit breaker to CLOSED state., Get current state as string for serialization., OPEN state should block requests., Business errors should not increment failure count. (+11 more)
+Cohesion: 0.07
+Nodes (20): CircuitBreaker, Dispatch-level circuit breaker.      Tracks consecutive failures from Dispatcher, Reset to CLOSED on any successful dispatch., Check if dispatch is allowed.          Returns:             True if dispatch sho, Manually reset the circuit breaker to CLOSED state., Get current state as string for serialization., Expose last failure timestamp if recorded., OPEN state should block requests. (+12 more)
 
 ### Community 167 - "LocService"
 Cohesion: 0.06
 Nodes (29): PRLocCommentService, Any, Service for publishing LOC summary comments on PRs., Service to handle PR LOC summary comment logic., Initialize PRLocCommentService.          Args:             github_client: GitHub, Publish or update LOC summary comment on a PR.          Args:             pr_num, Find existing LOC comment by sentinel.          Args:             pr_number: PR, Render LOC summary markdown body.          Args:             stats: LOC statisti (+21 more)
 
 ### Community 168 - ".vibe_center"
-Cohesion: 0.14
-Nodes (13): Vibe Center default convention.          Used by the vibe-center profile with ta, Minimal convention for generic repos.          Used by minimal/github-flow profi, Tests for BranchConvention model., Test dev branch generation for Vibe Center convention., Test issue number parsing for Vibe Center convention., Test minimal convention for generic repos., Test that convention is immutable (frozen dataclass)., Test canonical branch generation for Vibe Center convention. (+5 more)
+Cohesion: 0.13
+Nodes (17): AutoSceneRecoveryService, Path, Auto-scene recovery for damaged task/issue-* worktrees., Return the active branch name, or HEAD for detached worktrees., Best-effort recovery for damaged auto task scenes., Recover damaged task/issue-* scenes when no live session owns the branch., _read_worktree_head(), Path (+9 more)
 
 ### Community 169 - "CommandType"
 Cohesion: 0.04
-Nodes (45): Check if a job type is registered.          Args:             job_type: The job, CommandType, JobContext, JobResult, Job execution contracts for the vibe3 command dispatch system.  This module defi, Runtime context populated when a job begins execution.      Captures the tmux/se, Outcome of a job execution.      Not frozen — downstream may update status incre, Canonical vibe3 command verbs that the job system dispatches.      Maps to the s (+37 more)
+Nodes (47): ValidationError, Check if a job type is registered.          Args:             job_type: The job, Map ExecutionLaunchResult to CommandResult.          Args:             result: T, CommandType, JobContext, JobResult, Job execution contracts for the vibe3 command dispatch system.  This module defi, Runtime context populated when a job begins execution.      Captures the tmux/se (+39 more)
 
 ### Community 170 - "OrchestrationFacade"
-Cohesion: 0.08
-Nodes (17): OrchestrationFacade, Orchestration facade - unified entry point for runtime observations.  将 runtime, Cleanup resources owned by the facade., Get the internal dispatch coordinator for pool exhaustion checks., Get issue numbers currently in the dispatch queue., Heartbeat polling -> 发布 GovernanceScanStarted 事件.          由 runtime heartbeat 定, Governance 发现需要决策的 issue -> 直接 post GitHub comment.          Args:             i, 扫描 supervisor candidates 并发布 SupervisorIssueIdentified 事件.          查找带有 supervi (+9 more)
+Cohesion: 0.05
+Nodes (25): ABC, OrchestrationFacade, Orchestration facade - unified entry point for runtime observations.  将 runtime, Cleanup resources owned by the facade., Get the internal dispatch coordinator for pool exhaustion checks., Get issue numbers currently in the dispatch queue., Heartbeat polling -> 发布 GovernanceScanStarted 事件.          由 runtime heartbeat 定, Governance 发现需要决策的 issue -> 直接 post GitHub comment.          Args:             i (+17 more)
 
 ### Community 171 - "_HasConnection"
 Cohesion: 0.17
@@ -2128,12 +2106,12 @@ Cohesion: 0.06
 Nodes (39): evaluate_rules(), EventRule, expand_template(), load_rules(), Path, Event routing rule engine.  Loads declarative event→action rules from YAML and e, Evaluate all matching rules for an event and execute their actions.      Args:, Resolve branch name from params or use convention.      Args:         params: Ac (+31 more)
 
 ### Community 174 - "VersionService"
-Cohesion: 0.07
-Nodes (35): Path, Version service implementation., Initialize version service.          Args:             version_file: Path to VER, Get current version from VERSION file.          Returns:             Current ver, Calculate version bump based on task group.          Args:             group: Ta, Service for version management., Calculate next version based on bump type.          Args:             current: C, VersionService (+27 more)
+Cohesion: 0.06
+Nodes (37): Response model for version bump., VersionBumpResponse, Path, Version service implementation., Initialize version service.          Args:             version_file: Path to VER, Get current version from VERSION file.          Returns:             Current ver, Calculate version bump based on task group.          Args:             group: Ta, Service for version management. (+29 more)
 
 ### Community 175 - "builtin_providers.py"
-Cohesion: 0.33
-Nodes (6): Path, Tests for built-in prompt variable providers., Relative mechanism skills resolve independently of Git management root., Missing optional skills retain None but expose the attempted location., test_missing_optional_skill_logs_actionable_warning(), test_relative_skill_uses_runtime_asset_resolution()
+Cohesion: 0.28
+Nodes (8): Resolve skill SKILL.md content through profile.      Args:         skill_name: S, resolve_skill_content(), Path, Tests for built-in prompt variable providers., Relative mechanism skills resolve independently of Git management root., Missing optional skills retain None but expose the attempted location., test_missing_optional_skill_logs_actionable_warning(), test_relative_skill_uses_runtime_asset_resolution()
 
 ### Community 176 - "sections.py"
 Cohesion: 0.04
@@ -2148,8 +2126,8 @@ Cohesion: 0.12
 Nodes (20): analyze_file(), analyze_python_file(), analyze_shell_file(), collect_python_file_structures(), FileStructure, FunctionInfo, Structure service - 分析文件结构, 自动检测语言并分析文件结构.      Args:         file_path: 文件路径      Returns:         文件结构信息 (+12 more)
 
 ### Community 179 - "BackendProtocol"
-Cohesion: 0.11
-Nodes (21): PRMixin, GitHub client PR operations (re-export module).  This module provides backward c, Composite mixin for all PR operations.      Combines read and write operations f, _build_failure_command(), _classify_failed_job(), _classify_failed_step_name(), _enrich_failed_check(), _extract_actions_run_details() (+13 more)
+Cohesion: 0.13
+Nodes (13): PlanSpecInput, Resolve spec planning input from an explicit value or flow spec_ref.      Priori, resolve_spec_plan_input(), Tests for resolve_spec_plan_input using flow's spec_ref as default., Explicit --file should work normally., When no --file or --msg, use flow.spec_ref (file type)., When no --file or --msg, use flow.spec_ref (issue type)., A read-only issue override must supply its own planning content. (+5 more)
 
 ### Community 180 - "PRCommentPort"
 Cohesion: 0.08
@@ -2160,32 +2138,32 @@ Cohesion: 0.04
 Nodes (55): _client(), github_client(), Tests for GitHub client - Issues., Create GitHub client fixture., Issue already closed should return 'already_closed' without calling close., Open issue should call close_issue once and return 'closed'., Failed close operation should return 'failed'., view_issue should use custom fields when provided. (+47 more)
 
 ### Community 182 - "SerenaClient"
-Cohesion: 0.22
-Nodes (8): Any, Narrow wrapper around the two Serena tools inspect symbols needs., Execute one Serena tool without contaminating structured stdout., Find a symbol definition constrained to one source file., Find static referencing symbols for an exact definition identity., SerenaClient, Serena code analysis error., SerenaError
+Cohesion: 0.11
+Nodes (13): issue_priority(), Sort orchestration issues by operational urgency., Unit tests for StatusQueryService utility functions., Tests for issue priority sorting., IN_PROGRESS should sort before all other states., READY should sort before BLOCKED., BLOCKED should have lower priority than IN_PROGRESS and READY., Tests for branch name classification helpers. (+5 more)
 
 ### Community 183 - "ConventionResolver"
-Cohesion: 0.09
-Nodes (23): diagnose_profile(), get_convention(), get_resolver(), ConventionResolver service for centralized convention lookup.  This module provi, Get current profile name for diagnostic context.      Returns:         Profile n, Return cached ProfileConvention for the current repo.      Safe to call repeated, Return cached ConventionResolver for the current repo.      Use when you need re, get_handoff_state_label() (+15 more)
+Cohesion: 0.12
+Nodes (11): Tests for AIClient class., Test generation with extra parameters., Install a fake litellm module for deterministic tests., Test initialization with valid config., Test initialization with missing API key returns None., Test initialization with custom base URL., Test successful text generation., Test generation with no API key returns None. (+3 more)
 
 ### Community 184 - "ProfileConfig"
-Cohesion: 0.19
-Nodes (8): ProfileConfig, Profile-based resource resolution.  Connects profile selection to adapter resour, Get path to a workflow.          Args:             name: Workflow name, Configuration for a specific profile's resource resolution.      Maps profile na, Get adapter for current profile.          Returns:             Adapter manifest, Get path to a policy file.          Args:             name: Policy name (e.g., ', Get path to a skill SKILL.md.          Args:             name: Skill name (e.g.,, Get path to a supervisor template.          Args:             name: Template nam
+Cohesion: 0.11
+Nodes (18): Authority, Governance LLM 引导, Implementation Notes, Issue States (state/*), Label Semantics, Legacy Priority Labels, Priority Scale (priority/[0-9]), Roadmap Scale (roadmap/p0-p2) (+10 more)
 
 ### Community 185 - "ProfileConvention"
-Cohesion: 0.06
-Nodes (36): LabelsConvention, ProfileConvention, Profile-based conventions that replace repo-bound defaults., Vibe Center opinionated defaults., Return full state label with prefix.          Args:             state: State nam, Return LabelsConvention grouping all label-related fields.          Returns:, Minimal defaults for portable/minimal profile., Vibe Center opinionated defaults. (+28 more)
+Cohesion: 0.04
+Nodes (59): LabelsConvention, ProfileConvention, Profile-based conventions that replace repo-bound defaults., Vibe Center opinionated defaults., Return full state label with prefix.          Args:             state: State nam, Return LabelsConvention grouping all label-related fields.          Returns:, Minimal defaults for portable/minimal profile., Vibe Center opinionated defaults. (+51 more)
 
 ### Community 186 - "FailedGate"
-Cohesion: 0.11
-Nodes (25): Path, Tests for prompt recipe manifests., Verify KeyError when variant key is not found., Verify KeyError with full context when provider is missing., Verify error message includes recipe, variant, and available providers., Verify section_recipe can have section-level source declarations., Verify template_recipe kind with variables mapping., Regression test: kind:file sources pass through --prompt-file, not stdin.      A (+17 more)
+Cohesion: 0.07
+Nodes (23): FailedGate, FailedGate: global freeze signal based on persistent error tracking.  Migrated f, Check global error thresholds.          Rules:         - CRITICAL severity → imm, Activate failed gate.          Args:             reason: Reason for activation, Orchestra failed state gate.      State machine:     - OPEN: normal operation, c, Clear failed gate (manual resume).          Args:             cleared_by: Who cl, Increment blocked_ticks counter (called each tick when ACTIVE)., Initialize FailedGate with SQLite persistence.          Args:             store: (+15 more)
 
 ### Community 187 - "test_spec_kit_bridge.py"
-Cohesion: 0.09
-Nodes (11): 执行 git 命令，统一错误处理.          Args:             args: git 子命令及参数列表             cwd:, Get commit subjects between base and head refs., Get the URL of a git remote.          Args:             name: Remote name (defau, Get merge-base commit between two branches., Resolve a revision to an exact object ID in this client's worktree., Return name-status and numstat for one exact Git diff partition., Push branch to remote.          Args:             branch_name: Branch to push, Pack all loose refs into packed-refs for consistency. (+3 more)
+Cohesion: 0.05
+Nodes (50): _adapter_code_lines(), bridge_env(), _load_extension_yml(), Path, T050: spec-kit bridge extension — metadata + fixture hook behavior (US3).  Spec, Each lifecycle hook maps to the publish command for its artifact kind     (spec, spec-kit namespace rule: every command is prefixed ``speckit.<id>.*``., after_specify/after_plan are ADDITIVE — superspec only declares     after_tasks/ (+42 more)
 
 ### Community 188 - "ServiceBase"
-Cohesion: 0.08
-Nodes (16): ABC, Register a service to receive events and tick callbacks., CheckServiceProtocol, Runtime service protocols.  Canonical home for ServiceBase and CheckServiceProto, Abstract protocol for runtime services observed by HeartbeatServer., Human-readable service name for orchestration logs., Whether this service initiates automated flow/task actions., Called on each heartbeat tick. (+8 more)
+Cohesion: 0.14
+Nodes (8): CheckServiceProtocol, Protocol for health check service operations., Verify current branch flow consistency., Verify branch flow consistency.          Args:             branch: Branch name t, Run consistency checks for flows in the store., Invalidate PR cache to force refresh on next check., Remove orchestra-scanned label from issues with assignee.          Returns:, Scan remote open issues for label constraint violations and auto-fix.          R
 
 ### Community 189 - "select_pre_push_tests"
 Cohesion: 0.13
@@ -2196,8 +2174,8 @@ Cohesion: 0.08
 Nodes (18): GitHubClientBase, GitHub client base functionality., Get current authenticated user login name., Extract PR number from URL., Base class for GitHub client operations.      Token Management:         This cla, Check if authenticated to GitHub.          Strategy:         1. If GH_TOKEN is s, Tests for GitHub client base functionality., Tests for _run_gh_command helper method. (+10 more)
 
 ### Community 191 - "ReviewMixin"
-Cohesion: 0.06
-Nodes (32): CommentMixin, _generate_ai_review_mention_body(), Any, GitHub client comment operations., Update an existing PR comment via GitHub API., Generate mention comment body for AI review requests.      Format:     @codex, Request AI review by posting mention comment.          Args:             pr_numb, Mixin for GitHub issue/PR comment operations. (+24 more)
+Cohesion: 0.14
+Nodes (8): DispatchLifecycleConfig, Configuration for the DispatchLifecycle FSM., Unit tests for the DispatchLifecycle FSM (issue #3220 Phase 1)., Scheduled full-collect tick gate., Pydantic validation on config fields., TestColdStart, TestConfigValidation, TestShouldCollect
 
 ### Community 192 - "resolve_runtime_asset"
 Cohesion: 0.10
@@ -2212,8 +2190,8 @@ Cohesion: 0.18
 Nodes (8): Path, PR-based worktree creation mixin for WorktreeManager.  Extracted from worktree.p, Check if a local branch exists (regardless of worktree registration).          A, Create worktree from PR head branch.          Attempts to fetch PR head branch a, Mixin for PR-based worktree creation functionality.      Provides methods to cre, Find the source PR number from dependency wake-up event history.          Args:, Fetch PR head branch and verify it's accessible.          Args:             pr_n, WorktreePRMixin
 
 ### Community 195 - "0006-spec-artifact-handoff-contract.md"
-Cohesion: 0.05
-Nodes (30): Consequences, Context, Decision, How, Spec Artifact 与 Handoff 统一契约, Specification Quality Checklist: Role Protocol Baseline, Feature Specification: Role Protocol Baseline, Key implementation PRs (+22 more)
+Cohesion: 0.04
+Nodes (46): Consequences, Context, Decision, How, Spec Artifact 与 Handoff 统一契约, Specification Quality Checklist: Flow Lifecycle Baseline, Feature Specification: Flow Lifecycle Baseline, Key implementation PRs (+38 more)
 
 ### Community 196 - "TestAuditObservation"
 Cohesion: 0.06
@@ -2229,19 +2207,19 @@ Nodes (8): ConstraintViolation, LabelConstraint, _labels_in_group(), _matches_gr
 
 ### Community 199 - "BaseResolutionUsecase"
 Cohesion: 0.05
-Nodes (50): build_base_resolution_usecase(), Construct shared base resolver for PR/review commands., BaseResolutionUsecase, Unify command-layer base-branch resolution semantics., Resolve base branch for PR creation while preserving current default., Tests for shared base resolution usecase., When auto-detected parent is not merged, should use it as base., creation_source should take precedence over dynamic parent detection. (+42 more)
+Nodes (51): GitClientProtocol, build_base_resolution_usecase(), Construct shared base resolver for PR/review commands., BaseResolutionUsecase, Unify command-layer base-branch resolution semantics., Resolve base branch for PR creation while preserving current default., Tests for shared base resolution usecase., When auto-detected parent is not merged, should use it as base. (+43 more)
 
 ### Community 200 - "dispatch_governance_execution"
-Cohesion: 0.08
-Nodes (19): Sync execution runner for governance scan.  Provides sync execution with ErrorTr, Run governance scan synchronously with error tracking.      This function is cal, run_governance_sync(), build_default_governance_fns(), Factory function for governance functions bundle., Build default GovernanceFunctions implementation.      Returns an object that im, dispatch_governance_execution(), Execute governance scan (execution-only entry point).      Entry point for inter (+11 more)
+Cohesion: 0.14
+Nodes (11): collect_prompt_refs(), Shared prompt routing metadata for role sync execution., Collect authoritative refs from flow state., Tests for collect_prompt_refs function., None flow_state should return empty dict., Empty flow_state should return empty dict., Should collect only keys that exist in flow_state., Should skip keys not in flow_state. (+3 more)
 
 ### Community 201 - "blocked"
 Cohesion: 0.24
 Nodes (11): blocked(), Argument, help, Option, Typer, Flow lifecycle commands - blocked., Hard rebuild an issue flow scene.      This deletes the old task flow/worktree/b, Register flow lifecycle commands. (+3 more)
 
 ### Community 202 - "clean_error_message"
-Cohesion: 0.07
-Nodes (22): clean_error_message(), Shared error message cleaning utilities.  Provides precompiled regex patterns an, Remove common noise patterns from error messages.      Applies three cleaning st, Tests for error_message_cleaner utility., Test cases for clean_error_message function., clean_error_message matches inline re.sub for trailing pipe., CLAUDE_CODE_TMPDIR and everything after is removed., TMPDIR preceded by pipe and space is handled. (+14 more)
+Cohesion: 0.10
+Nodes (16): clean_error_message(), Shared error message cleaning utilities.  Provides precompiled regex patterns an, Remove common noise patterns from error messages.      Applies three cleaning st, Test cases for clean_error_message function., CLAUDE_CODE_TMPDIR and everything after is removed., TMPDIR preceded by pipe and space is handled., === Recent Errors ===' suffix is removed., Trailing pipe separator is removed. (+8 more)
 
 ### Community 203 - "RoleCliOverrides"
 Cohesion: 0.08
@@ -2252,8 +2230,8 @@ Cohesion: 0.06
 Nodes (52): _make_mock_flow(), mock_plan_deps(), mock_review_deps(), mock_run_deps(), MonkeyPatch, Path, Unified tests for command parameter behavior.  Tests --branch default resolution, Silence review command baseline dependencies. (+44 more)
 
 ### Community 205 - "ReviewRunResult"
-Cohesion: 0.04
-Nodes (54): get_pending_result(), handle_manual_review_intent(), Any, Event handlers for CLI manual dispatch intents.  Handlers bridge CLI commands to, Handle ManualReviewIntent event by delegating to review execution functions., Retrieve and clear a pending result stored by a handler., Resolve backend/model/tmux/log for ReviewRunResult.      Priority: event (CLI ov, _resolve_review_metadata() (+46 more)
+Cohesion: 0.06
+Nodes (42): get_pending_result(), handle_manual_review_intent(), Any, Event handlers for CLI manual dispatch intents.  Handlers bridge CLI commands to, Handle ManualReviewIntent event by delegating to review execution functions., Retrieve and clear a pending result stored by a handler., Resolve backend/model/tmux/log for ReviewRunResult.      Priority: event (CLI ov, _resolve_review_metadata() (+34 more)
 
 ### Community 206 - "tsu.sh"
 Cohesion: 0.11
@@ -2264,8 +2242,8 @@ Cohesion: 0.07
 Nodes (34): AuditDecision, Audit decision data model for the final decision layer.  This module defines the, Generate unique decision ID., Factory method to create decision with auto-generated ID., Format the decision as a GitHub issue title., Format the decision as a GitHub issue body.          Args:             evidence_, Structured decision record for audit feedback loop.      Decisions are the final, Unit tests for AuditDecision model. (+26 more)
 
 ### Community 208 - "extract_material_description"
-Cohesion: 0.07
-Nodes (24): extract_material_description(), fetch_supervisor_candidates(), get_available_governance_materials(), governance_material_exists(), list_governance_materials(), Any, Path, Scan service functions - governance material scanning and dispatch.  Moved from (+16 more)
+Cohesion: 0.05
+Nodes (41): extract_material_description(), fetch_supervisor_candidates(), get_available_governance_materials(), governance_material_exists(), list_governance_materials(), Any, Path, Scan service functions - governance material scanning and dispatch.  Moved from (+33 more)
 
 ### Community 209 - "is_queue_dirty"
 Cohesion: 0.13
@@ -2284,36 +2262,36 @@ Cohesion: 0.20
 Nodes (9): Exception, FieldSource, Any, Task Bridge 数据模型。  本模块定义本地 execution bridge 对象与合并视图对象。  字段分类： - Bridge 字段：本地允许持久, 尝试向本地存储写入 truth 字段时抛出。, 本地 execution bridge 对象。      bridge 字段：本地允许持久化的最小字段集合。     truth 字段：只能从 GitHub P, 检查写入字段中是否包含 truth 字段，若有则抛出异常。          Args:             fields: 准备写入本地存储的字段字典, TaskBridgeModel (+1 more)
 
 ### Community 213 - "get_store"
-Cohesion: 0.11
-Nodes (18): handle_planner_dispatch_intent(), Handle PlannerDispatchIntent event via role request builder., PlannerDispatchIntent, Authoritative signal that planner should be dispatched for an issue., _make_mock_request(), _make_mock_request(), Tests for dispatch not launched scenario.  Verifies that when coordinator does n, Create a minimal ExecutionRequest for testing. (+10 more)
+Cohesion: 0.06
+Nodes (33): _RequestBuilder, get_store(), SQLiteClient context manager for dependency injection., Provide SQLiteClient instance with automatic cleanup.      Yields:         SQLit, _dispatch_role_intent(), handle_executor_dispatch_intent(), handle_planner_dispatch_intent(), handle_reviewer_dispatch_intent() (+25 more)
 
 ### Community 214 - "AgentResult"
-Cohesion: 0.10
-Nodes (13): AgentBackend, Path, 运行 agent。          Args:             prompt: 输入给 agent 的指令或提示词。             opti, AgentResult, Models for agent execution (used by plan/run/review commands)., Result from running a review agent.      Attributes:         exit_code: The exit, Check if the agent run was successful., Verify OpenCode backend completes cleanly without plugin-related errors. (+5 more)
+Cohesion: 0.13
+Nodes (11): Path, 运行 agent。          Args:             prompt: 输入给 agent 的指令或提示词。             opti, AgentResult, Models for agent execution (used by plan/run/review commands)., Result from running a review agent.      Attributes:         exit_code: The exit, Check if the agent run was successful., Tests for AgentResult dataclass., is_success should return True for exit_code 0. (+3 more)
 
 ### Community 215 - "AdapterManifest"
-Cohesion: 0.04
-Nodes (68): AdapterManifest, AdapterResource, Adapter manifest model for declaring distribution resources., Manifest declaring what an adapter provides.      An adapter is a distribution o, Build resource index for O(1) lookup after validation., Get all resources of a specific type.          Args:             resource_type:, Get a specific resource by type and name.          Args:             resource_ty, Ensure resources have unique type+name combinations. (+60 more)
+Cohesion: 0.06
+Nodes (43): AdapterManifest, AdapterResource, Adapter manifest model for declaring distribution resources., Manifest declaring what an adapter provides.      An adapter is a distribution o, Build resource index for O(1) lookup after validation., Get all resources of a specific type.          Args:             resource_type:, Get a specific resource by type and name.          Args:             resource_ty, Ensure resources have unique type+name combinations. (+35 more)
 
 ### Community 216 - "apply_env_overrides"
 Cohesion: 0.07
 Nodes (28): apply_env_overrides(), EnvOverrideRule, get_env_override(), Any, Unified environment variable override framework.  This module provides a central, Set a value in a nested dictionary using dot-separated path.      Args:, Apply environment variable overrides to configuration dictionary.      Returns a, Get environment variable value with type conversion.      Convenience function f (+20 more)
 
 ### Community 217 - "Protocol"
-Cohesion: 0.05
-Nodes (29): Protocol, ConfigLoaderProtocol, GitClientProtocol, Infrastructure layer protocol interfaces to break circular dependencies., Protocol for git operations to break config → clients dependency., Find repository root directory., Get current git branch name., Protocol for config loading to break utils → config dependency. (+21 more)
+Cohesion: 0.06
+Nodes (25): Protocol, AgentBackend, ConfigLoaderProtocol, GitClientProtocol, Infrastructure layer protocol interfaces to break circular dependencies., Protocol for git operations to break config → clients dependency., Find repository root directory., Get current git branch name. (+17 more)
 
 ### Community 218 - "OrchestraSnapshot"
 Cohesion: 0.05
-Nodes (37): Expose last failure timestamp if recorded., Get current orchestra snapshot., format_issue_runtime_line(), format_issue_summary_line(), is_running_issue(), OrchestraSnapshot, OrchestraStatusService, OrchestraStatusService: aggregate read-only status for orchestra system. (+29 more)
+Nodes (48): Get current orchestra snapshot., OrchestraSnapshot, Frozen snapshot of Orchestra system state., Path, Tests for status command configuration display enhancements., Configuration output should show debug mode status., vibe status should show both Orchestra Status and Vibe3 Configuration., keys.env should still fill MANAGER_USERNAMES when another key is set. (+40 more)
 
 ### Community 219 - "AuditLogger"
 Cohesion: 0.20
 Nodes (8): AuditEntry, AuditLogger, Any, Audit logging for Vibe 3.0.  This module provides audit logging capabilities for, A single audit log entry.      Attributes:         timestamp: When the action oc, Audit logger for recording compliance-relevant events.      Status: RESERVED - N, Initialize audit logger.          Note: Currently a placeholder. Future implemen, Record an auditable action.          Args:             action: Action name
 
 ### Community 220 - ".render"
-Cohesion: 0.13
-Nodes (11): DispatchQueueMaintenanceService, CheckServiceProtocol, Frozen-queue maintenance service for GlobalDispatchCoordinator.  Extracted from, Promote state-changed entries to front; remove terminal entries.          Return, Re-sort existing queue entries without full collection.          Lightweight que, Run scheduled full queue refresh if tick matches interval.          Returns:, Check paused state and re-qualify blocked entries.          Returns:, Rebuild queue when actionable candidates are exhausted after dispatch. (+3 more)
+Cohesion: 0.14
+Nodes (11): Sort ready queue issues by queue ordering rules.      Sort order (primary to sec, sort_ready_issues(), Tests for sorting ready queue issues., Test priority/9 issue sorts before priority/7 in same milestone., Test roadmap/p0 sorts before roadmap/p1 in same milestone., Test milestone v0.1 sorts before v0.3., Test issue without priority label defaults to 0., Test issue without roadmap sorts after roadmap-labeled in same milestone. (+3 more)
 
 ### Community 221 - "load_prompt_templates"
 Cohesion: 0.11
@@ -2324,8 +2302,8 @@ Cohesion: 0.05
 Nodes (46): infer_resume_label(), FlowState, Flow resume resolver service.  Provides pure logic to infer the correct GitHub s, Infer the correct state label a flow should return to.      Used by:     1. Qual, blocks_merge(), passes_review(), VerdictValue, Central verdict policy for review and merge behavior. (+38 more)
 
 ### Community 223 - "TransitionRecorder"
-Cohesion: 0.14
-Nodes (13): Confirmed state transition persistence and loop budget queries., Counts produced by persisting one real state transition., Persist confirmed transitions without selecting business targets., Return whether one more code-owned transition would exceed a limit., Atomically record one already-confirmed state transition., TransitionRecorder, TransitionRecordResult, Tests for confirmed transition accounting and loop budgets. (+5 more)
+Cohesion: 0.11
+Nodes (10): Test PR source raises error when get_merge_base not provided., Test PR source raises error when get_pr returns None., Test get_numstat function., Test uncommitted source uses 'git diff --numstat HEAD'., Test commit source uses 'git diff --numstat sha^ sha'., Test branch source uses merge-base correctly., Test branch source raises error when get_merge_base not provided., Test PR source uses github_client.get_pr for ref resolution. (+2 more)
 
 ### Community 224 - "TaskQueryProtocol"
 Cohesion: 0.18
@@ -2336,20 +2314,20 @@ Cohesion: 0.18
 Nodes (15): RuntimeError, _has_marker(), Path, Resource-root resolution helpers for adapter-managed files., Raised when adapter resources cannot be resolved from a valid root., Resolve a repo/resource root that contains the required marker.      Git common, resolve_resource_root(), ResourceRootNotFoundError (+7 more)
 
 ### Community 226 - "TriggerableRoleDefinitionProtocol"
-Cohesion: 0.13
-Nodes (17): AutoSceneRecoveryService, Path, Auto-scene recovery for damaged task/issue-* worktrees., Return the active branch name, or HEAD for detached worktrees., Best-effort recovery for damaged auto task scenes., Recover damaged task/issue-* scenes when no live session owns the branch., _read_worktree_head(), Path (+9 more)
+Cohesion: 0.11
+Nodes (16): mock_config(), mock_flow_manager(), mock_github(), mock_store(), qualify_gate_service(), Tests for remote-first coordination in QualifyGateService., Create a mock orchestra config., Create a mock GitHub client. (+8 more)
 
 ### Community 227 - "GovernanceScanStarted"
-Cohesion: 0.06
-Nodes (30): Base class for all domain events.  Re-exported from models layer to break L3 cir, GovernanceScanStarted, Governance domain events.  Events for governance service lifecycle and periodic, Governance scan started event.      Published when periodic governance scan begi, GovernanceScanDependencies, handle_governance_scan_started(), Governance scan domain event handler.  Subscribes to GovernanceScanStarted and d, Resolve effective backend and model for governance execution.      Priority: (+22 more)
+Cohesion: 0.04
+Nodes (58): _display_execution_results(), _display_supervisor_candidates(), _publish_and_wait_governance_event(), _publish_and_wait_supervisor_events(), Any, Scan command: standalone governance/supervisor scans without HeartbeatServer., Display supervisor candidates with status., Display execution dispatch results. (+50 more)
 
 ### Community 228 - "build_supervisor_handoff_payload"
-Cohesion: 0.10
-Nodes (23): build_supervisor_apply_request(), build_supervisor_cli_request(), build_supervisor_cli_sync_request(), build_supervisor_handoff_payload(), Any, Path, Supervisor role definitions and request builders., Build the supervisor apply execution request.      The temporary worktree is acq (+15 more)
+Cohesion: 0.06
+Nodes (42): Configuration for supervisor handoff issue consumption., SupervisorHandoffConfig, build_supervisor_apply_request(), build_supervisor_cli_request(), build_supervisor_cli_sync_request(), build_supervisor_handoff_payload(), build_supervisor_task_string(), Any (+34 more)
 
 ### Community 229 - "domain_types.py"
-Cohesion: 0.25
-Nodes (7): Get full gate status for display.          Returns:             GateStatus datac, GateStatus, Full status of FailedGate for display., Test that serve resume clears error_log even when gate is already OPEN.      Thi, Test that serve resume clears gate when it is ACTIVE., test_resume_clears_errors_even_when_gate_is_open(), test_resume_clears_gate_when_active()
+Cohesion: 0.08
+Nodes (18): DispatchCoordinatorProtocol, FlowManagerProtocol, IssueCollectionServiceProtocol, LabelServiceProtocol, QualifyGateServiceProtocol, Domain types and protocols for the KERNEL layer.  This module is the canonical h, Protocol for flow manager operations (external consumer interface).      This pr, Find the latest flow for an issue. (+10 more)
 
 ### Community 230 - "load_governance_material_catalog"
 Cohesion: 0.09
@@ -2361,43 +2339,43 @@ Nodes (13): Read blocked state from issue body projection., Read blocked state f
 
 ### Community 233 - ".is_dependency_resolved"
 Cohesion: 0.08
-Nodes (22): DependencyResolution, DependencyResolutionService, Centralized dependency resolution service.  This module provides a single source, Result of checking whether a dependency issue is resolved., Service for checking dependency issue resolution status., Check if a dependency issue is resolved.          Resolution logic:         1. I, Unit tests for DependencyResolutionService., Dependency is not resolved when merged PR check raises exception. (+14 more)
+Nodes (20): DependencyResolutionService, Centralized dependency resolution service.  This module provides a single source, Service for checking dependency issue resolution status., Check if a dependency issue is resolved.          Resolution logic:         1. I, Unit tests for DependencyResolutionService., Dependency is not resolved when merged PR check raises exception., Tests for DependencyResolution dataclass., DependencyResolution is immutable (frozen). (+12 more)
 
 ### Community 234 - "render_task_show"
-Cohesion: 0.11
-Nodes (12): _is_protected_worktree(), datetime, Path, Expired resource cleanup service - handles cleanup of old worktrees and branches, Clean expired remote non-protected branches older than max_age_days.          Sa, Return True when the worktree's directory name is reserved.      A worktree is c, Clean local branches that have no active/blocked flow record.          The safet, Return branches tracked by a live flow record (status active/blocked). (+4 more)
+Cohesion: 0.24
+Nodes (9): build_task_show_payload(), _get_yaml(), ModuleType, Lazy import yaml to avoid unconditional import cost., Render issue body and last N comments with human/agent labels.      Args:, Build a single JSON payload for task show., Render task show output.      Args:         task_result: Task show query result, render_task_comments() (+1 more)
 
 ### Community 235 - "TestProtocolImports"
-Cohesion: 0.06
-Nodes (18): BaseResolver, BaseResolver — Protocol for base branch resolution.  Import paths:     # Recomme, Protocol for base branch resolution., Protocol for TriggerableRoleDefinition used by services layer.  Moved from domai, Protocol for TriggerableRoleDefinition used by services.label_utils., Trigger name for this role (e.g., 'manager', 'plan', 'run')., Issue state that triggers this role (e.g., IssueState.READY)., TriggerableRoleDefinitionProtocol (+10 more)
+Cohesion: 0.09
+Nodes (12): BaseResolver, BaseResolver — Protocol for base branch resolution.  Import paths:     # Recomme, Protocol for base branch resolution., Test that every exported symbol is importable from its explicit source module., Test BaseResolver is a Protocol., Test TriggerableRoleDefinitionProtocol is importable from role.py., Test BackendProtocol is importable from backend.py., Test FlowReader and FlowStatePort are importable from flow.py. (+4 more)
 
 ### Community 236 - "build_prompt_file_content"
 Cohesion: 0.11
 Nodes (13): build_prompt_file_content(), get_vibe_config(), prepare_prompt_file(), Path, Config-dependent prompt helpers for Codeagent backend.  Extracted from vibe3.uti, Get VibeConfig with delayed import., Apply configured global notice to the prompt file content., Create temporary prompt file with global notice.      Returns:         tuple of (+5 more)
 
 ### Community 237 - "DiffSummary"
-Cohesion: 0.09
-Nodes (21): DiffSummary, DiffSummary model for change summaries (git-only, no snapshot dependency)., Summary of file-level changes from git diff.      Fields retained from the retir, PRCreateUsecase, Coordinate PR creation: AI suggestions, title resolution, flow checks., Return final PR title, prompting if needed., _format_diff_summary(), Render DiffSummary as a Markdown table.      Only files and LOC are shown — modu (+13 more)
+Cohesion: 0.12
+Nodes (16): DiffSummary, DiffSummary model for change summaries (git-only, no snapshot dependency)., Summary of file-level changes from git diff.      Fields retained from the retir, _format_diff_summary(), Render DiffSummary as a Markdown table.      Only files and LOC are shown — modu, Tests for DiffSummary model., Test that DiffSummary initializes with zero defaults., Test adding empty summary to a non-empty one. (+8 more)
 
 ### Community 238 - "find_latest_prepush_report"
 Cohesion: 0.17
 Nodes (14): find_latest_prepush_report(), LocalReviewReport, parse_prepush_report(), Any, Discover local review verdict evidence without risk-score inference., A local review verdict and its source artifact., Return the newest pre-push review artifact by modification time., Extract only explicit verdict and created-at evidence. (+6 more)
 
 ### Community 239 - ".create"
-Cohesion: 0.05
-Nodes (54): file_age_days(), find_audit_files(), git_common_dir(), main(), parse_yaml_file(), parse_yaml_frontmatter(), print_results(), prune_files() (+46 more)
+Cohesion: 0.08
+Nodes (30): AuditSuggestion, Any, Audit suggestion data model for structured improvement suggestions.  This module, Factory method to create suggestion with auto-generated IDs., Structured suggestion record for audit improvements.      Suggestions are derive, Generate unique suggestion ID., Tests for AuditSuggestion model., Test factory method produces valid model. (+22 more)
 
 ### Community 240 - "display_material_list"
 Cohesion: 0.10
 Nodes (17): PromptMaterialSpec, A material specification for catalog rotation., display_material_list(), display_supervisor_dry_run(), Console, UI display functions for scan command.  Result display helpers have moved to vib, Display supervisor scan dry-run candidate information.      Note: Prompt Composi, Display list of available governance materials.      Args:         console: Rich (+9 more)
 
 ### Community 241 - ".block_flow"
-Cohesion: 0.11
-Nodes (18): Authority, Governance LLM 引导, Implementation Notes, Issue States (state/*), Label Semantics, Legacy Priority Labels, Priority Scale (priority/[0-9]), Roadmap Scale (roadmap/p0-p2) (+10 more)
+Cohesion: 0.25
+Nodes (6): FlowLifecycleMixin, Self, Flow block/abort operations mixin., Mark flow as aborted (abandoned).          Args:             branch: Branch name, Mixin providing flow lifecycle operations., Mark flow as blocked.          Sets flow_status="blocked" and writes blocked_rea
 
 ### Community 243 - "validate_authoritative_ref"
-Cohesion: 0.14
-Nodes (11): collect_prompt_refs(), Shared prompt routing metadata for role sync execution., Collect authoritative refs from flow state., Tests for collect_prompt_refs function., None flow_state should return empty dict., Empty flow_state should return empty dict., Should collect only keys that exist in flow_state., Should skip keys not in flow_state. (+3 more)
+Cohesion: 0.16
+Nodes (15): PrQueryTarget, Resolved PR query target from explicit args or current flow., Resolve explicit target or infer PR number from branch/issue.      Resolution or, _resolve_pr_target(), Tests for pr_query command with --branch parameter., Positional pr_number must not invoke FlowService or issue resolution., Test resolving PR from issue number via branch inference., Test fail-fast behavior when no flow found for issue number. (+7 more)
 
 ### Community 244 - "Document Quality Standards"
 Cohesion: 0.04
@@ -2417,27 +2395,27 @@ Nodes (47): 1. 禁虚假精度评分, 2. 强制规则引用, 3. 验证再断言�
 
 ### Community 248 - "execute_manual_run"
 Cohesion: 0.04
-Nodes (59): RunPromptMode, describe_run_plan_sections(), make_publish_context_builder(), make_run_context_builder(), make_skill_context_builder(), Path, PromptContextMode, Run context builder - assemble prompt body for execution agent.  Public API: - ` (+51 more)
+Nodes (56): RunPromptMode, describe_run_plan_sections(), make_publish_context_builder(), make_run_context_builder(), make_skill_context_builder(), Path, PromptContextMode, Run context builder - assemble prompt body for execution agent.  Public API: - ` (+48 more)
 
 ### Community 249 - ".get_instance"
 Cohesion: 0.28
 Nodes (8): Path, Regression tests for Vibe3 test database isolation., Default SQLiteClient should derive handoff.db inside the test tempdir., record_error(store=None) should not reuse a stale non-isolated singleton., Shared temp_store fixture should provide an initialized test database., test_default_error_tracking_singleton_uses_isolated_database(), test_default_sqlite_client_uses_isolated_database(), test_temp_store_fixture_provides_initialized_database()
 
 ### Community 250 - "_reset_registry"
-Cohesion: 0.07
-Nodes (28): get_actor_registry(), Get the module-level actor registry singleton.      Returns:         The singlet, Reset the module-level registry singleton.      This is for test use only., _reset_registry(), list_jobs(), List active and recent jobs.      Args:         _: Auth dependency (unused retur, Test get_actor_registry singleton., get_actor_registry() returns the same instance. (+20 more)
+Cohesion: 0.08
+Nodes (20): Reset the module-level registry singleton.      This is for test use only., _reset_registry(), Tests for actor supervision tracking., Reset the singleton registry before each test., Test get_actor_registry singleton., get_actor_registry() returns the same instance., _reset_registry() creates a new instance., reset_registry() (+12 more)
 
 ### Community 251 - "definitions.py"
 Cohesion: 0.29
 Nodes (7): IssueRoleSyncSpec, Shared role definition types and base classes., Minimal declarative definition for a runtime role., Role definition with mandatory trigger fields for label dispatch.      Extends R, Role-owned hooks for the generic issue sync runner., RoleDefinition, TriggerableRoleDefinition
 
 ### Community 252 - "remote.py"
-Cohesion: 0.20
-Nodes (9): InitResult, is_empty_auto_scene(), Remote index synchronization for check service., Result of remote index initialization., Check if issue state requires handoff file., Resolve task issue number from branch or flow data., Check if flow has empty auto scene markers.      Session state is now tracked in, requires_handoff() (+1 more)
+Cohesion: 0.11
+Nodes (15): CheckRemote, InitResult, is_empty_auto_scene(), Remote index synchronization for check service., Result of remote index initialization., Check if issue state requires handoff file., Resolve task issue number from branch or flow data., Check if flow has empty auto scene markers.      Session state is now tracked in (+7 more)
 
 ### Community 253 - "TestAbandonFlowService"
-Cohesion: 0.09
-Nodes (12): AbandonFlowService, Abandon flow service - unified abandonment orchestration.  This service coordina, Orchestrates complete flow abandonment.      This service coordinates multiple o, Execute complete flow abandonment.          Args:             issue_number: GitH, Tests for AbandonFlowService., Already-closed/already-aborted paths should still retry PR cleanup only., Tests for unified abandonment flow., Create AbandonFlowService with mocked dependencies. (+4 more)
+Cohesion: 0.08
+Nodes (13): AbandonFlowService, Abandon flow service - unified abandonment orchestration.  This service coordina, Orchestrates complete flow abandonment.      This service coordinates multiple o, Initialize abandon flow service.          Args:             github: GitHub clien, Execute complete flow abandonment.          Args:             issue_number: GitH, Tests for AbandonFlowService., Already-closed/already-aborted paths should still retry PR cleanup only., Tests for unified abandonment flow. (+5 more)
 
 ### Community 254 - "FlowProjection"
 Cohesion: 0.29
@@ -2448,8 +2426,8 @@ Cohesion: 0.08
 Nodes (32): format_diagnostic_message(), Diagnostic message formatting for user-friendly error messages., Format a user-friendly diagnostic message.      Args:         resource: The miss, DiagnosticContext, MissingResourceError, Diagnostic context for missing resource errors.      Provides structured informa, Missing configuration or runtime asset with diagnostic context.      This error, Return a configured recipe by key. (+24 more)
 
 ### Community 256 - "is_branch_merged_to_main"
-Cohesion: 0.15
-Nodes (11): is_branch_merged_to_main(), Git branch utilities for finding parent branches., Check if a branch has been merged into main.      Uses `git merge-base --is-ance, Run a git command and return stripped stdout.      Raises subprocess.CalledProce, _run_git(), Unit tests for find_parent_branch performance optimization., Tests for is_branch_merged_to_main function., Test that merged branch returns True. (+3 more)
+Cohesion: 0.08
+Nodes (21): find_parent_branch(), is_branch_merged_to_main(), Git branch utilities for finding parent branches., Check if a branch has been merged into main.      Uses `git merge-base --is-ance, Find the closest parent branch for the current branch.      This function analyz, Run a git command and return stripped stdout.      Raises subprocess.CalledProce, _run_git(), Unit tests for find_parent_branch performance optimization. (+13 more)
 
 ### Community 257 - "extract_session_id"
 Cohesion: 0.22
@@ -2468,12 +2446,12 @@ Cohesion: 0.33
 Nodes (4): Any, SQLite repository methods for flow event persistence., Flow event read/write operations., SQLiteEventRepo
 
 ### Community 263 - "ExecutionRolePolicyService"
-Cohesion: 0.17
-Nodes (7): ConcurrencyClass, ExecutionRolePolicyService, PromptContract, Execution role policy service., Resolve preset-backed agent options and sync codeagent models., Resolve execution policy by role., SessionStrategy
+Cohesion: 0.11
+Nodes (11): Resolve backend/model metadata for result display.      Some role paths carry an, resolve_display_agent_options(), Default backend factory., Lazy-initialized backend., ConcurrencyClass, ExecutionRolePolicyService, PromptContract, Execution role policy service. (+3 more)
 
 ### Community 264 - "load_session_id"
 Cohesion: 0.06
-Nodes (42): _is_valid_session_id(), load_session_id(), SessionRole, Execution session resume helpers., Return True for wrapper-like session ids, but reject tmux session names., Load existing session_id for the current branch and role from registry., Tests for shared agent execution service., load_session_id should return session from registry. (+34 more)
+Nodes (40): _is_valid_session_id(), load_session_id(), SessionRole, Execution session resume helpers., Return True for wrapper-like session ids, but reject tmux session names., Load existing session_id for the current branch and role from registry., Tests for shared agent execution service., load_session_id should return session from registry. (+32 more)
 
 ### Community 265 - "Audit Decision Maker"
 Cohesion: 0.04
@@ -2484,8 +2462,8 @@ Cohesion: 0.04
 Nodes (47): 0.5. 分支身份验证, 0. Scope 一致性（最高优先级）, 0. Scope 审查（最高优先级）, 0. 当前分析的 commit 是否属于目标分支？, 0a. 提取 plan 声明的文件路径, 0b. 获取实际变更的文件路径, 0c. 路径级交叉验证, 0d. 判断标准 (+39 more)
 
 ### Community 268 - "FlowBootstrapProtocol"
-Cohesion: 0.14
-Nodes (11): Sort ready queue issues by queue ordering rules.      Sort order (primary to sec, sort_ready_issues(), Tests for sorting ready queue issues., Test priority/9 issue sorts before priority/7 in same milestone., Test roadmap/p0 sorts before roadmap/p1 in same milestone., Test milestone v0.1 sorts before v0.3., Test issue without priority label defaults to 0., Test issue without roadmap sorts after roadmap-labeled in same milestone. (+3 more)
+Cohesion: 0.08
+Nodes (17): LabelResume, FlowRebuildUsecase, Any, Explicit flow rebuild usecase.  Rebuild is destructive: delete the old physical, Clear blocked markers after rebuild.          Post-rebuild: consistency is guara, Hard rebuild a flow scene and restore issue state through label-auto., Hard-delete the old scene, recreate flow/worktree, append handoff, resume., Rebuild stale canonical ready flow using FlowRebuildUsecase. (+9 more)
 
 ### Community 269 - "test_internal.py"
 Cohesion: 0.04
@@ -2500,12 +2478,12 @@ Cohesion: 0.33
 Nodes (3): Soft delete flow and normalize to tombstone state.          Sets deleted_at time, Hard delete flow with cascade, removing all related records., Delete flow (soft by default, hard if force=True).
 
 ### Community 272 - ".for_base"
-Cohesion: 0.03
-Nodes (71): ReviewPromptMode, _build_output_contract_section(), _build_review_observation_section(), build_review_prompt_body(), _build_review_prompt_providers(), describe_review_sections(), make_review_context_builder(), Path (+63 more)
+Cohesion: 0.29
+Nodes (5): Path, Tests for build_policy_section from vibe3.prompts., Should read policy from file., Should return None if policy file not found., TestBuildPolicySection
 
 ### Community 273 - "_render_handoff_events"
-Cohesion: 0.16
-Nodes (16): _format_flow_details(), iter_issue_branch_candidates(), Any, Helpers for resolving issue numbers to canonical flow branches.  This module pro, Select best flow or raise UserError for conflicts.      Args:         candidates, Yield supported branch candidates for an issue number., Resolve numeric issue input with conflict detection.      Changes from original:, Format single flow details: branch (status: X, pr: Y).      Args:         flow: (+8 more)
+Cohesion: 0.15
+Nodes (13): Handoff rendering utilities for CLI display.  Pure functions for rendering agent, Render successful handoff events in reverse chronological order.      Filters ou, _render_handoff_events(), Tests for handoff helper functions., File refs are display paths, not database ref aliases., Test _format_relative_time at key boundaries.      Verifies correct pluralizatio, Test that naive datetime (no timezone) is assumed to be UTC., Verify that successful handoff events render correctly. (+5 more)
 
 ### Community 274 - "get_config_value"
 Cohesion: 0.40
@@ -2516,16 +2494,16 @@ Cohesion: 0.20
 Nodes (8): Any, T, Handler registration utility to eliminate boilerplate., Decorator to register a handler for an event.      Eliminates boilerplate of man, register_handler(), Tests for handler registry utility., register_handler should subscribe function to event., test_register_handler_decorator()
 
 ### Community 277 - "AsyncLauncherProtocol"
-Cohesion: 0.33
-Nodes (4): AsyncLauncherProtocol, Path, Execution contracts for unifying role execution., Protocol for async command launcher function.
+Cohesion: 0.14
+Nodes (11): DispatchHealthService, EmitEventCallable, CheckServiceProtocol, FlowServiceProtocol, Pre-dispatch health checks for orchestra dispatch., Protocol for orchestra event emission callables.      Accepts category, message,, Pre-dispatch health check for branch and flow state., Pre-dispatch health check. Returns True if issue can be dispatched.          Del (+3 more)
 
 ### Community 278 - "record_dispatch_failure_if_unexpected"
-Cohesion: 0.04
-Nodes (53): internal_apply_dispatch(), internal_bootstrap(), internal_governance_dispatch(), internal_manager_dispatch(), Argument, _ASYNC_OPT, _DRY_RUN_OPT, help (+45 more)
+Cohesion: 0.06
+Nodes (26): dispatch_run_command_async(), Dispatch manual run command asynchronously through execution., get_current_tick_id(), Get current heartbeat tick ID from context (0 if outside heartbeat).      This f, Exception, Convenience wrappers for error recording that auto-create ErrorTrackingService., Convenient error recording function (auto-get singleton).      Args:         err, Record dispatch failure if it's unexpected (not normal throttling).      Args: (+18 more)
 
 ### Community 279 - "MockIssueState"
-Cohesion: 0.07
-Nodes (29): format_snapshot_for_mcp(), MCP Server for Orchestra - exposes orchestra state to external AI agents., Convert OrchestraSnapshot to JSON-serializable dict., Format snapshot for MCP tool output., _serialize_snapshot(), MockIssueState, MockIssueStatusEntry, MockOrchestraSnapshot (+21 more)
+Cohesion: 0.06
+Nodes (35): Run MCP server in stdio mode (for MCP client integration).      This runs the Or, run(), create_mcp_server(), format_snapshot_for_mcp(), MCP Server for Orchestra - exposes orchestra state to external AI agents., Create MCP server for Orchestra.      Args:         status_service: OrchestraSta, Convert OrchestraSnapshot to JSON-serializable dict., Format snapshot for MCP tool output. (+27 more)
 
 ### Community 280 - ".notify_downstream"
 Cohesion: 0.14
@@ -2536,8 +2514,8 @@ Cohesion: 0.33
 Nodes (5): cleanup_old_errors(), clear_errors(), Error tracking cleanup functions.  Extracted from ErrorTrackingService to keep t, Clear all error records.      Args:         db_path: Path to SQLite database, Delete error records older than retention period.      Args:         db_path: Pa
 
 ### Community 284 - "_resolve_branch_arg"
-Cohesion: 0.18
-Nodes (9): Branch argument resolution for CLI commands.  Thin wrapper around resolve_comman, Resolve --branch argument to a canonical branch name.      This is a thin wrappe, Resolve --branch argument and extract issue number in one call.      This centra, resolve_branch_and_issue(), _resolve_branch_arg(), Tests for branch_arg resolver wrapper., 测试：纯数字输入返回 canonical branch（无 flow 时）, 测试 resolve_branch_arg 薄包装行为 (+1 more)
+Cohesion: 0.13
+Nodes (14): CircuitBreakerConfig, default_pid_file(), PollingConfig, PRReviewDispatchConfig, Path, QueueRefreshConfig, Orchestra configuration models - canonical definitions.  These configuration cla, Resolve global PID file path. (+6 more)
 
 ### Community 286 - "ref_to_handoff_cmd"
 Cohesion: 0.06
@@ -2601,7 +2579,7 @@ Nodes (4): __getattr__(), Any, Issue domain services subpackage.  Public API Con
 
 ### Community 303 - "IssueFailed"
 Cohesion: 0.05
-Nodes (37): IssueFailed, Published when a role (executor/planner/reviewer/manager) fails., publish_run_command_failure(), Publish run failure lifecycle for command-mode execution., build_error_projection_hook(), PublishHook, Projection service that maps DomainEvents to error_log records.  This module imp, Build a publish hook that projects domain events to error_log.      Returns: (+29 more)
+Nodes (42): IssueFailed, Published when a role (executor/planner/reviewer/manager) fails., publish_run_command_failure(), Publish run failure lifecycle for command-mode execution., _build_server_with_launch_cwd(), Instantiate heartbeat + FastAPI app with explicit launch cwd context., build_error_projection_hook(), PublishHook (+34 more)
 
 ### Community 304 - "__getattr__"
 Cohesion: 0.40
@@ -2616,8 +2594,8 @@ Cohesion: 0.40
 Nodes (4): __getattr__(), Any, PR domain services subpackage.  Public API Contract: - PRService, PRCreateUsecas, Lazy import for PR services symbols to avoid circular dependencies.      This al
 
 ### Community 307 - "test_events.py"
-Cohesion: 0.05
-Nodes (49): GovernanceScanCompleted, Governance scan completed event.      Published when periodic governance scan fi, PolicyChanged, Published when policy configuration files change., get_publisher(), Get the global event publisher singleton., Tests for domain events system (expanded)., Test creating FlowBlocked event with required fields. (+41 more)
+Cohesion: 0.04
+Nodes (49): Base class for all domain events.  Re-exported from models layer to break L3 cir, GovernanceScanCompleted, Governance domain events.  Events for governance service lifecycle and periodic, Governance scan completed event.      Published when periodic governance scan fi, get_publisher(), Get the global event publisher singleton., Tests for domain events system (expanded)., Test creating FlowBlocked event with required fields. (+41 more)
 
 ### Community 308 - "__getattr__"
 Cohesion: 0.40
@@ -2692,8 +2670,8 @@ Cohesion: 0.05
 Nodes (42): Always-on Server, Always-on Server Mode, Architecture, Architecture, Behavioral Differences, CapacityService, Characteristics, Characteristics (+34 more)
 
 ### Community 327 - "WorktreeManager"
-Cohesion: 0.06
-Nodes (34): Best-effort cleanup for resources owned by a dead session., Worktree management for environment isolation and runtime path resolution., Unified manager for issue worktrees (L3) and temporary worktrees (L2).      This, WorktreeManager, Unit tests for branch-from-PR creation in WorktreeManager., Tests for _find_dependency_wakeup_pr method., When wake-up event has no source_pr, return None., When no dependency_wake_up event, return None. (+26 more)
+Cohesion: 0.07
+Nodes (28): Worktree management for environment isolation and runtime path resolution., Unified manager for issue worktrees (L3) and temporary worktrees (L2).      This, WorktreeManager, Unit tests for branch-from-PR creation in WorktreeManager., Tests for _find_dependency_wakeup_pr method., When wake-up event has no source_pr, return None., When no dependency_wake_up event, return None., Tests for _fetch_pr_branch method. (+20 more)
 
 ### Community 328 - "__init__.py"
 Cohesion: 0.50
@@ -2704,8 +2682,8 @@ Cohesion: 0.50
 Nodes (3): __getattr__(), Utility modules for Vibe3., Lazy import for utils symbols to avoid circular dependencies.
 
 ### Community 332 - "HandoffRecord"
-Cohesion: 0.14
-Nodes (11): DispatchHealthService, EmitEventCallable, CheckServiceProtocol, FlowServiceProtocol, Pre-dispatch health checks for orchestra dispatch., Protocol for orchestra event emission callables.      Accepts category, message,, Pre-dispatch health check for branch and flow state., Pre-dispatch health check. Returns True if issue can be dispatched.          Del (+3 more)
+Cohesion: 0.15
+Nodes (9): PRCreateUsecase, Coordinate PR creation: AI suggestions, title resolution, flow checks., Return injected flow service (required)., Require current flow to have task bound unless bypassed by --yes., Run AI suggestion flow and return (title, body).          Falls back to empty st, Return final PR title, prompting if needed., Accept or reject a single AI-suggested field., Injected usecase collaborators should be preserved even if they are falsey. (+1 more)
 
 ### Community 337 - "Plan Policy"
 Cohesion: 0.05
@@ -2724,8 +2702,8 @@ Cohesion: 0.05
 Nodes (42): 1. Sisyphus Orchestrator（西西弗斯）, 2. Atlas Orchestrator（阿特拉斯）, 3. Hephaestus（赫菲斯托斯）, Agent 与模型的关系, Agent 类型总览, Category + Skills 系统, Delegation Prompt 结构（7 部分）, Explore（探索者） (+34 more)
 
 ### Community 435 - "README.md"
-Cohesion: 0.09
-Nodes (27): 1. 架构分层, 2. 数据真源, 3. 代码复杂度控制, 4. 禁止事项, 5. 幂等性和确定性, Phase 1: Infrastructure（基础设施层）✅ 当前阶段, Phase 1 验证, Phase 2: Trace（调试追踪层）⏸️ 下一步 (+19 more)
+Cohesion: 0.40
+Nodes (5): Phase 1: Infrastructure（基础设施层）✅ 当前阶段, Phase 2: Trace（调试追踪层）⏸️ 下一步, Phase 3: Handoff（责任链层）⏸️ 待启动, Phase 4: Orchestra（自动编排层）⏸️ 冻结, 实施阶段（强制顺序，不得跳跃）
 
 ### Community 436 - "apply_unified_noop_gate"
 Cohesion: 0.09
@@ -2744,8 +2722,8 @@ Cohesion: 0.05
 Nodes (40): 1. Error registry, 1. Error Severity, 2. Error tracking, 2. Execution Outcome, 3. Failed gate, 3. Flow State, 4. Codeagent execution path, 5. No-op gate diagnostics (+32 more)
 
 ### Community 440 - "TestTransitionRules"
-Cohesion: 0.03
-Nodes (53): DispatchPreflightService, QualifyGateLike, Unified pre-dispatch checks for orchestra dispatch., Subset of QualifyGate used by dispatch preflight., Qualify a blocked issue for dispatch., Run semantic dispatch qualification for an issue., Converges semantic and structural dispatch checks., Run semantic and structural checks before dispatch intent emission. (+45 more)
+Cohesion: 0.04
+Nodes (37): IssueState, Orchestration models for GitHub label state machine and issue data., # NOTE: blocked → other states removed (修复 Issue #303), GitHub issue orchestration state.      Maps to GitHub label: state/{value}, Convert to GitHub label name., Parse state from GitHub label., State transition record., StateTransition (+29 more)
 
 ### Community 441 - "VerdictService"
 Cohesion: 0.06
@@ -2760,8 +2738,8 @@ Cohesion: 0.05
 Nodes (40): 1. V3 Hub (lib3/), 1. 统一配置源, 2. 单一容量检查点, 2. 命令入口 (bin/), 3. 一致的生命周期记录, 3. 环境隔离 (Worktree), 4. 依赖注入, API (+32 more)
 
 ### Community 444 - "governance-roadmap-closed-loop.md"
-Cohesion: 0.06
-Nodes (29): Consequences, Context, Decision, How, 采纳 RFC→ADR→Standards 闭环, governed 标签的约束, Task Status 过滤逻辑, 与 governance 的关系 (+21 more)
+Cohesion: 0.05
+Nodes (31): Vibe3 State Sync Standard, [DEPRECATED] Vibe 3.0 User Guide, V3 推荐操作模型 (Quick Reference), 📖 现行真源 (Current Truth), Consequences, Context, Decision, How (+23 more)
 
 ### Community 445 - "codeagent-wrapper 内部实现指南"
 Cohesion: 0.05
@@ -2784,8 +2762,8 @@ Cohesion: 0.09
 Nodes (37): BlockedFlow, collect_reason_pattern_hits(), compute_execution_age(), count_evidence_sources(), extract_affected_issue_numbers(), fetch_github_issue_state(), fetch_pr_info(), flow_sources() (+29 more)
 
 ### Community 450 - "LabelService"
-Cohesion: 0.10
-Nodes (27): Get current issue state for event record.          Args:             issue_numbe, LabelService, Thin orchestration layer for issue state labels.  Domain transition rules live i, Check whether an issue currently has the given label., Confirm vibe-task mirror label with minimum action., Coordinate issue state transitions against GitHub labels., FakeIssuePort, Tests for LabelService. (+19 more)
+Cohesion: 0.07
+Nodes (34): Get current issue state for event record.          Args:             issue_numbe, LabelService, Thin orchestration layer for issue state labels.  Domain transition rules live i, Confirm target issue state with minimum action.          Only short-circuits whe, Normalize remote state labels to exactly one target state., Directly set state (internal method, atomically replace state/* labels)., Get all state/* labels of an issue., Check whether an issue currently has the given label. (+26 more)
 
 ### Community 451 - "conftest.py"
 Cohesion: 0.06
@@ -2797,7 +2775,7 @@ Nodes (36): 1.1 核心模块实现, 1.2 文档完善, 2.1 核心功能, 2.2 命�
 
 ### Community 453 - "CodeagentExecutionService"
 Cohesion: 0.12
-Nodes (22): CodeagentCommand, Configuration for a codeagent command execution., _make_github_issue_payload(), _make_mock_agent_result(), _make_mock_store(), Integration tests for execute_sync gate/callback invocation., Gate does not fire when issue_number or branch is None., Create a mock SQLiteClient. (+14 more)
+Nodes (26): CodeagentCommand, Configuration for a codeagent command execution., CodeagentExecutionService, Unified sync execution shell for command-mode codeagent runs., _make_github_issue_payload(), _make_mock_agent_result(), _make_mock_store(), Integration tests for execute_sync gate/callback invocation. (+18 more)
 
 ### Community 454 - "Test Strategy: Mock vs Real-Test Classification"
 Cohesion: 0.05
@@ -2816,16 +2794,16 @@ Cohesion: 0.06
 Nodes (36): 1. 目标, 2.1 真源分层, 2.2 基本原则, 2. 真源边界, 3.1 标签分类语义, 3.2 路线图标签语义 (roadmap/*), 3.3 可视化辅助标签语义, 3.4 编排状态标签语义 (state/*) (+28 more)
 
 ### Community 458 - "MergedPRCache"
-Cohesion: 0.08
-Nodes (32): MergedPRCache, Persistent cache for merged PR status.  This module provides a file-based cache, Persistent cache for merged PR data.      The cache file structure:     {, Ensure cache directory exists., From remote sync flow state (mostly back-filling task_issue_number)., MockGitHubClient, Unit tests for MergedPRCache., Mock GitHub client for testing. (+24 more)
+Cohesion: 0.07
+Nodes (32): cache(), MockGitHubClient, Path, Unit tests for MergedPRCache., Mock GitHub client for testing., sync() adds new PRs without losing existing ones., sync() does not duplicate already-cached PRs., rebuild() clears old entries and writes fresh data. (+24 more)
 
 ### Community 459 - "MissingVariableError"
-Cohesion: 0.07
-Nodes (26): _describe_source(), _extract_template_variables(), Any, PromptAssembler: render a PromptRecipe into a PromptRenderResult., Return a human-readable description of where a variable came from., Return all {variable_name} placeholders in a template string., Render a recipe into a PromptRenderResult., MissingVariableError (+18 more)
+Cohesion: 0.06
+Nodes (33): _describe_source(), _extract_template_variables(), Any, PromptAssembler: render a PromptRecipe into a PromptRenderResult., Return a human-readable description of where a variable came from., Return all {variable_name} placeholders in a template string., Render a recipe into a PromptRenderResult., MissingVariableError (+25 more)
 
 ### Community 460 - "compute_hash_from_loader"
-Cohesion: 0.14
-Nodes (10): compute_hash_from_loader(), _Loadable, Path, Shared hash computation helpers for governance content versioning., Protocol for objects with a load_all method., Compute governance hash using a loader factory function.      Args:         load, Policy hash should aggregate all policy files., Material hash should aggregate all material files. (+2 more)
+Cohesion: 0.08
+Nodes (19): Render Runtime Versions section showing current versions.      Displays the curr, _render_runtime_versions(), compute_governance_hash(), compute_hash_from_loader(), _HashableEntry, _Loadable, Path, Shared hash computation helpers for governance content versioning. (+11 more)
 
 ### Community 461 - "Assignee Pool 治理材料"
 Cohesion: 0.06
@@ -2836,12 +2814,12 @@ Cohesion: 0.07
 Nodes (30): Tests for review command assembler integration and CLI surface.  Merged from tes, vibe review --help should only show supported command: base.      Removed comman, vibe review base --help should mention --dry-run option., review base dry-run should not display detailed results., review async launch completes successfully., Remove ANSI color codes from text., A crash inside execute_manual_review_sync must surface as         verdict=ERROR, Assert review context builders go through PromptAssembler. (+22 more)
 
 ### Community 463 - "_make_operations"
-Cohesion: 0.08
-Nodes (34): _make_operations(), Create a TaskResumeOperations instance with mocked dependencies., _make_usecase(), Tests for core task resume operations., Label-auto resume clears blocked state without deleting the task scene., Task resume must not keep a legacy destructive reset path., Destructive scene reset belongs to FlowRebuildUsecase, not task resume., Create a TaskResumeUsecase with fully mocked dependencies. (+26 more)
+Cohesion: 0.05
+Nodes (48): block_gh_subprocess(), coverage_service(), _make_operations(), _mock_label_service(), mock_project_root(), Path, Shared fixtures for services tests., Create a TaskResumeOperations instance with mocked dependencies. (+40 more)
 
 ### Community 464 - "classify_error_hybrid"
-Cohesion: 0.13
-Nodes (14): BaseException, classify_error_from_exception(), classify_error_hybrid(), Classify error from exception instance.      Checks exception type first, then e, Hybrid classification: try exception first, then string fallback.      Use when, Test classify_error_from_exception function., Test TimeoutError classification., Test asyncio.TimeoutError classification. (+6 more)
+Cohesion: 0.08
+Nodes (23): BaseException, classify_error_from_exception(), classify_error_hybrid(), Error classification functions.  Classify errors from backend output and determi, # NOTE: CRITICAL severity only affects FailedGate, NOT flow block, # NOTE: ERROR severity only affects FailedGate, NOT flow block, Classify error from exception instance.      Checks exception type first, then e, Hybrid classification: try exception first, then string fallback.      Use when (+15 more)
 
 ### Community 465 - "Agent 调试标准 (DEPRECATED)"
 Cohesion: 0.06
@@ -2852,8 +2830,8 @@ Cohesion: 0.06
 Nodes (35): 1. 这份文档解决什么, 2.1 真源分层, 2.2 Project 不做什么, 2.3 为什么不能直接用 label 分栏, 2. 核心原则, 3.1 必需字段, 3.2 可选字段, 3.3 不推荐字段 (+27 more)
 
 ### Community 467 - "test_flow_update.py"
-Cohesion: 0.06
-Nodes (32): Tests for flow update and bind commands.  Merged from test_flow_actor_defaults.p, flow bind 248 249 --role dependency should bind all issues., Guard against replacing flow bootstrap with a monolithic command., Guard against replacing flow bootstrap with a monolithic command., flow update should block when branch has live runtime sessions., Auto-create branch when issue number provided and branch missing., # TODO: Add integration test with proper fixture setup, Branch creation message should not corrupt JSON output. (+24 more)
+Cohesion: 0.07
+Nodes (28): Tests for flow update and bind commands.  Merged from test_flow_actor_defaults.p, flow bind 248 249 --role dependency should bind all issues., Guard against replacing flow bootstrap with a monolithic command., Guard against replacing flow bootstrap with a monolithic command., flow update should block when branch has live runtime sessions., Auto-create branch when issue number provided and branch missing., # TODO: Add integration test with proper fixture setup, Branch creation message should not corrupt JSON output. (+20 more)
 
 ### Community 468 - "Vibe3 Error Severity and Blocking Standard"
 Cohesion: 0.06
@@ -2864,8 +2842,8 @@ Cohesion: 0.06
 Nodes (33): 1. 当前业务原则, 2.1 代码层不背复杂业务逻辑, 2.2 manager 仍然是业务 owner, 2.3 no-op 失败会显性暴露, 2.4 `blocked` 比伪成功更有价值, 2. 这样做的好处, 3.1.1 worker no-op 的正确语义, 3.1 agent 一旦不执行，链路会直接断 (+25 more)
 
 ### Community 470 - "policy_loader"
-Cohesion: 0.10
-Nodes (21): PolicyEntry, Loaded policy file with source path, parsed data, and content hash., _parse_policy(), policy_loader(), Generic dispatch-time file loader for governance materials and policies., Create a loader for governance policy files (.yaml/.yml)., Path, Unit tests for policy_loader factory. (+13 more)
+Cohesion: 0.08
+Nodes (26): PolicyEntry, Loaded policy file with source path, parsed data, and content hash., FileLoader, _parse_policy(), policy_loader(), T, Generic dispatch-time file loader for governance materials and policies., Create a loader for governance policy files (.yaml/.yml). (+18 more)
 
 ### Community 471 - "Flow Blocked vs Bind Dependency：现状梳理与统一方向分析"
 Cohesion: 0.06
@@ -2888,8 +2866,8 @@ Cohesion: 0.10
 Nodes (22): MaterialEntry, Loaded governance material with source path and content hash., material_loader(), _parse_material(), Path, Create a loader for governance material files (.md)., Path, Unit tests for material_loader factory. (+14 more)
 
 ### Community 476 - "TestRunQualifyGate"
-Cohesion: 0.06
-Nodes (23): mock_config(), mock_flow_manager(), mock_github(), mock_store(), qualify_gate_service(), Unit tests for QualifyGateService domain logic.  Tests for core run_qualify_gate, Issue with no flow state but blocked label should return None., Issue with no flow state and wrong label should return None. (+15 more)
+Cohesion: 0.11
+Nodes (10): Issue with no flow state but blocked label should return None., Issue with no flow state and wrong label should return None., Body truth blocked should call reconcile_blocked and block dispatch., Blocked truth + existing blocked label should block dispatch., Blocked issue with cleared dependencies should reconcile and unblock.          W, Stale cache without flow_status=blocked or blocked label — no reconcile., Body truth blocked -> reconcile_blocked called, no dispatch.          Regression, Tests for run_qualify_gate method. (+2 more)
 
 ### Community 477 - "Path"
 Cohesion: 0.08
@@ -2920,12 +2898,12 @@ Cohesion: 0.06
 Nodes (21): Tests for --show-prompt requires --dry-run validation., plan command should accept --show-prompt with --dry-run., Integration tests for review command validation., review command should reject --show-prompt without --dry-run., review command should accept --show-prompt with --dry-run., Integration tests for review base subcommand validation., review base command should reject --show-prompt without --dry-run., review base command should accept --show-prompt with --dry-run. (+13 more)
 
 ### Community 484 - "test_error_block_decoupling.py"
-Cohesion: 0.07
-Nodes (23): _make_tracking_github(), Integration tests for ERROR/BLOCK decoupling.  These tests verify the architectu, Test that agent noop (no state change) triggers block_flow.      Scenario: agent, Agent noop should trigger block_flow., Test that GitHub API failures do NOT trigger block_flow.      Scenario: GitHub A, GitHub API failure should raise GitHubAPIError, not block., GitHub API failure after retries should record to error_log., Test that dependency not satisfied triggers block_flow.      Scenario: required (+15 more)
+Cohesion: 0.08
+Nodes (19): _make_tracking_github(), Integration tests for ERROR/BLOCK decoupling.  These tests verify the architectu, Test that agent noop (no state change) triggers block_flow.      Scenario: agent, Agent noop should trigger block_flow., Test that dependency not satisfied triggers block_flow.      Scenario: required, FlowService.block_flow() should write blocked_reason., Test that ERROR and BLOCK systems are completely orthogonal., Runtime errors should be stored in error_log, not block flow. (+11 more)
 
 ### Community 485 - "_make_check_pr_service"
-Cohesion: 0.17
-Nodes (10): build_prompt_meta(), Derive prompt routing metadata from refs + session state., Should use custom mode strings., Should pass refs through to PromptMeta., Tests for build_prompt_meta factory function., First run with no session should use default mode and bootstrap., Retry with no session should use retry mode and bootstrap., Retry with session should use retry mode and resume. (+2 more)
+Cohesion: 0.09
+Nodes (31): _make_check_pr_service(), Tests for CheckService PR closed handling., Verify that FlowRebuildUsecase is NOT called when PR closes., Create a CheckPRService instance with mocked dependencies., When PR closed and issue already closed, mark flow as aborted and cleanup., When bridge marker already exists, skip creation and just cleanup., When bridge marker exists but original close fails, preserve flow for retry., Bridge marker matching must not treat PR #1234 as PR #123. (+23 more)
 
 ### Community 486 - "安全限制：禁止修改文件和执行危险操作"
 Cohesion: 0.06
@@ -2940,20 +2918,20 @@ Cohesion: 0.06
 Nodes (31): 10. 变更历史, 1. 目的, 2.1 Truth vs Cache 分离, 2.2 Lazy Initialization, 2.3 Graceful Degradation, 2. 架构原则, 3.1 Schema, 3.2 字段语义 (+23 more)
 
 ### Community 489 - "ExecuteCheckResult"
-Cohesion: 0.05
-Nodes (46): execute_check_mode(), execute_remote_check(), ExecuteCheckResult, Shared command-layer helpers for check mode routing., Result of command-level check execution., Wire remote label check to CLI.      This is a thin command-layer wrapper around, Run verify_all_flows with Rich Progress display.      Args:         service: Che, Run command-oriented check modes     using CheckService primitives.      Args: (+38 more)
+Cohesion: 0.06
+Nodes (40): ExecuteCheckResult, Result of command-level check execution., LabelAnomaly, Audit finding for a single issue's label state., _InvalidFlowResult, Tests for check command.  Merged from test_check_branch.py + test_check_command., Test check command summary output., clean_branch details must render Rich markup, not show literal tags. (+32 more)
 
 ### Community 490 - "test_scan.py"
-Cohesion: 0.07
-Nodes (16): Tests for scan CLI command (governance tests only)., Governance scan publishes event, not direct dispatch., Manual governance scan ignores FailedGate (publishes event directly)., Verify governance scan does not call dispatch_governance_execution., Test that --show-prompt requires --dry-run in governance command., Test material_override is passed to GovernanceScanStarted event., Governance scan publishes GovernanceScanStarted event., _strip_ansi() (+8 more)
+Cohesion: 0.11
+Nodes (10): Tests for scan CLI command (governance tests only)., Test that --show-prompt requires --dry-run in governance command., _strip_ansi(), test_governance_invalid_role_shows_friendly_error(), test_governance_show_prompt_requires_dry_run(), TestFailedGateBlocking, TestGovernanceDryRunPromptDisplay, TestGovernanceScan (+2 more)
 
 ### Community 491 - "TimelineEvent"
 Cohesion: 0.08
 Nodes (28): Timeline event extracted from GitHub comments.      Represents automation events, TimelineEvent, parse_timeline_from_comments(), Any, Timeline event parsing from GitHub comments., Parse timeline events from GitHub issue comments.      Args:         comments: L, Tests for flow status --remote timeline source behavior., No local flow/events, --remote <issue> renders timeline from issue comments. (+20 more)
 
 ### Community 492 - "collect_label_anomalies"
-Cohesion: 0.08
-Nodes (19): collect_label_anomalies(), has_supervisor_label(), LabelAnomaly, Label anomaly detection utilities.  Implements the four label-normalization rule, Check if issue has the supervisor label., Audit finding for a single issue's label state., Collect all label anomalies for one issue.      Returns list of anomalies (empty, Display formatting: anomalies grouped by rule with actions and totals. (+11 more)
+Cohesion: 0.14
+Nodes (13): mock_config(), mock_github(), mock_store(), Placeholder flow checks for QualifyGateService., Create a mock orchestra config., Create a mock GitHub client., Create a mock SQLite client., Create a sample issue. (+5 more)
 
 ### Community 493 - "治理三层架构与公共定义"
 Cohesion: 0.06
@@ -3000,16 +2978,16 @@ Cohesion: 0.07
 Nodes (30): pyproject.toml, Python 版本要求, Vibe 3.0 - 编码标准, 代码复杂度（强制）, 代码审查检查清单, 代码规模限制, 代码质量, 代码质量 (+22 more)
 
 ### Community 504 - "test_output_format.py"
-Cohesion: 0.11
-Nodes (29): output_result(), _output_simple(), Any, Output result in the requested format.      Args:         result: Command result, Output simple key-value format.      Args:         result: Result dictionary, CaptureFixture, Tests for output format utilities.  Merged from test_output_format_basic.py + te, Test trace output in YAML format. (+21 more)
+Cohesion: 0.12
+Nodes (27): output_result(), _output_simple(), Any, Output result in the requested format.      Args:         result: Command result, Output simple key-value format.      Args:         result: Result dictionary, CaptureFixture, Tests for output format utilities.  Merged from test_output_format_basic.py + te, Test trace output in YAML format. (+19 more)
 
 ### Community 505 - ".from_repo"
-Cohesion: 0.10
-Nodes (26): Create resolver from current repo context.          Factory method that creates, Tests for ConventionResolver service.  Tests verify that: 1. Resolver returns mi, Test resolver fallback when git common dir lookup raises GitError., Test that resolved convention is immutable (frozen Pydantic model)., Test vibe-center convention can generate branch names., Test that _detect_profile result is cached to avoid repeated subprocess calls., Test that cache can be cleared by creating a new resolver instance., Test resolver returns minimal defaults when no profile specified. (+18 more)
+Cohesion: 0.09
+Nodes (28): Create resolver from current repo context.          Factory method that creates, Tests for ConventionResolver service.  Tests verify that: 1. Resolver returns mi, Test resolver fallback when git common dir lookup raises GitError., Test that resolved convention is immutable (frozen Pydantic model)., Test vibe-center convention can generate branch names., Test state_label with empty prefix., Test that _detect_profile result is cached to avoid repeated subprocess calls., Test that cache can be cleared by creating a new resolver instance. (+20 more)
 
 ### Community 506 - "PromptRecipe"
 Cohesion: 0.15
-Nodes (16): PromptAssembler, Renders a PromptRecipe into a PromptRenderResult.      - Loads the template text, Raised when a template key cannot be resolved., TemplateNotFoundError, PromptRecipe, Describes how to assemble a prompt: template key + variable sources., _make_prompts_yaml(), Path (+8 more)
+Nodes (16): ask(), BranchOption, Context, Ask command for project knowledge queries., Ask a question about project knowledge and get an answer from a code agent., PromptAssembler, Renders a PromptRecipe into a PromptRenderResult.      - Loads the template text, Raised when a template key cannot be resolved. (+8 more)
 
 ### Community 507 - "sanitize_prompt_for_display"
 Cohesion: 0.09
@@ -3048,8 +3026,8 @@ Cohesion: 0.07
 Nodes (29): 2.1 读取 RFC 详情 `[Agent]`, 2.2 向人类展示分析结果 `[人类确认]` ← 关键步骤, 2.3 执行人类决策 `[Agent]`, 2.4 验证决策已落地 `[Agent]`, 3.1 检查现场 `[Agent]`, 3.2 选择恢复方案 `[Agent]`, 3.3 执行恢复 `[Agent]`, 3.4 验证恢复结果 `[Agent]` (+21 more)
 
 ### Community 516 - "TestResolveManagerCwd"
-Cohesion: 0.12
-Nodes (12): is_exec_error(), Check if error is an execution error., Tests for dispatch error propagation and worktree resolution., Test that worktree_path is recorded to flow_state on creation., Call flow_service.update_flow_metadata with worktree_path., Tests for E_EXEC threshold in FailedGate., E_EXEC_* errors reaching threshold should trigger FailedGate., Single E_EXEC_* error below threshold should not trigger. (+4 more)
+Cohesion: 0.07
+Nodes (19): is_exec_error(), Check if error is an execution error., Tests for dispatch error propagation and worktree resolution., Test that worktree_path is recorded to flow_state on creation., validate_branch_matches returns True when HEAD matches expected branch., Call flow_service.update_flow_metadata with worktree_path., Return False when HEAD references a different branch., Tests for E_EXEC threshold in FailedGate. (+11 more)
 
 ### Community 517 - "公开 API"
 Cohesion: 0.07
@@ -3072,8 +3050,8 @@ Cohesion: 0.09
 Nodes (19): clean_idempotency_store(), client(), TestClient, Tests for control-plane dispatch and jobs endpoints., Verify ReviewerDispatchIntent is published., Verify GovernanceScanStarted published., Verify SupervisorIssueIdentified published., Invalid role returns 400. (+11 more)
 
 ### Community 522 - "test_check_multiple_state_labels.py"
-Cohesion: 0.08
-Nodes (25): check_service(), mock_git_client(), mock_github_client(), mock_store(), Tests for CheckService._check_multiple_state_labels method., Test that unknown state/* labels are flagged for manual fix., Create a mock SQLite store., Test that known state is kept when mixed with unknown states. (+17 more)
+Cohesion: 0.05
+Nodes (39): issue_state_from_payload(), Extract authoritative issue state from GitHub labels., check_service(), mock_git_client(), mock_github_client(), mock_store(), Tests for CheckService._check_multiple_state_labels method., Test that unknown state/* labels are flagged for manual fix. (+31 more)
 
 ### Community 523 - "Path"
 Cohesion: 0.11
@@ -3088,8 +3066,8 @@ Cohesion: 0.07
 Nodes (28): 10. Prohibited Fields (Legacy - V2), 11. Migration to V3 (SQLite Database), 1. V3 Architecture Change, 2. File Responsibility (Legacy - V2), 3. V3 Database Schema, 4. Root Shape (Legacy - V2), 5. Access Patterns (V3 Python), 5. Task Shape (Legacy - V2) (+20 more)
 
 ### Community 526 - "Path"
-Cohesion: 0.12
-Nodes (16): load_yaml_config(), Load YAML configuration file.      Args:         path: Path to YAML file, ConfigError, Configuration file or setting error., Path, Tests for load_config function., Provide config_path directly — config loaded from that file., Repo → global → project layers merge; project wins. (+8 more)
+Cohesion: 0.10
+Nodes (19): load_yaml_config(), Load YAML configuration file.      Args:         path: Path to YAML file, ConfigError, Configuration file or setting error., Path, Tests for load_config function., Provide config_path directly — config loaded from that file., Repo → global → project layers merge; project wins. (+11 more)
 
 ### Community 527 - "Services/Orchestra"
 Cohesion: 0.07
@@ -3124,8 +3102,8 @@ Cohesion: 0.07
 Nodes (27): Phase 1: Infrastructure（基础设施层）✅ 已完成, Phase 1 执行计划, Phase 2: Trace（调试追踪层）⏸️ Optional/Pending, Phase 2 验收状态, Phase 3: Handoff（责任链层）✅ 已完成, Phase 4: Orchestra（自动编排层）✅ Active, Phase 4 当前状态, Vibe 3.0 Parallel Rebuild (+19 more)
 
 ### Community 535 - "ValidationError"
-Cohesion: 0.18
-Nodes (15): _make_config_mock(), _make_flow(), SimpleNamespace, Tests for the task status dashboard segmentation., task status should show flows that have a PR reference., task status should not render system status sections.      This includes Orchest, task status should show issues without state/* in a dedicated section., Create a standard config mock for tests. (+7 more)
+Cohesion: 0.15
+Nodes (23): file_age_days(), find_audit_files(), git_common_dir(), main(), parse_yaml_file(), parse_yaml_frontmatter(), print_results(), prune_files() (+15 more)
 
 ### Community 536 - "Tasks: [FEATURE NAME]"
 Cohesion: 0.07
@@ -3149,7 +3127,7 @@ Nodes (26): Block 函数（role-specific 包装）, Body Managed Section, Body �
 
 ### Community 541 - "extract_material_from_log"
 Cohesion: 0.09
-Nodes (20): extract_material_from_log(), job_to_dict(), orchestra_tmux_session_exists(), Any, Path, Shared serve utilities for PID validation, tmux session management, and job seri, Return whether the orchestra tmux session currently exists., Extract governance material slug from log path filename.      Log filename forma (+12 more)
+Nodes (19): extract_material_from_log(), job_to_dict(), orchestra_tmux_session_exists(), Any, Shared serve utilities for PID validation, tmux session management, and job seri, Return whether the orchestra tmux session currently exists., Extract governance material slug from log path filename.      Log filename forma, Serialize an ActiveJob to a JSON-safe dictionary. (+11 more)
 
 ### Community 542 - "Audit Observation 治理材料"
 Cohesion: 0.07
@@ -3160,8 +3138,8 @@ Cohesion: 0.10
 Nodes (18): clean_idempotency_store(), client(), TestClient, Tests for control-plane authentication and idempotency., Test idempotency behavior., Same idempotency_key returns conflict., Different keys both succeed., Create test client for control-plane router. (+10 more)
 
 ### Community 544 - "TestVerifyCurrentFlow"
-Cohesion: 0.08
-Nodes (17): check_service(), mock_git_client(), mock_github_client(), mock_store(), Tests for CheckService verify flow functionality., Test task issue not found on GitHub., Test multiple task issues for branch., Test PR mismatch (e.g. branch has no PR on GitHub). (+9 more)
+Cohesion: 0.12
+Nodes (9): Test task issue not found on GitHub., Test multiple task issues for branch., Test PR mismatch (e.g. branch has no PR on GitHub)., Test ref files not found., Handoff file check removed - missing file is not an error., Ready issues should not fail just because current.md is missing., Tests for verify_current_flow method., Test valid flow passes all checks. (+1 more)
 
 ### Community 545 - "test_services_subpackage_boundaries.py"
 Cohesion: 0.11
@@ -3180,8 +3158,8 @@ Cohesion: 0.08
 Nodes (25): Acceptance Criteria, Allowed Patterns, ✅ App Boundary Layer: Instance Sharing, Client Lifecycle Management Standards, ❌ Clients Layer: Global Singleton Factories, Core Principles, Current State, Gradual Migration Strategy (+17 more)
 
 ### Community 549 - "Orchestra 调度器 PRD"
-Cohesion: 0.08
-Nodes (26): 0. 产品目标, 1.1 Self-hosted webhook server（非 Actions runner）, 1.2 Issue assignee 触发, 1.3 PR reviewer 触发, 1. 当前已落地能力（2026-03-29）, 2.1 必须支持, 2.2 明确不在本版, 2. 本版范围（MVP） (+18 more)
+Cohesion: 0.04
+Nodes (49): 0. 产品目标, 1.1 Self-hosted webhook server（非 Actions runner）, 1.2 Issue assignee 触发, 1.3 PR reviewer 触发, 1. 当前已落地能力（2026-03-29）, 2.1 必须支持, 2.2 明确不在本版, 2. 本版范围（MVP） (+41 more)
 
 ### Community 550 - "Workflow"
 Cohesion: 0.08
@@ -3192,24 +3170,20 @@ Cohesion: 0.08
 Nodes (25): 0.1 查询系统错误, 0.2 查询业务阻塞, 0.3 交叉验证 BLOCKED+CLOSED（关键！）, 0.4 验证 worktree 解析路径（关键！）, 0.5 搜索历史解决方案, 0.6 检查 handoff 上下文, Dispatch 故障模型, Step 0: Serve 错误快速诊断（必做） (+17 more)
 
 ### Community 552 - "核心命令组"
-Cohesion: 0.07
-Nodes (29): 1. 启动任务, 2. 执行工作流（详见 /vibe-continue）, 3. 提交与收口, ask - 项目知识问答, check / resume - 审计与恢复, Execution Flow（标准开发工作流）, flow - 逻辑现场管理, Guardrails（核心边界与误区） (+21 more)
+Cohesion: 0.08
+Nodes (25): 1. 启动任务, 2. 执行工作流（详见 /vibe-continue）, 3. 提交与收口, ask - 项目知识问答, check / resume - 审计与恢复, flow - 逻辑现场管理, handoff - 协作交接记录, inspect - 代码智能分析 (+17 more)
 
 ### Community 553 - "Tasks: Spec Artifact Handoff Bridge"
 Cohesion: 0.08
 Nodes (26): Dependencies & Execution Order, Format: `[ID] [Markers] [Story] Description`, Global Constraints, Implementation for User Story 1, Implementation for User Story 2, Implementation for User Story 3, Implementation for User Story 4, Implementation Strategy (+18 more)
 
 ### Community 554 - "validate_governance_material_consistency"
-Cohesion: 0.13
-Nodes (13): Specification Quality Checklist: Flow Lifecycle Baseline, Feature Specification: Flow Lifecycle Baseline, Key implementation PRs, Known gaps and tracking, Non-goals, Purpose and truth sources, Requirements, Scenario 1 - Flow and issue state remain separate (+5 more)
+Cohesion: 0.22
+Nodes (12): CodeagentResult, PlanRequest, execute_spec_plan_async(), execute_spec_plan_sync(), Planner role definition and request builders., Get spec_ref from flow state, or None if unavailable., Execute spec plan in async mode (tmux wrapper).      Async mode re-invokes the C, Execute spec plan in sync mode (direct execution). (+4 more)
 
 ### Community 555 - "Services/Check"
 Cohesion: 0.08
 Nodes (25): Branch-Level Locking（内部实现细节）, Check Pipeline 设计, Data-Driven Label Constraints（内部实现细节）, Data-Driven Label Constraints（见上 Pipeline 内部细节）, Pipeline 内部更多细节, PR State Change Detection（内部实现细节）, PR State Change 检测设计（`CheckPRService` 内部细节）, Rule Chain Pattern (+17 more)
-
-### Community 556 - "resolve_command_branch"
-Cohesion: 0.15
-Nodes (9): PR to Branch resolution with conflict detection., Unified branch resolution for flow/handoff/task commands.      Priority order:, resolve_command_branch(), 测试 canonical_fallback 参数, 测试：纯数字输入无 flow 时返回 canonical branch, 测试：canonical_fallback=False 时仍抛出 UserError, 测试：非数字输入时 canonical_fallback 无效, TestResolveCommandBranch (+1 more)
 
 ### Community 557 - "resolve_priority"
 Cohesion: 0.11
@@ -3248,8 +3222,8 @@ Cohesion: 0.09
 Nodes (21): CapacityService, Unified capacity service: capacity control for all execution roles.  Provides si, Unified capacity control for all execution roles.      Simple capacity model bas, Check if global capacity allows another dispatch.          Args:             rol, Get current capacity status.          Uses the same global pool model as can_dis, Lazy-initialized capacity service., config(), Path (+13 more)
 
 ### Community 566 - "build_governance_snapshot_context"
-Cohesion: 0.21
-Nodes (11): build_governance_snapshot_context(), Convert runtime observations into the governance prompt context dict., _make_config(), _make_snapshot(), Tests for governance snapshot context and comment format contract., Issues with orchestra-governed should be filtered from pool scan., Roadmap intake should not trust stale orchestra-governed         on unassigned i, Assignee-pool context should only expose local manager ungoverned issues. (+3 more)
+Cohesion: 0.19
+Nodes (11): IssueStatusEntry, Aggregated status for a single issue., _make_config(), _make_snapshot(), Tests for governance snapshot context and comment format contract., Issues with orchestra-governed should be filtered from pool scan., Roadmap intake should not trust stale orchestra-governed         on unassigned i, Assignee-pool context should only expose local manager ungoverned issues. (+3 more)
 
 ### Community 567 - "check_flow_consistency"
 Cohesion: 0.15
@@ -3268,12 +3242,12 @@ Cohesion: 0.11
 Nodes (21): _init_non_bare_repo(), MonkeyPatch, Path, Tests for SQLiteClient with a fresh database (schema verification)., Default-path client should recover if a previous caller closed the singleton., Test SQLiteClient.from_repo_path classmethod., Verify that a fresh DB does not contain deprecated columns in flow_state., from_repo_path should return SQLiteClient, not SQLiteClientBase. (+13 more)
 
 ### Community 571 - "TestHandoffAdvancedCommands"
-Cohesion: 0.09
-Nodes (11): Integration tests for Handoff commands - All CLI operations.  Note: test_handoff, Test handoff plan command., Test handoff report command., Test handoff audit command., Tests for advanced handoff CLI commands., Test handoff plan with explicit --branch name., Test handoff report with --branch <digits> converts to task/issue-N., Should fail-fast if no flow state exists for the resolved branch. (+3 more)
+Cohesion: 0.08
+Nodes (13): Integration tests for Handoff commands - All CLI operations.  Note: test_handoff, Test handoff plan command., Test handoff report command., Test handoff audit command., Tests for advanced handoff CLI commands., Test handoff plan with explicit --branch name., Test handoff report with --branch <digits> converts to task/issue-N., Should fail-fast if no flow state exists for the resolved branch. (+5 more)
 
 ### Community 572 - "test_supervisor_scan.py"
-Cohesion: 0.08
-Nodes (19): Tests for supervisor scan CLI command., Manual supervisor scan honors configured max_dispatch_per_tick., Supervisor async dispatch should not use command-specific result echo., Manual supervisor scan shows candidate list and execution info.      Uses max_di, Test that --show-prompt requires --dry-run in supervisor command., Test supervisor dry-run displays summary even with zero candidates., Supervisor dry-run must display Backend/Model via display_codeagent_result,, _run_supervisor_scan_dry_run calls display_codeagent_result. (+11 more)
+Cohesion: 0.06
+Nodes (23): Tests for supervisor scan CLI command., Manual supervisor scan honors configured max_dispatch_per_tick., Supervisor async dispatch should not use command-specific result echo., Verify supervisor scan does not call dispatch_supervisor_execution., Manual supervisor scan shows candidate list and execution info.      Uses max_di, Test that --show-prompt requires --dry-run in supervisor command., Test supervisor dry-run displays summary even with zero candidates., Supervisor dry-run must display Backend/Model via display_codeagent_result, (+15 more)
 
 ### Community 573 - "Vibe Center 3.0 — 开发指南"
 Cohesion: 0.08
@@ -3300,32 +3274,32 @@ Cohesion: 0.11
 Nodes (17): BLUE, BOLD, confirm_action(), CYAN, GREEN, log_step(), log_warn(), NC (+9 more)
 
 ### Community 579 - "Vibe Skills Manager"
-Cohesion: 0.07
-Nodes (28): 1. Superpowers, 2. OpenSpec, 3. Gstack, Execution Flow（工作流程）, Guardrails, Overview, Required Reading, Skill 职责 (+20 more)
+Cohesion: 0.08
+Nodes (23): 1. Superpowers, 2. OpenSpec, 3. Gstack, Skill 职责, Step 1: 扫描实际状态, Step 2: 使用 Skill 分析差距, Vibe Skills Manager, 使用方法 (+15 more)
 
 ### Community 580 - "sync_models_json"
-Cohesion: 0.12
-Nodes (15): Config resolution for codeagent backend.  Handles syncing effective backend/mode, Sync effective backend/model and agents presets to ~/.codeagent/models.json., sync_models_json(), Path, Tests for sync_models_json behavior.  Tests syncing effective backend/model to ~, sync_models_json should overwrite existing default_backend/model., sync_models_json should resolve agent preset before syncing., Tests for sync_models_json behavior. (+7 more)
+Cohesion: 0.24
+Nodes (13): ExecutionRequest, IssueInfo, OrchestraConfig, build_plan_prompt(), build_plan_request(), build_plan_sync_request(), Any, Path (+5 more)
 
 ### Community 581 - "SupervisorIssueIdentified"
-Cohesion: 0.12
-Nodes (14): _publish_and_wait_supervisor_events(), Publish SupervisorIssueIdentified events and wait for results.      Args:, handle_supervisor_issue_identified(), Supervisor scan domain event handler.  Subscribes to SupervisorIssueIdentified a, Dispatch supervisor apply via CLI self-invocation., Published when supervisor handoff service detects a governance issue., SupervisorIssueIdentified, SQLite client for data access. (+6 more)
+Cohesion: 0.15
+Nodes (11): handle_supervisor_issue_identified(), Supervisor scan domain event handler.  Subscribes to SupervisorIssueIdentified a, Dispatch supervisor apply via CLI self-invocation., Any, Load orchestra configuration., Published when supervisor handoff service detects a governance issue., SupervisorIssueIdentified, SQLite client for data access. (+3 more)
 
 ### Community 582 - "Execution"
 Cohesion: 0.08
 Nodes (23): Actor 监督模型, Capacity-based Dispatch, Command Adapter 机制, Execution, Job 监控, services 层依赖, Sync vs Async 执行模式, 三层协作关系 (+15 more)
 
 ### Community 583 - "promote_progressed_entries"
-Cohesion: 0.07
-Nodes (24): QualifyGateServiceProtocol, Protocol for qualify gate service operations., Run the Qualify Gate for an issue., get_flow_context(), is_auto_task_branch(), load_issue(), Issue loading and flow context utilities for dispatch coordination., Load the current issue snapshot for an already-frozen issue. (+16 more)
+Cohesion: 0.16
+Nodes (12): promote_progressed_entries(), Process frozen queue entries and categorize them., Tests for terminal state handling in frozen queue operations.  Regression tests, Issues with unchanged state should stay in place., Multiple entries with different state changes are correctly categorized., Tests that promote_progressed_entries removes terminal states., Tests that _dispatch_loop logs removal events when popping entries., Issues transitioning to blocked should be removed, not promoted. (+4 more)
 
 ### Community 584 - "Vibe Supervisor Engine (Tier 3)"
 Cohesion: 0.08
 Nodes (23): Boundary Defense Cases, Case A: 越界需求（例如"写一个网页爬虫"）, Case B: 跳步需求（例如"不写 PRD 直接改逻辑"）, Entry Command Contract, Exception Escalation Hook (异常举报通道), Gate 0: Intent Gate (智能调度器), Gate 1: Scope Gate, Gate 2: Spec Gate (+15 more)
 
 ### Community 585 - "TestHandoffBasicCommands"
-Cohesion: 0.08
-Nodes (13): Integration tests for Handoff commands - All CLI operations., Test handoff show without target displays help message., Test handoff show <artifact> renders single artifact., Test handoff show @key resolves shared artifact via @ prefix., Tests for basic handoff CLI commands., Test handoff show --branch <id> resolves numeric ID., Test handoff show <artifact> reports missing files., Test handoff show <artifact> rejects non-file paths. (+5 more)
+Cohesion: 0.05
+Nodes (26): HandoffStatusResult, HandoffStatusService, Any, FlowState, Handoff status aggregation service., Aggregate handoff status from multiple sources.          Args:             branc, Aggregated handoff status from multiple sources.      Return type for ``HandoffS, Return truly live runtime sessions from the registry for a branch.          This (+18 more)
 
 ### Community 586 - "Vibe3 Architecture Guide for AI Agents"
 Cohesion: 0.09
@@ -3344,8 +3318,8 @@ Cohesion: 0.09
 Nodes (21): Any, Invoke a registered provider with the given context., Tests for flow blocked command guards., CLI should reject removed --pr option., CLI should reject removed --blocked-by alias., Repeated --task options should append dependency links, not overwrite., Blocking a branch with no flow should fail with clear error., Auto-create flow when branch matches issue convention and no flow exists. (+13 more)
 
 ### Community 590 - "ensure_plan_file_exists"
-Cohesion: 0.10
-Nodes (19): ensure_plan_file_exists(), Any, Path, SimpleNamespace, Executor role helpers and definitions., Resolve run command mode from CLI inputs and flow state., Validate that a referenced plan file exists.      Uses the same resolution logic, Resolve executor agent options with env override support. (+11 more)
+Cohesion: 0.07
+Nodes (34): default(), _AGENT_OPT, Argument, _ASYNC_OPT, _BACKEND_OPT, BranchOption, Context, _DRY_RUN_OPT (+26 more)
 
 ### Community 591 - "Services/Handoff"
 Cohesion: 0.09
@@ -3373,11 +3347,11 @@ Nodes (21): Tests for RFC/Epic label handling in task status dashboard., Epic sh
 
 ### Community 597 - "_make_service"
 Cohesion: 0.13
-Nodes (10): _make_service(), Tests for unified flow recovery service., Manual path (task resume) should NOT auto-rebuild; guide user., Manual recovery of a missing artifact raises UserError guiding         rebind/re, Auto recovery of a missing artifact neither rebuilds nor clears         blocked, Placeholder flow (blocked + no branch) should classify as RESUME_ONLY., A missing recorded artifact in a healthy worktree classifies as         ARTIFACT, When scene is healthy, recover() just clears blocked markers. (+2 more)
+Nodes (12): FlowRecoveryService, Unified recovery: classify inconsistency, act, resume.      All recovery paths (, _make_service(), Tests for unified flow recovery service., Manual path (task resume) should NOT auto-rebuild; guide user., Manual recovery of a missing artifact raises UserError guiding         rebind/re, Auto recovery of a missing artifact neither rebuilds nor clears         blocked, Placeholder flow (blocked + no branch) should classify as RESUME_ONLY. (+4 more)
 
 ### Community 598 - "log_dispatch_error"
-Cohesion: 0.09
-Nodes (16): CalledProcessError, log_dispatch_error(), Exception, Convenience functions for error logging., Log a dispatch/execution error, classifying known external failures.      GitHub, Tests for error_helpers.py convenience functions., Tests for log_dispatch_error()., GitHubError logs via bind(external=True).warning, no traceback. (+8 more)
+Cohesion: 0.25
+Nodes (5): Tests for error_helpers.py convenience functions., Tests for has_recent_specific_error thin-reexport shell., Verify shared shell delegates to ErrorTrackingService., Verify conservative False return on exception., TestHasRecentSpecificError
 
 ### Community 599 - "LOC Governance Standard"
 Cohesion: 0.09
@@ -3388,7 +3362,7 @@ Cohesion: 0.09
 Nodes (22): 2.1 当前 CLI 命令语法, 2.2 常用启动选项, 3.1 日志路径, 3.2 真源路径（Ground Truth）, 4.1 执行路径, 4.2 async 模式的观察方法, 5.1 正确理解 blocked, 5.2 调试策略 (+14 more)
 
 ### Community 601 - "Phase 2 Execution Plan"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (21): Documentation Updates, Execution Phases, Phase 2.1: Flow Domain Core, Phase 2.2: Task Domain Core, Phase 2.3: Flow-Task Binding, Phase 2.4: PR Domain Core, Phase 2.5: Advanced Features, Phase 2 Execution Plan (+13 more)
 
 ### Community 602 - "4. 技术要求（分层实现）"
@@ -3400,8 +3374,8 @@ Cohesion: 0.13
 Nodes (13): classify_error(), Classify error from backend output.      Args:         error_output: Combined st, Test unknown error classification., Test AUP rejection classification., Test AUP rejection classification variant., Agent output that merely discusses AUP must NOT classify as AUP rejection., Mentioning 'content policy violation' without refusal is not AUP., Test that existing classify_error behavior is unchanged. (+5 more)
 
 ### Community 604 - "issue_state_from_payload"
-Cohesion: 0.10
-Nodes (16): issue_state_from_payload(), Extract authoritative issue state from GitHub labels., Resolve the governing remote ``state/*`` label without inference., resolve_state_label(), Direct unit tests for issue_state_from_payload() function., Test that priority order wins, not GitHub API order., Test that priority wins when GitHub lists in reverse., Test that single state label is correctly extracted. (+8 more)
+Cohesion: 0.23
+Nodes (11): _job_log_display(), _job_role_display(), _job_status_display(), _job_target_display(), Any, Service for displaying Orchestra server status., Display launched role sessions from durable runtime_session state., Return the most specific status available for a job row. (+3 more)
 
 ### Community 605 - "._clean_error_message"
 Cohesion: 0.13
@@ -3416,8 +3390,8 @@ Cohesion: 0.09
 Nodes (12): Test counting specific pair., Test recording new transition., Test recording transition with event_id reference., Test transition_history query methods., clear_transition_history should delete all records for a branch., Create fresh database with schema., Populate database with test transitions., Test basic pair counting. (+4 more)
 
 ### Community 608 - "_make_snapshot"
-Cohesion: 0.20
-Nodes (7): compute_governance_hash(), _HashableEntry, Protocol for entries with name and content_hash attributes., Compute aggregate SHA-256 hash of governance entries.      Expects each entry to, Tests for vibe3.utils.hash_helpers., Direct unit tests for compute_governance_hash., TestComputeGovernanceHash
+Cohesion: 0.13
+Nodes (14): _make_snapshot(), Any, Path, Tests for audit-suggestion governance context builder., Context includes all detected failure modes., Create a mock snapshot for testing., Fallback to relative path when get_git_common_dir fails., Skip files with invalid YAML content. (+6 more)
 
 ### Community 609 - "TestHasRecentSpecificError"
 Cohesion: 0.12
@@ -3457,7 +3431,7 @@ Nodes (12): Tests for execution_lifecycle module., Explicit None error_contract 
 
 ### Community 618 - "MockDispatchCoordinator"
 Cohesion: 0.14
-Nodes (8): _resolve_base_ref 测试., Clear module-level fetch cache before each test., Already qualified remote ref is returned unchanged., Local 'main' is resolved to 'origin/main' with fetch., Second call within TTL uses cache and skips fetch., After TTL expiry, cache is bypassed and refetch occurs., When fetch fails, _resolve_base_ref still returns remote ref., TestResolveBaseRef
+Nodes (16): _config(), MockDispatchCoordinator, _MockService, Tests for pool exhaustion auto-stop logic., Server should stop when exhaustion threshold reached., Should not crash when coordinator is None., Should not check exhaustion when auto_stop_on_exhaustion=False., Mock coordinator for pool exhaustion testing. (+8 more)
 
 ### Community 619 - "test_flow_cleanup_service.py"
 Cohesion: 0.10
@@ -3540,16 +3514,16 @@ Cohesion: 0.10
 Nodes (19): Architecture Contract, `check_command_alignment()`, `check_pseudocode_convention()`, `check_shell_boundary()`, `check_skill_scope()`, `check_standard_citation()`, Core Rules, `exit()` 语义 (+11 more)
 
 ### Community 639 - "ADR Consideration"
-Cohesion: 0.10
-Nodes (20): ADR change proposals, ADR Consideration, Applicable constraints, Candidates, Complexity Tracking, Design, Dismissed candidates, Extension registration and adapter resolution (+12 more)
+Cohesion: 0.05
+Nodes (36): ADR change proposals, ADR Consideration, Applicable constraints, Candidates, Complexity Tracking, Design, Dismissed candidates, Extension registration and adapter resolution (+28 more)
 
 ### Community 640 - "Roles"
 Cohesion: 0.10
 Nodes (19): IssueRoleSyncSpec 设计, Label-based Dispatch, Roles, scan_service 执行入口, services 层依赖, 三层协作关系, 与 main 分支差异, 依赖 (+11 more)
 
 ### Community 641 - "has_roadmap_label"
-Cohesion: 0.23
-Nodes (6): State label recovery predicates for local check., Whether check may restore a missing state label from local flow refs., should_recover_missing_state_label(), has_roadmap_label(), Whether labels contain roadmap/rfc or roadmap/epic., TestHasRoadmapLabel
+Cohesion: 0.18
+Nodes (8): Path, Tests for repo_models_json_path with VIBE3_REPO_MODELS_ROOT override., Without override, should return default REPO_MODELS_JSON_PATH., With VIBE3_REPO_MODELS_ROOT, resolve to override/config/v3/models.json., VIBE3_REPO_MODELS_ROOT should support ~ expansion., VIBE3_REPO_MODELS_ROOT should resolve to absolute path., Tests for repo_models_json_path with VIBE3_REPO_MODELS_ROOT override., TestRepoModelsJsonPath
 
 ### Community 642 - "Vibe Center Test Suite"
 Cohesion: 0.10
@@ -3624,20 +3598,20 @@ Cohesion: 0.11
 Nodes (19): 1. Pre-commit Hook, 1. 检查 Rules 冲突, 2. 定期检查, 2. 生成详细报告, 3. 自动清理重复, 4. 交互式修复, Rules 分层体系, Token 节省估算 (+11 more)
 
 ### Community 660 - "conftest.py"
-Cohesion: 0.10
-Nodes (17): Session management utilities for codeagent backend.  Pure functions for session, Return True when wrapper failure indicates the resume target is invalid.      Ar, should_retry_without_session(), Execute a gh CLI command with standard error handling.          Args:, _close_events_log(), Close the persistent events log handle., cleanup_tmux_sessions(), clear_find_repo_root_cache() (+9 more)
+Cohesion: 0.09
+Nodes (19): Session management utilities for codeagent backend.  Pure functions for session, Return True when wrapper failure indicates the resume target is invalid.      Ar, should_retry_without_session(), Execute a gh CLI command with standard error handling.          Args:, _close_events_log(), Close the persistent events log handle., cleanup_tmux_sessions(), clear_find_repo_root_cache() (+11 more)
 
 ### Community 661 - "CoordinationResolver"
-Cohesion: 0.14
-Nodes (13): mock_config(), mock_github(), mock_store(), Placeholder flow checks for QualifyGateService., Create a mock orchestra config., Create a mock GitHub client., Create a mock SQLite client., Create a sample issue. (+5 more)
+Cohesion: 0.13
+Nodes (14): CoordinationResolver, Coordination resolver for remote-first blocked/dependency reads., Read collaboration fields from issue body projection.          Args:, Resolver for remote-first coordination state.      Implements truth table:     -, Resolve coordination truth with remote-first strategy.          Args:, Tests for coordination resolver., Test coordination resolver prefers remote over local., Test resolver falls back to local when remote unavailable. (+6 more)
 
 ### Community 662 - "Domain"
 Cohesion: 0.11
 Nodes (18): Domain, events/ 子目录, handlers/ 子目录, protocols/ 子目录, services 层依赖, 三层协作关系, 三层执行链, 事件流 (+10 more)
 
 ### Community 663 - "test_issue_role_sync_runner.py"
-Cohesion: 0.23
-Nodes (11): _job_log_display(), _job_role_display(), _job_status_display(), _job_target_display(), Any, Service for displaying Orchestra server status., Display launched role sessions from durable runtime_session state., Return the most specific status available for a job row. (+3 more)
+Cohesion: 0.19
+Nodes (8): Path, Tests for worktree cleanup safety checks., Tests for worktree cleanup safety checks., Skip cleanup if tmux session is using worktree., recycle_worktree_path should proceed with cleanup when no tmux sessions., recycle_worktree_path should proceed with cleanup when tmux not installed., Skip if session path starts with worktree path., TestWorktreeManagerSafety
 
 ### Community 664 - "Prompt/Governance Auditor"
 Cohesion: 0.11
@@ -3652,8 +3626,8 @@ Cohesion: 0.11
 Nodes (10): Happy path: backend returns success, output is displayed., Backend error should be handled gracefully., Backend output with sensitive data should be sanitized before display., PromptAssembler.render should be called with correct template_key., Backend.run should receive correct agent and timeout options., Backend returning stderr but no stdout should still succeed., resolve_orchestra_repo_root failure should be handled gracefully., PromptAssembler.render failure should be handled gracefully. (+2 more)
 
 ### Community 667 - "test_migrated_config_paths.py"
-Cohesion: 0.13
-Nodes (20): Path, Regression tests for migrated repository config paths., get_defaults() works when CWD has no config/v3/settings.yaml., The dependencies helper should not require root config/dependencies.toml., Doctor should use one repository-owned Graphify version declaration., Migrated config should not keep root-level duplicate files., Prompt recipes belong beside prompt templates, not under config/v3., Settings should not bind prompt source or output fields. (+12 more)
+Cohesion: 0.15
+Nodes (18): Path, Regression tests for migrated repository config paths., get_defaults() works when CWD has no config/v3/settings.yaml., The dependencies helper should not require root config/dependencies.toml., Migrated config should not keep root-level duplicate files., Prompt recipes belong beside prompt templates, not under config/v3., Settings should not bind prompt source or output fields., Prompt docs should not name deleted supervisor material settings fields. (+10 more)
 
 ### Community 668 - "make_config"
 Cohesion: 0.16
@@ -3672,12 +3646,12 @@ Cohesion: 0.20
 Nodes (18): _categorize_failure(), _cli_env(), Path, Layer 2: CLI subprocess smoke tests.  Tests that plan/run/review/internal-manage, Test that plan --dry-run --show-prompt accepts flags and fails at right stage., Test that run --dry-run --show-prompt accepts flags and fails at right stage., Categorize CLI failure based on stderr output and exit code.      Returns one of, Test that review --dry-run --show-prompt accepts flags and fails at right     st (+10 more)
 
 ### Community 672 - "TestFlowServiceAbort"
-Cohesion: 0.19
-Nodes (8): Path, Tests for worktree cleanup safety checks., Tests for worktree cleanup safety checks., Skip cleanup if tmux session is using worktree., recycle_worktree_path should proceed with cleanup when no tmux sessions., recycle_worktree_path should proceed with cleanup when tmux not installed., Skip if session path starts with worktree path., TestWorktreeManagerSafety
+Cohesion: 0.20
+Nodes (9): Render Issue Progress section (Assignee Intake, Ready Queue, Exceptions)., Render Roadmap Epic section (parent governance containers)., render_epic_items(), render_issue_progress(), parse_epic_dependencies(), Utility functions for status dashboard rendering.  This module contains helper f, Render shared task detail lines for task-oriented dashboard sections., Parse issue numbers from the ## Dependencies section of an Epic body.      Args: (+1 more)
 
 ### Community 673 - "TestSnapshotIssuePoolBoundary"
-Cohesion: 0.14
-Nodes (10): Tests for OrchestraStatusService snapshot boundary behavior., Tests that snapshot correctly respects assignee issue pool boundary., Failed gate snapshot should not require a nonexistent issue number., snapshot should batch PR lookup via PRService instead of         per-issue get_p, Snapshot should include log_path field with non-empty absolute path., Supervisor issues must not appear in the assignee issue snapshot., Snapshot should only contain issues from assignee pool., Snapshot is empty when no assignee issues exist. (+2 more)
+Cohesion: 0.22
+Nodes (9): discover_project_scope_overlays(), Return {section_key: path} for each .vibe/policies/*.md file that exists.      U, build_run_request(), build_run_sync_request(), Any, Path, Executor request builders., Build the executor sync execution request. (+1 more)
 
 ### Community 674 - "test_task_resume_usecase.py"
 Cohesion: 0.15
@@ -3716,8 +3690,8 @@ Cohesion: 0.11
 Nodes (17): Architecture Alignment, Cleanup Modes, Core Workflow, Error Handling, Permission Boundaries, preserve (for done/merged flows), Purpose, Related Skills (+9 more)
 
 ### Community 683 - "Workflow"
-Cohesion: 0.17
-Nodes (12): blocklist, Codex 兼容说明, extraKnownMarketplaces, Git 配置注意事项, Hook 目录, Plugin Setup Standard, remote fetch 配置, 关联文档 (+4 more)
+Cohesion: 0.11
+Nodes (18): Pre-flow Dependency Rules, Restrictions, Scope, Step 0.5: 治理漏网检查 `[Agent]`, Step 0.6: 反模式检查 `[Agent]`, Step 0: 消化未处理的 governance suggest `[Agent]`, Step 1.5: Milestone 健康检查 `[Agent]`, Step 1: 检查版本目标 `[人类确认]` (+10 more)
 
 ### Community 684 - "ADR Consideration"
 Cohesion: 0.11
@@ -3753,19 +3727,19 @@ Nodes (11): CliRunner, Path, Test PR create with --ai when AI is disabled., Test
 
 ### Community 692 - "test_loader.py"
 Cohesion: 0.11
-Nodes (10): Tests for configuration loaders in vibe3.config.loader., Tests for load_config with target_repo parameter., Provide target_repo pointing to temp dir with .vibe/settings.yaml., Tests for load_orchestra_config with target_repo parameter., Verify load_orchestra_config respects target_repo parameter., Tests for _deep_merge pure function., Three sequential merges respect layer priority., TestDeepMerge (+2 more)
+Nodes (11): _expand_variables(), Expand variable references in configuration values., Tests for configuration loaders in vibe3.config.loader., Smoke tests: _expand_variables delegates to expand_config_variables., Tests for load_orchestra_config with target_repo parameter., Verify load_orchestra_config respects target_repo parameter., Tests for _deep_merge pure function., Three sequential merges respect layer priority. (+3 more)
 
 ### Community 693 - "TestPlannerCommitDetection"
 Cohesion: 0.11
-Nodes (14): CodeagentExecutionService, Unified sync execution shell for command-mode codeagent runs., State-set capture tests for the synchronous codeagent runner., test_prepare_context_captures_every_remote_state_label(), Tests for planner commit detection in CodeagentExecutionService., Planner commits with mixed authorized/unauthorized files trigger finding., Planner execution with no commits passes the check., Planner check skips if no branch provided. (+6 more)
+Nodes (10): Tests for planner commit detection in CodeagentExecutionService., Planner commits with mixed authorized/unauthorized files trigger finding., Planner execution with no commits passes the check., Planner check skips if no branch provided., Planner check handles git errors gracefully., Planner check handles handoff append errors gracefully., Planner commits in docs/plans/ and docs/reports/ pass the check., Planner commits outside docs/plans/ trigger finding. (+2 more)
 
 ### Community 694 - "_make_service"
 Cohesion: 0.20
 Nodes (17): _make_service(), Path, Tests for check handling of closed task issues with branch PR status., Closed PR for a closed issue follows the existing abort cleanup path., Aborted flow with all phases done + merged PR transitions to done., Aborted flow with running phases stays aborted (legitimate abort preserved)., Aborted flow with all phases done but no merged PR stays aborted., Merged PR wins over closed issue and marks the flow done. (+9 more)
 
 ### Community 695 - "test_flow_block_enhanced.py"
-Cohesion: 0.20
-Nodes (7): mock_flow_timeline_service(), mock_store(), Tests for enhanced block_flow() behavior.  Covers: - Issue state transition to B, Mock SQLiteClient store., Mock FlowTimelineService., Create FlowService instance with mocked dependencies., service()
+Cohesion: 0.11
+Nodes (12): mock_flow_timeline_service(), mock_store(), Tests for enhanced block_flow() behavior.  Covers: - Issue state transition to B, block_flow without task issue must raise SystemError (incomplete flow)., block_flow transitions label but doesn't add comment when reason is None., Mock SQLiteClient store., Mock FlowTimelineService., Create FlowService instance with mocked dependencies. (+4 more)
 
 ### Community 696 - "test_flow_idempotent_create.py"
 Cohesion: 0.11
@@ -3828,12 +3802,12 @@ Cohesion: 0.22
 Nodes (24): build_review_observation(), Path, Build exact Git facts and deterministic Review Kernel classification., KernelObservation, Deterministic Review/Architecture Kernel classification., Repository-owned minimum review policy, not a risk prediction., ReviewPolicy, _build_inspect_summary() (+16 more)
 
 ### Community 711 - "UserError"
-Cohesion: 0.21
-Nodes (11): _fetch_and_record_external_events(), Fetch CI status and comments from GitHub, record as external events.      This i, Integration tests for PR show external event recording., Test successful recording of CI status and comments., Test handling of PR without CI status., Test that failures in fetching/recording are handled gracefully., Test handling of comment fetch failures., test_fetch_and_record_external_events_comment_fetch_failure() (+3 more)
+Cohesion: 0.20
+Nodes (6): Tests for CICheck model and PRResponse.ci_checks field., Test CICheck model instantiation., Test CICheck model serialization excludes None fields., Test CICheck model serialization keeps failure metadata., Test suite for CICheck model., TestCICheckModel
 
 ### Community 712 - "validate_transition"
-Cohesion: 0.14
-Nodes (17): InvalidTransitionError, Invalid state transition in orchestration state machine., can_transition(), State machine definitions for issue label transitions.  Moved from domain layer, Return whether a transition is allowed by domain rules., Validate a state transition against domain rules., validate_transition(), Tests for domain state-machine rules. (+9 more)
+Cohesion: 0.16
+Nodes (15): can_transition(), State machine definitions for issue label transitions.  Moved from domain layer, Return whether a transition is allowed by domain rules., Validate a state transition against domain rules., validate_transition(), Tests for domain state-machine rules., blocked → handoff should be forbidden without force (#2561)., Manual resume commands can bypass blocked state with force=True. (+7 more)
 
 ### Community 713 - "resolve_milestone_rank"
 Cohesion: 0.14
@@ -3841,7 +3815,7 @@ Nodes (11): Any, Queue ordering utilities for orchestra ready queue., Resolve mi
 
 ### Community 714 - "test_handoff_file_ops.py"
 Cohesion: 0.20
-Nodes (6): Tests for error classification functions., Test classify_error_hybrid function., Test that structured classification is tried first., Test fallback to string matching for unknown exceptions., Test hybrid classification with unknown error., TestClassifyErrorHybrid
+Nodes (9): check_service(), mock_git_client(), mock_github_client(), mock_store(), Tests for CheckService verify flow functionality., Create a mock SQLiteClient., Create a mock GitClient., Create a mock GitHubClient with safe defaults. (+1 more)
 
 ### Community 715 - "AI Agent Guide"
 Cohesion: 0.12
@@ -3861,7 +3835,7 @@ Nodes (28): 1. Scope, 2. Audit Pipeline, 3. Evidence Bundle Schema, 4.1 GitHub R
 
 ### Community 719 - "Vibe Skills 与 Slash 命令标准"
 Cohesion: 0.20
-Nodes (6): Unit tests for prompt_meta module., Tests for PromptMeta.summary method., Summary should include fallback_context_mode when it exists., Summary should exclude fallback_context_mode when it's None., Summary should include all expected fields., TestPromptMetaSummary
+Nodes (7): Tests for ServeStatusService., Test cases for _display_log_path method., _display_log_path should show the orchestra events log absolute path., display_status should include log path after daemon status., Runtime Jobs should sit next to orchestration activity, not at the bottom., test_display_status_places_runtime_jobs_after_activity(), TestDisplayLogPath
 
 ### Community 720 - "Vibe 3.0 Execution Plan (Isolated Phase Logic)"
 Cohesion: 0.12
@@ -3888,24 +3862,24 @@ Cohesion: 0.12
 Nodes (14): Specification Quality Checklist: Exception Model Baseline, Feature Specification: Exception Model Baseline, Implemented entities, Key implementation PRs, Known gaps and tracking, Non-goals, Purpose and truth sources, Requirements (+6 more)
 
 ### Community 726 - "Feature Specification: Spec Artifact Handoff Bridge"
-Cohesion: 0.12
-Nodes (16): Artifact identity and mapping, Automated material consumption, Consistency and recovery, Extension bridge, Feature Specification: Spec Artifact Handoff Bridge, Non-goals, Problem, Relationships to baseline specs (+8 more)
+Cohesion: 0.20
+Nodes (6): Tests for error_message_cleaner utility., clean_error_message matches inline re.sub for trailing pipe., Verify the shared function produces the same output as inline patterns., clean_error_message matches inline re.split for TMPDIR., clean_error_message matches inline re.split for Recent Errors., TestCleanErrorMessageCallerDelegation
 
 ### Community 727 - "TestPRFieldValidation"
 Cohesion: 0.16
 Nodes (10): Validate that all field names are known GitHub PR API fields., _validate_pr_fields(), Tests for GitHub issue field validation., Tests for _validate_pr_fields function., A representative set of known valid PR fields should pass validation., Empty list should pass validation (edge case)., Typo 'headRefNme' should raise ValueError suggesting 'headRefName'., Multiple invalid PR fields should all be listed in error. (+2 more)
 
 ### Community 728 - "find_available_port"
-Cohesion: 0.20
-Nodes (7): Tests for ServeStatusService., Test cases for _display_log_path method., _display_log_path should show the orchestra events log absolute path., display_status should include log path after daemon status., Runtime Jobs should sit next to orchestration activity, not at the bottom., test_display_status_places_runtime_jobs_after_activity(), TestDisplayLogPath
+Cohesion: 0.28
+Nodes (6): Path, T, Connection/bootstrap layer shared by focused SQLite repositories., Create a SQLiteClient resolved from a repository root path.          Centralizes, Initialize schema and run migrations (idempotent).          Uses a migration ver, SQLiteClientBase
 
 ### Community 729 - "check_constraints"
 Cohesion: 0.21
 Nodes (5): check_constraints(), Validate labels against all constraints.      Args:         labels: Set of label, An issue can trigger multiple constraints simultaneously., Each constraint should detect violations correctly., TestConstraintDetection
 
 ### Community 730 - "normalize_labels"
-Cohesion: 0.16
-Nodes (10): Scan remote open issues for label constraint violations and auto-fix.          T, normalize_labels(), Extract label names from GitHub issue payload labels field.      Compatible with, Tests for normalize_labels function., Empty list should return empty list., Should extract 'name' field from dict items., Should skip items without 'name' field., Should preserve plain string items, skip non-string non-dict. (+2 more)
+Cohesion: 0.25
+Nodes (6): Self, One-based inclusive source range., Reject ranges that cannot point to real source text., SourceRange, Validation tests for versioned inspect evidence models., test_source_range_rejects_end_before_start()
 
 ### Community 731 - "assert_rebuild_postconditions"
 Cohesion: 0.17
@@ -3924,8 +3898,8 @@ Cohesion: 0.12
 Nodes (15): console.py, flow_ui_primitives.py, flow_ui.py, flow_ui_timeline.py, handoff_ui.py, pr_ui.py, task_ui.py, UI (+7 more)
 
 ### Community 735 - "find_parent_branch"
-Cohesion: 0.17
-Nodes (10): find_parent_branch(), Find the closest parent branch for the current branch.      This function analyz, Tests for find_parent_branch function., Test handling of git command errors., Test finding parent when on main branch (root branch with no parent)., Test finding parent for task/issue-* branch., Test that find_parent_branch doesn't spawn O(K) subprocesses., Test when no parent branch can be found. (+2 more)
+Cohesion: 0.25
+Nodes (5): Test cases for _display_config method., When server is running, display shows runtime value from live snapshot., When server is unreachable, display shows static config value., When live snapshot matches config, no override indicator is shown., TestDisplayConfig
 
 ### Community 736 - "resolve_roadmap_rank"
 Cohesion: 0.16
@@ -3936,8 +3910,8 @@ Cohesion: 0.12
 Nodes (15): 1. 死代码（Dead Code）, 2. 自我检测/自我实现代码（Self-Checking Code）, 3. 已废弃的测试（Orphaned Tests）, 4. 绕路逻辑（Roundabout Logic）, 5. 过滤代替删除（Filter-Instead-of-Delete）, Code Auditor 代码质量审计材料, Design Rationale, Execution Pattern (+7 more)
 
 ### Community 738 - "test_flow_status_remote_projection.py"
-Cohesion: 0.17
-Nodes (15): _make_flow_state(), _mock_pr(), Tests for flow status remote-first PR projection behavior., flow status without --all only shows active flows., flow status --all includes flows in terminal states (done, aborted)., flow status --check should run consistency verification before render., flow status --check should warn if the full check returns issues., PR data is fetched by branch via projection service. (+7 more)
+Cohesion: 0.29
+Nodes (4): DispatchState, Dispatch lifecycle FSM for queue sleep/wake cycling.  Two-state finite state mac, Two-state FSM for the dispatch queue lifecycle., Advance the FSM given this tick's dispatch outcome.          Returns the resulti
 
 ### Community 739 - "test_env_override.py"
 Cohesion: 0.19
@@ -3952,8 +3926,8 @@ Cohesion: 0.16
 Nodes (10): _git_runner(), Tests for align_auto_scene_to_base best-effort fetch semantics.  Regression cove, Build a subprocess.run side_effect keyed on the git subcommand., Best-effort fetch must not gate worktree usability., 核心回归 (#1729): reviewer 已提交的分支 fetch 失败,worktree 仍可用。, has_commits=True 时不执行 destructive 对齐 (不动 reviewer 的产出)。, has_commits=False + fetch 失败,destructive 成功 → True。, destructive 对齐失败仍判定不可用 (保护 scene 正确性)。 (+2 more)
 
 ### Community 742 - "TestCommandTypeToExecutionRoleMapping"
-Cohesion: 0.22
-Nodes (8): Behavior, Commit Workflow Contract, Decision, Generated Artifact Delivery, Goal, Graphify Version Check in Vibe Doctor, Implementation Boundary, Verification
+Cohesion: 0.29
+Nodes (4): Tests for AIClient when litellm is not installed., Test initialization when litellm is not installed., Test generation when litellm is not installed., TestAIClientWithoutLitellm
 
 ### Community 743 - "TestRetryCounterPersistence"
 Cohesion: 0.12
@@ -3964,24 +3938,24 @@ Cohesion: 0.12
 Nodes (11): Tests for CI parity - ensuring tests behave consistently across environments.  T, Verify tests handle environment variables correctly., Tests should pass regardless of GITHUB_ACTIONS env var., Verify tests don't depend on specific working directory., Verify repo root detection works from any subdirectory., Verify config loading works from any working directory., Verify tests don't depend on specific git state., Verify inspect base works with mocked git state. (+3 more)
 
 ### Community 745 - "TestTransientErrorLogging"
-Cohesion: 0.19
-Nodes (10): make_config(), make_issue(), Tests for manager role service request preparation., Unexpected errors should still log full traceback., Unit test for classification logic., Manager dispatch should be reduced to request preparation only., Manager should use warning for transient git errors, exception for others., Git ref lock conflict should be logged as warning, not exception. (+2 more)
+Cohesion: 0.14
+Nodes (13): is_transient_git_error(), Git transient error patterns and classification utilities.  This module centrali, Check if error message matches known transient Git error patterns.      Args:, make_config(), make_issue(), Tests for manager role service request preparation., Unexpected errors should still log full traceback., Unit test for classification logic. (+5 more)
 
 ### Community 746 - "TestPublishAndWait"
 Cohesion: 0.12
 Nodes (9): Test EventBus publish_and_wait() functionality., Reset EventPublisher singleton before each test., publish() continues to work and ignores return values., Handler raises exception, should log error and continue., Handler returns ExecutionLaunchResult, verify correct return., No handler registered, returns None., Multiple handlers, take first non-None value., Tests for publish_and_wait() method. (+1 more)
 
 ### Community 747 - "TestQueueExhaustedRefresh"
-Cohesion: 0.25
-Nodes (8): claude-mem, Codex SessionStart 重复输出修复, Codex 兼容, `doctor` 端口漂移说明（上游问题，等待修复）, marketplace 配置, 使用, 安装, 验证
+Cohesion: 0.29
+Nodes (6): Path, Shared fixtures for exception tests., Reset ErrorTrackingService singleton between tests to prevent state leakage., Create a temporary SQLiteClient for testing., reset_error_tracking(), temp_store()
 
 ### Community 748 - "test_pr_lifecycle_cache.py"
-Cohesion: 0.25
-Nodes (8): Codex 兼容, spec-kit, superspec 扩展, 初始化项目, 安装 specify CLI, 技能列表, 集成安装, 验证
+Cohesion: 0.12
+Nodes (14): Shared patch-path constants for PR service subpackage tests.  When PR service mo, Tests for PR title caching during PR lifecycle., PR creation should append update to handoff., PR creation should cache PR number and title., Batch open PR refresh should update flow_context_cache for each branch., Recent PR cache should reuse fresh local snapshot for 10-minute window., PRService.refresh_recent_pr_cache(sync_context_cache=False)     should not write, Marking PR ready should update cache with latest PR title. (+6 more)
 
 ### Community 749 - "TestAutoFixBranch"
-Cohesion: 0.20
-Nodes (9): check_service(), mock_git_client(), mock_github_client(), mock_store(), Tests for CheckService.auto_fix_branch method., Create a mock SQLiteClient., Create a mock GitClient., Create a mock GitHubClient. (+1 more)
+Cohesion: 0.12
+Nodes (13): check_service(), mock_git_client(), mock_github_client(), mock_store(), Tests for CheckService.auto_fix_branch method., Create a mock SQLiteClient., Create a mock GitClient., Create a mock GitHubClient. (+5 more)
 
 ### Community 750 - "test_flow_events.py"
 Cohesion: 0.12
@@ -4064,8 +4038,8 @@ Cohesion: 0.13
 Nodes (14): format_result_entries(), Any, Convert to human-readable text.          Returns:             Human-readable tex, Format result dict entries as text lines.      Handles dict values (nested key-v, Test format_result_entries with dict value., Test format_result_entries with list value., Test format_result_entries with scalar value., Test format_result_entries with empty dict. (+6 more)
 
 ### Community 770 - "finalize_review_output"
-Cohesion: 0.11
-Nodes (16): finalize_review_output(), _load_existing_audit_ref(), _load_existing_verdict(), Audit artifact helpers for reviewer role., Load existing verdict from flow state if agent already wrote it., Read audit_ref and verdict from flow state after review completes.      This is, Tests for reviewer role audit artifact helpers and dispatch., When agent wrote both audit_ref and verdict, return them. (+8 more)
+Cohesion: 0.09
+Nodes (25): build_base_review_request(), _build_manual_review_async_cli_args(), build_manual_review_request_payload(), _build_manual_review_task(), _dispatch_async_manual_review(), execute_manual_review_async(), execute_manual_review_sync(), ReviewRequest (+17 more)
 
 ### Community 771 - "Supervisor Apply 治理材料"
 Cohesion: 0.13
@@ -4092,12 +4066,12 @@ Cohesion: 0.19
 Nodes (12): Pair-loop behavior at the no-op integration boundary., test_fourth_observed_pair_is_recorded_then_blocks(), test_third_existing_pair_allows_one_observed_transition(), Complete state-label set regressions for the unified noop gate., test_added_state_label_passes_when_stale_label_remains(), _payload(), No-op integration tests for confirmed transition accounting., _store() (+4 more)
 
 ### Community 777 - "test_plan.py"
-Cohesion: 0.25
-Nodes (8): context7, exa search, MCP 服务器, 优势, 使用, 配置, 配置, 验证
+Cohesion: 0.28
+Nodes (6): Path, execute_spec_plan_async must set worktree_requirement=PERMANENT., ExecutionRequest must include worktree_requirement=PERMANENT., Even without issue_number, worktree_requirement must be PERMANENT., Async display metadata should come from the same resolved plan options., TestExecuteSpecPlanAsyncWorktreeRequirement
 
 ### Community 778 - "conftest.py"
-Cohesion: 0.13
-Nodes (14): block_gh_subprocess(), coverage_service(), _mock_label_service(), mock_project_root(), Path, Shared fixtures for services tests., Create a mock LabelService for BlockedStateService.unblock tests., Block real gh CLI calls in unit tests.      Fails the test with a clear message (+6 more)
+Cohesion: 0.38
+Nodes (6): _make_coordinator_dependencies(), Test degraded mode logging in GlobalDispatchCoordinator., Test that dispatch does not log degraded mode when not entered., Test that dispatch logs when degraded mode is entered during qualification., test_dispatch_logs_degraded_mode(), test_dispatch_no_log_when_not_degraded()
 
 ### Community 779 - "更新日志"
 Cohesion: 0.14
@@ -4124,7 +4098,7 @@ Cohesion: 0.14
 Nodes (14): 1. Qualify Gate (资格门), 2. Intelligent Resume (智能恢复), 3. Branch Creation from PR Source, Architecture, Architecture, Data Model, Declaring Dependencies, Dependency Handling Mechanism (V3) (+6 more)
 
 ### Community 785 - "CI Simulation Mode 使用指南"
-Cohesion: 0.14
+Cohesion: 0.15
 Nodes (13): CI Simulation Mode 使用指南, Q1: 为什么我的测试在本地通过但在 CI 失败？, Q2: VIBE_CI_PARITY 和 VIBE_CI_SIMULATE 的区别？, Q3: 何时使用 GITHUB_ACTIONS=true 而不是 VIBE_CI_SIMULATE？, 一、VIBE_CI_SIMULATE=1 — 完整 CI 环境模拟, 七、相关资源, 三、GITHUB_ACTIONS=true — 直接环境变量, 二、VIBE_CI_PARITY=1 — 双重测试验证 (+5 more)
 
 ### Community 786 - "trace_manager.py"
@@ -4148,8 +4122,8 @@ Cohesion: 0.18
 Nodes (12): get_git_diff_summary(), Git-only diff summary for PR change summaries., Build DiffSummary from git numstat + name-status.      Collects both committed (, Tests for git-based diff summary., Test basic git diff summary generation., Test that get_git_diff_summary handles merge-base resolution failure., Test git diff summary with no changes., Test git diff summary handles renames correctly. (+4 more)
 
 ### Community 791 - "get_error_handling_contract"
-Cohesion: 0.05
-Nodes (43): get_error_handling_contract(), Get handling contract for an error code.      Args:         error_code: Error co, ErrorHandlingContract, Error severity classification for Orchestra runtime., Registry-backed handling metadata for each error code.      This replaces prefix, get_current_tick_id(), Get current heartbeat tick ID from context (0 if outside heartbeat).      This f, Record error and check if threshold reached.          Args:             error_co (+35 more)
+Cohesion: 0.14
+Nodes (9): get_error_handling_contract(), Get handling contract for an error code.      Args:         error_code: Error co, Test AUP rejection error classification., Verify WARNING severity, gate_action=ignore, no threshold count., Verify classify_error_hybrid() with AgentExecutionError + AUP text., TestAUPRejectionClassification, Test that WARNING severity errors don't fail the issue., Test that CRITICAL severity triggers immediate FailedGate.          NOTE: CRITIC (+1 more)
 
 ### Community 792 - "Server"
 Cohesion: 0.14
@@ -4160,8 +4134,8 @@ Cohesion: 0.19
 Nodes (9): has_manager_assignee(), Whether issue assignees still include a configured manager username.      Return, Tests for has_manager_assignee function., Empty manager list should allow all issues (no restriction)., Issue with manager assignee should return True., Issue without manager assignee should return False., Unassigned issue with managers configured should return False., Function should accept both list and tuple for manager_usernames. (+1 more)
 
 ### Community 794 - "SignatureService"
-Cohesion: 0.12
-Nodes (14): FlowLifecycleMixin, Self, Flow block/abort operations mixin., Mark flow as aborted (abandoned).          Args:             branch: Branch name, Mixin providing flow lifecycle operations., Mark flow as blocked.          Sets flow_status="blocked" and writes blocked_rea, Unified actor/signature resolution for workflow and flow events., Unified actor resolution and normalization.      Two primary use cases:     - ** (+6 more)
+Cohesion: 0.20
+Nodes (8): Unified actor/signature resolution for workflow and flow events., Unified actor resolution and normalization.      Two primary use cases:     - **, Internal normalizer for flow-operation comparisons., Return True if actor conveys no meaningful identity (flow layer)., Normalize an actor identifier for display (PR body, UI).          Handles:, Get git user.name from current worktree as the final source of truth., Resolve actor for a flow-state mutation.          Precedence (Single Source of T, SignatureService
 
 ### Community 795 - "🗂️ 目录职责详解"
 Cohesion: 0.14
@@ -4184,28 +4158,28 @@ Cohesion: 0.14
 Nodes (13): Tests for task intake command blocked-by flows., Without --blocked-by, placeholder flow creation should not be called., --blocked-by parameter should create placeholder flow and set blocked label., If assignee fails, placeholder flow should not be created., If placeholder flow creation fails, warn and propagate error., --blocked-reason alone (without --blocked-by) should create placeholder flow., --blocked-by and --blocked-reason should remain mutually exclusive., test_intake_blocked_by_assignee_failure_skips_placeholder() (+5 more)
 
 ### Community 800 - "test_dispatch_preflight_error_logging.py"
-Cohesion: 0.39
-Nodes (3): has_roadmap_conflict(), Whether labels have both a roadmap label and a state/* label., TestHasRoadmapConflict
+Cohesion: 0.09
+Nodes (21): DispatchPreflightService, QualifyGateLike, Unified pre-dispatch checks for orchestra dispatch., Subset of QualifyGate used by dispatch preflight., Qualify a blocked issue for dispatch., Run semantic dispatch qualification for an issue., Converges semantic and structural dispatch checks., Run semantic and structural checks before dispatch intent emission. (+13 more)
 
 ### Community 801 - "TestTraceOutputIntegration"
 Cohesion: 0.14
 Nodes (9): Integration tests for trace output functionality., Keep pr show output tests focused on formatting, not remote lookups., Integration tests for --trace output formats., Test pr show --trace with default format., Test pr show --trace --json outputs JSON with trace info., Test pr show --trace --yaml outputs YAML with trace info., Test pr show with both --json and --yaml fails., stub_pr_show_service() (+1 more)
 
 ### Community 802 - "_make_config"
-Cohesion: 0.09
-Nodes (17): GovernanceConfig, Configuration for periodic governance scan service., _compute_material_hash(), Compute aggregate hash of governance material files on disk., _make_config(), _make_snapshot(), Tests for governance recipe building and prompt rendering., Verify material hash and description resolve via VIBE3_RUNTIME_ASSETS_ROOT. (+9 more)
+Cohesion: 0.13
+Nodes (13): _compute_material_hash(), Compute aggregate hash of governance material files on disk., _make_config(), _make_snapshot(), Tests for governance recipe building and prompt rendering., Verify material hash and description resolve via VIBE3_RUNTIME_ASSETS_ROOT., _compute_material_hash should resolve through resolve_runtime_asset., When VIBE3_RUNTIME_ASSETS_ROOT has no materials, falls back to bundled. (+5 more)
 
 ### Community 803 - "test_flow_timeline_service.py"
 Cohesion: 0.14
 Nodes (13): Tests for FlowTimelineService., Test that duplicate handoff_append comments are skipped., Test that policy blocks state_sync events from writing comments.      flow_block, Test that different event_type comments are added.      Uses milestone_recorded, Test that comment is skipped when issue_number is None., Test that duplicate event_type comments are skipped.      Uses milestone_recorde, Test that record_timeline_event calls both add_event and add_comment.      Uses, test_record_timeline_event_allows_different_event_type() (+5 more)
 
 ### Community 804 - "TestResolveBranchAndIssue"
-Cohesion: 0.17
-Nodes (7): 测试：无效分支名返回原值和 None issue number, 测试：返回值类型为 tuple，且元素类型正确, 测试 resolve_branch_and_issue 组合解析行为, 测试：None 输入返回当前分支和正确的 issue number, 测试：纯数字输入返回 canonical branch 和 issue number, 测试：分支名输入返回原值和解析出的 issue number, TestResolveBranchAndIssue
+Cohesion: 0.09
+Nodes (16): Branch argument resolution for CLI commands.  Thin wrapper around resolve_comman, Resolve --branch argument to a canonical branch name.      This is a thin wrappe, Resolve --branch argument and extract issue number in one call.      This centra, resolve_branch_and_issue(), _resolve_branch_arg(), Tests for branch_arg resolver wrapper., 测试：无效分支名返回原值和 None issue number, 测试：返回值类型为 tuple，且元素类型正确 (+8 more)
 
 ### Community 805 - "test_task_service_fresh_db.py"
 Cohesion: 0.29
-Nodes (7): claude-hud, Combined Statusline, 可选显示, 安装, 注意, 配置 (macOS + bun), 验证
+Nodes (5): Tests for planner role completion scenarios.  钉死 planner 的关键行为： 1. blocked issue, execute_spec_plan_sync must pass cwd=None to ExecutionRequest., Sync execution passes cwd=None for coordinator to resolve., test_build_plan_prompt_retry_resume_provides_bootstrap_fallback(), TestExecuteSpecPlanSyncCwdNone
 
 ### Community 806 - "extract_cross_module_imports"
 Cohesion: 0.19
@@ -4260,8 +4234,8 @@ Cohesion: 0.15
 Nodes (12): 1. 强制前置检查（优化：并行执行）, 2. Pre-Bootstrap Sync Check（强制）, 3. Epic 入口分流检查, 4. 确认未提供的信息（优化：只问未指定的）, 5. 确认依赖关系, 6. Bootstrap flow scene, 7. 留痕（Trace）, 8. 指向 vibe-continue 工作流 (+4 more)
 
 ### Community 819 - "/vibe-project-check - 项目配置检查与补全"
-Cohesion: 0.11
-Nodes (17): Execution Flow, Guardrails（交互原则）, Overview, Phase 1: vibe init 产物验证, Phase 2: 配置补全检查, Phase 3: Orchestra 管理配置, Phase 4: 运行时验证, Phase 5: Global Runtime Asset Completeness (+9 more)
+Cohesion: 0.15
+Nodes (12): Phase 1: vibe init 产物验证, Phase 2: 配置补全检查, Phase 3: Orchestra 管理配置, Phase 4: 运行时验证, Phase 5: Global Runtime Asset Completeness, Phase 6: Target Repo Init State, Phase 7: Agent/Toolchain Availability, Phase 8: Core Command Prompt Readiness (+4 more)
 
 ### Community 820 - "Vibe Redundancy Audit"
 Cohesion: 0.15
@@ -4272,8 +4246,8 @@ Cohesion: 0.15
 Nodes (12): Assumptions, Edge Cases, Feature Specification: [FEATURE NAME], Functional Requirements, Key Entities *(include if feature involves data)*, Measurable Outcomes, Requirements *(mandatory)*, Success Criteria *(mandatory)* (+4 more)
 
 ### Community 822 - "FlowRecoveryService"
-Cohesion: 0.29
-Nodes (7): CLI 配置, Codex 兼容, Git Hooks, graphify, 使用, 安装, 验证
+Cohesion: 0.38
+Nodes (6): Tests for check-service label constraint enforcement side effects., Remote enforcement keeps valid state/* labels on scanned conflicts., Remote enforcement catches no-assignee state/* issues., _removed_labels(), test_remote_scan_covers_state_labels_without_assignee(), test_remote_scanned_state_with_assignee_removes_only_scanned()
 
 ### Community 823 - "Audit Report — Anti-Pattern Gate & Scope Auditor"
 Cohesion: 0.15
@@ -4288,12 +4262,12 @@ Cohesion: 0.15
 Nodes (12): Execution Steps, Invocation Boundary, Layer 1: 语法 + Lint 检查（修改后）, Layer 2: 测试验证（修复后）, Layer 3: Review Gate（严格审查）, Output Format, Overview, System Role (+4 more)
 
 ### Community 826 - "TestAskInputValidation"
-Cohesion: 0.15
-Nodes (7): Tests for vibe3.commands.ask module., Tests for input validation logic., Empty string should fail validation., Whitespace-only string should fail validation., Question exceeding MAX_QUESTION_LENGTH should fail., Question exactly at MAX_QUESTION_LENGTH should pass validation., TestAskInputValidation
+Cohesion: 0.18
+Nodes (6): Tests for input validation logic., Empty string should fail validation., Whitespace-only string should fail validation., Question exceeding MAX_QUESTION_LENGTH should fail., Question exactly at MAX_QUESTION_LENGTH should pass validation., TestAskInputValidation
 
 ### Community 827 - "TestOrchestrationFacadeDispatchServices"
-Cohesion: 0.43
-Nodes (5): Contracts for post-merge Graphify artifact synchronization., test_graphify_sync_has_minimum_write_permissions(), test_graphify_sync_runs_after_non_graph_main_changes(), test_graphify_sync_uses_pinned_tool_and_graph_only_delivery(), _workflow()
+Cohesion: 0.33
+Nodes (5): Affected Areas, Gap Analysis, Graphify Explore: spec 012 US4 — Planner Context Consumption, Key Symbols, Risk Notes
 
 ### Community 828 - "_make_init_script"
 Cohesion: 0.22
@@ -4304,8 +4278,8 @@ Cohesion: 0.21
 Nodes (12): Path, Integration tests for install.sh runtime asset distribution., Verify critical runtime assets exist at canonical paths after install., Verify install/update sanity check follows the runtime_assets module move., Verify settings.yaml points to canonical runtime asset paths., Verify runtime_assets_root() points to ~/.vibe in global distribution mode., Verify install.sh migrates old assets/ paths to canonical paths., test_canonical_paths_exist_after_install() (+4 more)
 
 ### Community 830 - "test_check_missing_state_recovery.py"
-Cohesion: 0.21
-Nodes (12): Path, Tests for check-time recovery of missing remote state labels., RFC and epic issues may intentionally have no execution state label., Missing remote state is reported, never inferred from local refs., Network failures must not be treated as missing state labels., Missing or malformed label payloads must not be treated as missing state., Blocked flows require explicit resume; check must not auto-unblock them., test_verify_branch_does_not_infer_missing_state_label_from_flow_refs() (+4 more)
+Cohesion: 0.47
+Nodes (3): has_orchestra_governed(), Whether labels contain orchestra-governed., TestHasOrchestraGoverned
 
 ### Community 831 - "Engineering Patterns (Supplement)"
 Cohesion: 0.17
@@ -4348,12 +4322,12 @@ Cohesion: 0.17
 Nodes (12): 1. Governance 材料错误分类, 2. Layer 标注设计冗余, 3. Manager 材料可能需要拆分, MaterialLayer 映射, Vibe Ecosystem vs Vibe-Center Boundary, 具体分类, 分类标准, 参考 (+4 more)
 
 ### Community 841 - "Task: Orchestra 调度器"
-Cohesion: 0.17
-Nodes (12): 1) Tier 3 治理调度 (Operational), 2) Issue assignee 触发 manager 执行, 2) Self-hosted webhook 事件服务, 3) PR reviewer 触发 review, Task: Orchestra 调度器, 事件到执行链路（当前真源）, 当前状态, 快速开始 (+4 more)
+Cohesion: 0.33
+Nodes (4): Tests for flow add status checking., A branch without any flow record should create a new flow., Existing flow should be confirmed idempotently., TestFlowAddStatusCheck
 
 ### Community 842 - "Orchestra 发布接手手册"
-Cohesion: 0.17
-Nodes (11): 1. 当前架构, 2. 发布前检查, 3.1 干跑（建议先做）, 3.2 真实执行（收口标准）, 3. 验证步骤（必须留证据）, 4. 已知 follow-up, 5. 发布 agent 交付清单, Orchestra 发布接手手册 (+3 more)
+Cohesion: 0.33
+Nodes (4): Test that GitHub API failures do NOT trigger block_flow.      Scenario: GitHub A, GitHub API failure should raise GitHubAPIError, not block., GitHub API failure after retries should record to error_log., TestGitHubAPIFailureNoBlock
 
 ### Community 843 - "init.sh"
 Cohesion: 0.41
@@ -4376,24 +4350,24 @@ Cohesion: 0.17
 Nodes (12): _classify_github_api_error(), Classify GitHub API error from stderr output and exit code.      Args:         s, Should classify rate limit errors correctly., Should classify timeout errors correctly., Should classify service unavailable errors correctly., Should classify network errors correctly., Should fallback to E_API_UNKNOWN for unclassified errors., test_classify_github_api_error_network() (+4 more)
 
 ### Community 848 - "get_vibe3_cache_path"
-Cohesion: 0.20
-Nodes (10): Path, Initialize cache with repository path.          Args:             repo_path: Pat, get_vibe3_cache_path(), get_vibe3_db_path(), get_vibe3_log_dir(), Path, Vibe3 path resolution utilities.  This module provides centralized path resoluti, Get path to a vibe3 cache file under .git/vibe3/.      Args:         repo_path: (+2 more)
+Cohesion: 0.40
+Nodes (5): 关键决策记录, 决策 1：为什么四阶段？, 决策 2：为什么 Engine/Runtime 冻结？, 决策 3：为什么 Trace 分两个阶段？, 决策 4：为什么不学习 Symphony 的 agent 模型？
 
 ### Community 849 - "FlowReader"
-Cohesion: 0.29
-Nodes (3): Tests for PR to Branch resolver., 测试 handoff status --pr 集成, TestCommandIntegration
+Cohesion: 0.50
+Nodes (4): _format_datetime_iso(), datetime, PR service implementation., Format datetime to ISO string, pass through None and str.
 
 ### Community 850 - "rule_missing_branch_cleanup"
 Cohesion: 0.38
 Nodes (11): Mark flow aborted when local branch deleted., rule_missing_branch_cleanup(), _make_ctx(), _make_svc(), SimpleNamespace, Tests for rule_missing_branch_cleanup terminal-state preservation.  Issue #3189:, test_aborted_flow_not_re_aborted_on_missing_branch(), test_active_flow_still_aborted_on_missing_branch() (+3 more)
 
 ### Community 851 - "BranchBehindInfo"
-Cohesion: 0.20
-Nodes (8): format_branch_behind_body(), Format branch behind info as markdown for PR body.      Args:         info: Bran, Tests for branch_compare utilities., Output should be formatted as markdown., Output should contain recommended git commands., Tests for format_branch_behind_body function., Output should contain head and base branch names., TestFormatBranchBehindBody
+Cohesion: 0.26
+Nodes (9): BranchBehindInfo, format_branch_behind_body(), Information about how far a branch is behind its base., Format branch behind info as markdown for PR body.      Args:         info: Bran, Output should be formatted as markdown., Output should contain recommended git commands., Tests for format_branch_behind_body function., Output should contain head and base branch names. (+1 more)
 
 ### Community 852 - "format_branch_behind_console"
-Cohesion: 0.26
-Nodes (9): BranchBehindInfo, format_branch_behind_console(), Format branch behind info for console display (Rich markup).      Args:, Information about how far a branch is behind its base., Tests for format_branch_behind_console function., Output should contain head and base branch names., Output should contain Rich markup tags., Output should contain recommended git commands. (+1 more)
+Cohesion: 0.20
+Nodes (8): format_branch_behind_console(), Format branch behind info for console display (Rich markup).      Args:, Tests for branch_compare utilities., Tests for format_branch_behind_console function., Output should contain head and base branch names., Output should contain Rich markup tags., Output should contain recommended git commands., TestFormatBranchBehindConsole
 
 ### Community 853 - "Vibe Center 项目结构"
 Cohesion: 0.17
@@ -4408,16 +4382,16 @@ Cohesion: 0.21
 Nodes (8): mock_pr_svc_factory(), Tests for pr show command - bound task display., Factory fixture to create mock PR service with common setup., Test pr show command with bound task display., Test pr show displays bound tasks from flow truth., Test pr show when no bound tasks exist in flow., Test pr show displays PR comments with author and time., TestPRShowBoundTask
 
 ### Community 856 - "._call"
-Cohesion: 0.13
-Nodes (16): _make_config_mock(), _make_flow(), SimpleNamespace, Tests for special sections of the task status dashboard: governed anomaly, serve, Tests for _resolve_server_label covering all branches., Tests for _compute_effective_server_running., task status should show remote tasks in a separate section., dev/issue-N flows should appear in Human Collaboration Flows section. (+8 more)
+Cohesion: 0.26
+Nodes (4): Tests for _resolve_server_label covering all branches., Tests for _compute_effective_server_running., TestComputeEffectiveServerRunning, TestResolveServerLabel
 
 ### Community 857 - "test_flow_manager_imports.py"
 Cohesion: 0.17
 Nodes (11): Test FlowManager import migration across codebase., Verify server/registry.py imports FlowManager directly from domain., Verify governance_sync_runner.py does NOT import FlowManager from domain.      A, Verify mcp.py imports FlowManager from domain., Verify manager.py uses flow_factory instead of importing FlowManager.      After, Verify governance_scan.py imports FlowManager from domain., test_governance_scan_imports_from_domain(), test_governance_sync_runner_does_not_import_flow_manager() (+3 more)
 
 ### Community 858 - "conftest.py"
-Cohesion: 0.24
-Nodes (9): _clean_git_env(), installed_vibe_home(), Path, TempPathFactory, Shared fixtures for integration tests., Return env for nested git commands run from hooks or other git subprocesses., Create a temp directory simulating ~/.vibe with runtime assets installed.      T, Create a minimal target repo for cross-project testing.      This fixture:     - (+1 more)
+Cohesion: 0.21
+Nodes (11): _clean_git_env(), installed_vibe_home(), Path, TempPathFactory, Shared fixtures for integration tests., Create a temporary SQLiteClient for testing., Return env for nested git commands run from hooks or other git subprocesses., Create a temp directory simulating ~/.vibe with runtime assets installed.      T (+3 more)
 
 ### Community 859 - "test_inspect_contract.py"
 Cohesion: 0.20
@@ -4440,20 +4414,20 @@ Cohesion: 0.17
 Nodes (11): Tests for web UI HTML templates.  This module tests HTML template validity and s, tasks.html template file must exist., tasks.html must contain required JavaScript functions and elements., BLOCK_CONFIG must define field configurations for all required sections., BLOCK_CONFIG for 'blocked' section must include blocked_reason field., BLOCK_CONFIG for 'waiting-for-pool' section must exclude state field., test_tasks_html_block_config_has_required_sections(), test_tasks_html_blocked_section_shows_blocked_reason() (+3 more)
 
 ### Community 864 - "TestEnsureFlowForBranch"
-Cohesion: 0.33
-Nodes (3): Check if flow is blocked (reads from authoritative truth)., Get blocked reason from authoritative truth., Resolve authoritative truth, fallback to database in degraded mode.
+Cohesion: 0.50
+Nodes (4): Phase 1 验证, Phase 2 验证, Phase 3 验证, 验证标准
 
 ### Community 865 - "TestFlowStatus"
-Cohesion: 0.47
-Nodes (3): has_orchestra_governed(), Whether labels contain orchestra-governed., TestHasOrchestraGoverned
+Cohesion: 0.50
+Nodes (4): 参考文档, 外部参考, 实施文档, 项目宪法
 
 ### Community 866 - "test_issue_failure_service.py"
-Cohesion: 0.33
-Nodes (4): Test AUP rejection error classification., Verify WARNING severity, gate_action=ignore, no threshold count., Verify classify_error_hybrid() with AgentExecutionError + AUP text., TestAUPRejectionClassification
+Cohesion: 0.50
+Nodes (4): Render Blocked Issues section., render_blocked_items(), extract_blocked_reason_summary(), Extract key information from blocked_reason for status display.      Filters out
 
 ### Community 867 - "test_vibe_task_label.py"
-Cohesion: 0.47
-Nodes (5): _make_mock_coordinator_dependencies(), Regression tests for orphan flow dispatch health checks., Create mock dependencies for GlobalDispatchCoordinator construction., test_dispatch_loop_logs_missing_flow_context_once(), test_health_check_skips_non_ready_issue_without_flow_context()
+Cohesion: 0.50
+Nodes (3): load_config_for_role(), Config loading utilities for non-CLI contexts (domain handlers, etc).  These fun, Load runtime config for a role without CLI dependencies.      This is a non-type
 
 ### Community 868 - "TestIndependentImport"
 Cohesion: 0.17
@@ -4548,12 +4522,12 @@ Cohesion: 0.25
 Nodes (7): Any, Run pytest with --cov --cov-json and parse output.          Output is saved to ., Analyze coverage for a specific architectural layer.          Args:, Pre-categorize coverage files by architectural layer in one pass.          Retur, Run pytest with coverage and generate layer-based report.          Returns:, get_source_root(), Get the configured vibe3 source root directory.      Returns configured path or
 
 ### Community 892 - "_run_legacy_check"
-Cohesion: 0.40
-Nodes (5): Caveman, Statusline Badge, 子技能, 安装, 激活
+Cohesion: 0.25
+Nodes (11): check(), local(), Context, help, Option, Verify handoff store consistency.      Default mode: Check + fix all active flow, Legacy check logic, shared by check() callback and local() subcommand., Verify handoff store consistency (default behavior). (+3 more)
 
 ### Community 893 - "create_trace_output"
-Cohesion: 0.22
-Nodes (10): add_execution_step(), create_trace_output(), datetime, Output format utilities.  This module provides utilities for handling multiple o, Create a new trace output model.      Args:         command: Command name, Add an execution step to trace output.      Args:         trace_output: Trace ou, Test creating a trace output model., Test adding an execution step to trace output. (+2 more)
+Cohesion: 0.18
+Nodes (12): add_execution_step(), create_trace_output(), datetime, Output format utilities.  This module provides utilities for handling multiple o, Create a new trace output model.      Args:         command: Command name, Add an execution step to trace output.      Args:         trace_output: Trace ou, Test creating a trace output model., Test adding an execution step to trace output. (+4 more)
 
 ### Community 894 - "Prompts"
 Cohesion: 0.18
@@ -4564,12 +4538,12 @@ Cohesion: 0.20
 Nodes (10): coverage_service(), mock_project_root(), Path, Shared fixtures for analysis service tests., Create coverage service fixture with explicit thresholds., Create a mock project root with coverage.json., Sample coverage data for testing., Create a temporary snapshot directory with test data. (+2 more)
 
 ### Community 896 - "TestAskBranchParameter"
-Cohesion: 0.18
-Nodes (6): Tests for --branch parameter resolution and worktree handling., --branch option should resolve branch and pass worktree path as cwd., --branch 1234 should resolve to canonical task/issue-1234., No --branch option should use resolve_orchestra_repo_root., --branch with no existing worktree should show clear error., TestAskBranchParameter
+Cohesion: 0.15
+Nodes (7): Tests for vibe3.commands.ask module., Tests for --branch parameter resolution and worktree handling., --branch option should resolve branch and pass worktree path as cwd., --branch 1234 should resolve to canonical task/issue-1234., No --branch option should use resolve_orchestra_repo_root., --branch with no existing worktree should show clear error., TestAskBranchParameter
 
 ### Community 897 - "TestAsyncDefaults"
-Cohesion: 0.13
-Nodes (12): build_self_invocation(), Path, Foundational helpers for command-level codeagent execution., Build baseline-project self-invocation for tmux child., Resolve backend/model metadata for result display.      Some role paths carry an, _repo_root(), resolve_display_agent_options(), Tests for async-by-default CLI options. (+4 more)
+Cohesion: 0.15
+Nodes (10): build_self_invocation(), Path, Foundational helpers for command-level codeagent execution., Build baseline-project self-invocation for tmux child., _repo_root(), Tests for async-by-default CLI options., Verify that self-invocation logic correctly standardizes on --no-async., Verify that legacy --async flag is dropped and standardized to --no-async. (+2 more)
 
 ### Community 898 - "test_resume_normalization_failure_keeps_body_and_cache_blocked"
 Cohesion: 0.24
@@ -4620,7 +4594,7 @@ Cohesion: 0.20
 Nodes (9): Approach: Simple Patch (Option A), Constraint, Data Migration: Backfill Command, Design, Error Handling, Fix worktree_path Recording for Auto Task Branches, Impact, Problem (+1 more)
 
 ### Community 910 - "配置项说明"
-Cohesion: 0.20
+Cohesion: 0.17
 Nodes (10): 1. code_limits - 代码量控制, 2. review_scope - 审核范围, 3.1 agent / backend / model 解析规则, 3. review - Review 配置, 4. quality - 质量标准, 概述, 相关文档, 配置原则 (+2 more)
 
 ### Community 911 - "6. Git And Runtime Terms"
@@ -4656,8 +4630,8 @@ Cohesion: 0.20
 Nodes (9): ADR change proposals, ADR Consideration, Applicable constraints, Candidates, Dismissed candidates, Example: semantic-only candidate, Metadata flags, Open conflicts (+1 more)
 
 ### Community 919 - "/vibe-onboard - 安装后入门引导"
-Cohesion: 0.14
-Nodes (13): codeagent-wrapper 安装, Execution Flow（完整流程）, Guardrails（注意事项）, Overview, Required Reading, /vibe-onboard - 安装后入门引导, When to Use, 事实来源 (+5 more)
+Cohesion: 0.20
+Nodes (9): codeagent-wrapper 安装, /vibe-onboard - 安装后入门引导, 事实来源, 停止点, 完整流程, 密钥配置与加载机制, 常见安装指引, 核心职责 (+1 more)
 
 ### Community 920 - "Core Principles"
 Cohesion: 0.20
@@ -4672,20 +4646,12 @@ Cohesion: 0.24
 Nodes (9): get_merged_pr_for_issue(), has_merged_pr_for_issue(), Any, Path, PR Status Checker — authoritative truth for issue completion status.  This modul, Check if an issue has a merged PR (authoritative truth).      This is the ONLY s, Resolve the repository root path for cache operations., Get the merged PR associated with an issue (if any).      This is the ONLY sourc (+1 more)
 
 ### Community 923 - "check_worktree_health"
-Cohesion: 0.05
-Nodes (34): check_worktree_health(), Any, Path, Worktree and dependency checks for qualify gate logic., Any, QualifyGateService, Domain service for qualify gate logic., Domain service for qualify gate logic. (+26 more)
+Cohesion: 0.22
+Nodes (8): check_worktree_health(), Any, Path, Worktree and dependency checks for qualify gate logic., _append_orchestra_event(), Any, Helper functions for qualify gate logic., terminalize_closed_issue()
 
 ### Community 924 - "Orchestra 模块"
 Cohesion: 0.20
 Nodes (9): 1. Governance / Supervisor 决定 ready, 2. State Trigger 消费已有状态, Orchestra 模块, 内置 Service, 架构, 注册自定义 Service, 触发机制, 部署（开发服务器） (+1 more)
-
-### Community 925 - "test_flow_context_cache_store.py"
-Cohesion: 0.50
-Nodes (4): Typer, Validated positive symbol evidence for ``vibe3 inspect symbols``., Register the evidence-only symbols command., register()
-
-### Community 926 - "TestLoadRuntimeConfig"
-Cohesion: 0.20
-Nodes (6): Tests for load_runtime_config function., Set up four-layer temp structure, verify each layer's precedence., Provide cli_overrides dict, verify highest priority., Verify agent_config backend/model/agent can be overridden., Verify orchestra fields can be overridden from project config., TestLoadRuntimeConfig
 
 ### Community 927 - "test_policy_paths.py"
 Cohesion: 0.20
@@ -4695,10 +4661,6 @@ Nodes (9): Tests for dynamic policy path resolution in VibeConfig., ConventionRe
 Cohesion: 0.20
 Nodes (6): Tests for extended execution roles (manager, supervisor, governance)., Manager started event should create runtime session., Manager lifecycle should NOT write to flow_state., Supervisor started event should create runtime session., Governance completed event should mark registry session as done., TestExtendedRoles
 
-### Community 929 - "_mock_execution_coordinator"
-Cohesion: 0.50
-Nodes (4): _format_datetime_iso(), datetime, PR service implementation., Format datetime to ISO string, pass through None and str.
-
 ### Community 930 - "test_orchestra_log.py"
 Cohesion: 0.20
 Nodes (9): enable_event_log(), Comprehensive unit tests for orchestra_log.py., Reset module-level globals before and after each test., Default VIBE3_ORCHESTRA_LOG_LEVEL=INFO filters out DEBUG events., Enable event logging via environment variable., append_orchestra_event silently degrades unknown color name to plain output., reset_global_handle(), test_append_event_level_filter_default_info() (+1 more)
@@ -4707,17 +4669,9 @@ Nodes (9): enable_event_log(), Comprehensive unit tests for orchestra_log.py., R
 Cohesion: 0.20
 Nodes (10): Path, append_orchestra_run_separator writes formatted separator line., append_orchestra_event embeds ANSI codes when color passed and isatty=True., append_supervisor_event writes to both supervisor.log and events.log., orchestra_log_dir returns tmp_path / orchestra and creates it., test_append_event_with_color_enabled(), test_logs_root_honors_env_override(), test_orchestra_log_dir_default() (+2 more)
 
-### Community 932 - "test_flow_lifecycle.py"
-Cohesion: 0.50
-Nodes (4): codex, 使用, 安装, 验证
-
 ### Community 933 - "TestDoneEligibility"
-Cohesion: 0.50
-Nodes (4): Hook 配置, RTK, 安装, 验证
-
-### Community 934 - "TestFlowList"
-Cohesion: 0.50
-Nodes (3): Error classification functions.  Classify errors from backend output and determi, # NOTE: CRITICAL severity only affects FailedGate, NOT flow block, # NOTE: ERROR severity only affects FailedGate, NOT flow block
+Cohesion: 0.06
+Nodes (26): FlowStatusService, Flow status management service for marking and updating flow states., Check if branch follows the task/issue-N auto-flow pattern., Mark a flow as done and record the event.          For flows with role=task issu, Service for managing flow status transitions and related side effects., Mark a flow as aborted and record the event., Mark an empty active flow as stale and record the event., Transition an aborted flow to done with phase-level cleanup.          Unlike mar (+18 more)
 
 ### Community 935 - "TestRealWorldIssues"
 Cohesion: 0.20
@@ -4835,14 +4789,6 @@ Nodes (9): ADR Consideration artifact, Feature Specification: Low-Code ADR Recal
 Cohesion: 0.28
 Nodes (6): _build_review_task_section(), Build review task section.      Source: config/prompts/prompts.yaml (review.revi, Tests for _build_review_task_section (unit test)., Should use custom task text., Should return empty string if None., TestBuildReviewTaskSection
 
-### Community 964 - "_compute_material_hash"
-Cohesion: 0.50
-Nodes (3): Regression tests for cross-agent skill installation policy., Codex setup should reproduce the Caveman skills available in Claude., test_codex_manifest_installs_caveman_skill_family()
-
-### Community 965 - "format_dry_run_header"
-Cohesion: 0.19
-Nodes (7): format_dry_run_header(), Shared actor formatting helpers for execution and handoff., Resolve the actual backend and model for database recording.      This function, Format the unified dry-run header string.      Returns a multi-line string (no t, resolve_actor_backend_model(), Tests for services/shared/actors.py formatting functions., TestFormatDryRunHeader
-
 ### Community 966 - "has_execution_state"
 Cohesion: 0.36
 Nodes (3): has_execution_state(), Whether labels contain an execution-phase state/* label., TestHasExecutionState
@@ -4856,12 +4802,8 @@ Cohesion: 0.28
 Nodes (8): Path, Test that singleton connection prevents FD exhaustion., Verify FD count does not grow under high-frequency operations., Verify queue operations do not exhaust FDs., Verify event operations do not exhaust FDs., test_fd_not_exhausted_event_operations(), test_fd_not_exhausted_queue_operations(), test_fd_not_exhausted_under_high_frequency()
 
 ### Community 969 - "test_scan_combined.py"
-Cohesion: 0.18
-Nodes (7): Tests for combined scan CLI paths., Combined scan bypasses FailedGate (publishes events directly)., _strip_ansi(), test_scan_governance_list_includes_audit_observation(), TestCombinedScan, TestCombinedScanDryRun, TestFailedGateBlocking
-
-### Community 970 - "TestClearAllSessions"
-Cohesion: 0.31
-Nodes (4): Tests for SessionManager safety improvements., clear_all_sessions skips tmux check — that's the whole point., Tests for SessionRegistryService.clear_all_sessions()., TestClearAllSessions
+Cohesion: 0.25
+Nodes (5): Tests for combined scan CLI paths., _strip_ansi(), test_scan_governance_list_includes_audit_observation(), TestCombinedScan, TestCombinedScanDryRun
 
 ### Community 971 - "test_cli_bootstrap.py"
 Cohesion: 0.28
@@ -4927,14 +4869,6 @@ Nodes (7): _clean_stale_files(), ORCHESTRA_SESSION, update.sh script, _sync_comp
 Cohesion: 0.25
 Nodes (7): Phase 1 - ADR metadata truth, Phase 2 - Canonical agent procedure, Phase 3 - spec-kit plan integration, Phase 4 - review constraint, Phase 5 - verification, Phase 6 - review follow-up, Tasks: Low-Code ADR Recall
 
-### Community 987 - "setup_logging"
-Cohesion: 0.50
-Nodes (3): Tests for JobMonitorService snapshot aggregation., Reset the singleton registry before each test., reset_registry()
-
-### Community 988 - "TestMCPServerIntegration"
-Cohesion: 0.67
-Nodes (3): bun / node, uv（Python 包管理器）, 第三方 CLI 工具
-
 ### Community 989 - "Utils"
 Cohesion: 0.25
 Nodes (7): Git 操作, Utils, 依赖关系, 关键组件, 其他工具, 已迁移模块, 文件列表
@@ -4986,18 +4920,6 @@ Nodes (7): _make_github_issue_payload(), _make_mock_store(), Regression: no-op g
 ### Community 1001 - "test_loc_settings.py"
 Cohesion: 0.32
 Nodes (7): _load_loc_settings_module(), Tests for LOC settings parsing and runtime config alignment., The root loc_limits.yaml duplicate should not remain after migration., test_legacy_loc_config_removed_after_migration(), test_loc_settings_parser_reads_unified_exceptions(), test_runtime_config_loads_same_loc_exceptions(), test_runtime_defaults_align_with_hook_fallbacks()
-
-### Community 1002 - "TestMergeBehavior"
-Cohesion: 0.67
-Nodes (3): openspec / opsx, openspec-* 技能, 安装
-
-### Community 1003 - "test_ensure_flow_for_dev_branch_initializes_issue_context"
-Cohesion: 0.67
-Nodes (3): superpowers, 安装, 核心技能
-
-### Community 1004 - "test_issue_flow_init_caches_issue_title_without_mutating_spec_ref"
-Cohesion: 0.67
-Nodes (3): vibe 项目技能, 安装, 技能列表
 
 ### Community 1007 - "TestCloseoutIntegration"
 Cohesion: 0.25
@@ -5111,6 +5033,10 @@ Nodes (3): Specification Quality Checklist: Low-Code ADR Recall, Contract: ADR C
 Cohesion: 0.29
 Nodes (6): Contract: ADR Recall Frontmatter, `decides`, Schema extension, `scope`, Source-of-truth rule, Supersede contract
 
+### Community 1035 - "render_review_observation"
+Cohesion: 0.13
+Nodes (19): Renderers for the evidence-only inspect base result., Render human output from the same model used by JSON and YAML., render_review_observation(), ComparisonObservation, KernelHit, One changed file matched by an explicit kernel entry., Versioned inspect-base result shared by command and PR consumers., Exact Git revisions used for a branch comparison. (+11 more)
+
 ### Community 1036 - "Kiro Integration Rules"
 Cohesion: 0.29
 Nodes (7): Documentation Standards, Kiro Integration Rules, Python Project Setup, Spec Location, Status Synchronization, Task Lifecycle, Vibe Task Integration
@@ -5122,6 +5048,10 @@ Nodes (6): Path, Test thread safety of singleton SQLite connection., Verify conc
 ### Community 1039 - "test_supplementary_loading_from_external_cwd"
 Cohesion: 0.33
 Nodes (6): Path, Tests for .vibe/config.yaml validity., Verify that supplementary data is loaded when CWD is external., Test that current repo has valid .vibe/config.yaml., test_supplementary_loading_from_external_cwd(), test_vibe_center_repo_config()
+
+### Community 1040 - ".test_cache_hit_skips_api_call"
+Cohesion: 0.28
+Nodes (6): Path, Test MergedPRCache integration with pr_status_checker., When cache hits, get_merged_pr_for_issue should skip API call., When cache misses, get_merged_pr_for_issue should sync and return result., Cache sync API failures should be logged, not silently swallowed., TestMergedPRCacheIntegration
 
 ### Community 1041 - "运行时加载时机契约 — Kernel/Material/Job 三层与可插拔边界"
 Cohesion: 0.33
@@ -5162,6 +5092,10 @@ Nodes (3): mutate_blocked_by(), roadmap_issue_dependency.sh script, show_depende
 ### Community 1050 - "Phase 1: 修复审计问题 (立即，1-2天)"
 Cohesion: 0.33
 Nodes (6): 1.1 消除代码重复 (P0), 1.2 创建 commit-msg hook (P1), 1.3 简化 post-commit hook (可选，P2), 1.4 实现 review comments 检查 (P1), 1.4 统一配置读取 (P1), Phase 1: 修复审计问题 (立即，1-2天)
+
+### Community 1051 - "强制规则（不可违反）"
+Cohesion: 0.33
+Nodes (6): 1. 架构分层, 2. 数据真源, 3. 代码复杂度控制, 4. 禁止事项, 5. 幂等性和确定性, 强制规则（不可违反）
 
 ### Community 1052 - "vibe.sh"
 Cohesion: 0.40
@@ -5214,14 +5148,6 @@ Nodes (5): Tests for CLI top-level error handling behavior., SystemError should 
 ### Community 1064 - "test_handoff_spec.py"
 Cohesion: 0.33
 Nodes (5): Contract tests for `vibe3 handoff spec` command (US1, FR-005).  Mirrors the `han, `handoff spec <canonical>` routes to HandoffService.record_spec., Invalid spec_ref surfaces as non-zero exit (G1 write-strict contract)., test_handoff_spec_command_delegates_to_record_spec(), test_handoff_spec_command_propagates_validation_error()
-
-### Community 1066 - "TestManagerDryRunResultDisplay"
-Cohesion: 0.33
-Nodes (4): Manager sync execution displays via display_execution_result, sharing     the un, Manager --no-async displays ExecutionLaunchResult via shared path., Manager --dry-run (without --no-async) forces sync execution., TestManagerDryRunResultDisplay
-
-### Community 1067 - "test_task_status_json.py"
-Cohesion: 0.40
-Nodes (5): _make_config_mock(), Tests for task status --format json functionality., Create a standard config mock for tests., Test task status with --format json works correctly., test_task_status_json_format()
 
 ### Community 1068 - "test_data_source.py"
 Cohesion: 0.33
@@ -5278,18 +5204,6 @@ Nodes (5): 📊 Completion Metrics, ⚠️ Deprecations, ✨ New Features, 🔧 
 ### Community 1083 - "开发流分支语义标准"
 Cohesion: 0.40
 Nodes (4): 1. 分支命名规则, 2. 判断规则, 3. 约束, 开发流分支语义标准
-
-### Community 1084 - "Protocol-based Dependency Injection"
-Cohesion: 0.40
-Nodes (5): Consequences, Context, Decision, How, Protocol-based Dependency Injection
-
-### Community 1085 - "DomainEvent 与 FlowEvent 分层边界及投影关系"
-Cohesion: 0.40
-Nodes (5): Consequences, Context, Decision, DomainEvent 与 FlowEvent 分层边界及投影关系, How
-
-### Community 1086 - "Prompt/Policy/Skill 审计证据模型"
-Cohesion: 0.40
-Nodes (5): Consequences, Context, Decision, How, Prompt/Policy/Skill 审计证据模型
 
 ### Community 1087 - "Architecture Decision Records"
 Cohesion: 0.40
@@ -5399,10 +5313,6 @@ Nodes (4): Commands, Inspect 证据接口, 主要命令组, 依赖规则
 Cohesion: 0.60
 Nodes (4): _load_module(), Path, Tests for the audit cleanup helper script., test_cleanup_matches_only_explicit_source_report()
 
-### Community 1115 - "cache"
-Cohesion: 0.40
-Nodes (5): cache(), Path, Create temporary repo path with .git/vibe3 directory., Create cache instance with temp repo path., temp_repo_path()
-
 ### Community 1118 - "test_config_no_adapters_import.py"
 Cohesion: 0.40
 Nodes (3): Tests to prevent architectural violations in the config module., Verify config module does not import from vibe3.adapters.          Allows lazy i, TestConfigModularity
@@ -5491,10 +5401,6 @@ Nodes (3): _extract_latest_verdict(), VerdictValue, Unified no-op gate: blocks w
 Cohesion: 0.50
 Nodes (3): create_global_dispatch_coordinator(), Runtime factory for wiring the dispatch coordinator., Create GlobalDispatchCoordinator with orchestra runtime services.
 
-### Community 1141 - "branch_resolution.py"
-Cohesion: 0.50
-Nodes (3): Convenience wrappers for branch resolution that auto-create FlowService.  These, Resolve --branch argument and extract issue number in one call.      Convenience, resolve_branch_and_issue()
-
 ### Community 1143 - "🤖 AI Workspace Directories (AI 工作区)"
 Cohesion: 0.50
 Nodes (4): `.agent/context/` - AI 上下文, `.agent/templates/` - 文档模板, `.agent/workflows/` - 工作流定义, 🤖 AI Workspace Directories (AI 工作区)
@@ -5518,14 +5424,6 @@ Nodes (3): Tests for config public API type-checking exports., Every config lazy
 ### Community 1149 - "test_global_dispatch_coordinator_adapter.py"
 Cohesion: 0.50
 Nodes (3): Test orchestra/global_dispatch_coordinator adapter shell., Verify orchestra re-exports GlobalDispatchCoordinator from domain., test_global_dispatch_coordinator_reexports_from_domain()
-
-### Community 1150 - "test_block_flow_raises_when_no_issue"
-Cohesion: 0.50
-Nodes (3): Tests that block_flow raises SystemError when no task issue is linked., block_flow with no linked task issue must raise SystemError, not write_cache., test_block_flow_raises_when_no_issue()
-
-### Community 1151 - "test_check_sync_rules.py"
-Cohesion: 0.50
-Nodes (3): Tests for CheckService with sync rules., Issue #3189: review/failed must be treated as inactive by CheckService., test_inactive_flow_statuses_includes_pr_backed_terminal_states()
 
 ### Community 1153 - "test_vibe_project_check_readiness.py"
 Cohesion: 0.83
@@ -5556,21 +5454,21 @@ Cohesion: 0.67
 Nodes (3): `.claude/` - Claude AI 配置 (Current Truth), `.claude/rules/` - 编码规则, `.claude/skills/` - 技能运行时
 
 ## Knowledge Gaps
-- **5410 isolated node(s):** `block-destructive.sh script`, `detect-secrets.sh script`, `protect-files.sh script`, `uv`, `publish-artifact.sh script` (+5405 more)
+- **5333 isolated node(s):** `Purpose and truth sources`, `Scenario 1 - Flow and issue state remain separate`, `Scenario 2 - Remote-first blocked-state reconciliation`, `Scenario 3 - Manual and automatic recovery use the current shared path`, `Scenario 4 - Terminal state and resource cleanup` (+5328 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **357 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **355 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `SQLiteClient` connect `SQLiteClient` to `PR Service and Response Models`, `Check Cleanup Service`, `Store Context and Governance`, `test_concurrent_connection_creation_no_thread_error`, `Codeagent Execution Lifecycle`, `get_convention`, `._has_tmux_session`, `TestConfirmedTransitionTransaction`, `start`, `update`, `IssueFlowService`, `SQLiteFlowStateRepo`, `FlowProjectionService`, `TestVerifyCurrentFlow`, `OrchestraConfig`, `ExecutionLaunchResult`, `JobActor`, `DomainEvent`, `control_plane.py`, `CapacityService`, `OrchestraStatusService`, `ExecutionRequest`, `test_sqlite_client_fresh_db.py`, `enable_method_trace`, `QualifyGateService`, `BlockedStateService`, `HandoffStorage`, `init_schema`, `TaskService`, `ErrorTrackingService`, `FlowStatusResponse`, `TestHasRecentSpecificError`, `GitHubClient`, `ExternalEventRecorder`, `build_review_prompt_body`, `FlowService`, `RecentPRCache`, `FlowStatusResolver`, `CheckCleanupService`, `SQLiteTransitionHistoryRepo`, `PRMetadata`, `FlowTimelineService`, `_utcnow_iso`, `TestIssueTitleCacheIntegration`, `_resolve_shared_artifact`, `internal_manager_dispatch`, `CodeagentResult`, `conftest.py`, `test_issue_role_sync_runner.py`, `SQLiteSessionRepo`, `test_aup_rejection.py`, `StateVerificationService`, `SQLiteQueueRepo`, `_make_service`, `ConventionResolver`, `test_flow_idempotent_create.py`, `ReviewRunResult`, `TransitionRecorder`, `TriggerableRoleDefinitionProtocol`, `TestRetryCounterPersistence`, `TestAutoFixBranch`, `test_flow_events.py`, `execute_manual_run`, `.get_instance`, `_reset_registry`, `SQLiteEventRepo`, `load_session_id`, `record_dispatch_failure_if_unexpected`, `MockIssueState`, `.notify_downstream`, `test_check_missing_state_recovery.py`, `WorktreeManager`, `test_resume_normalization_failure_keeps_body_and_cache_blocked`, `TestExtendedRoles`, `apply_unified_noop_gate`, `audit-blocked-flows.py`, `test_sqlite_fd_exhaustion.py`, `Path`, `test_error_block_decoupling.py`, `ExecuteCheckResult`?**
-  _High betweenness centrality (0.106) - this node is a cross-community bridge._
-- **Why does `GitClient` connect `GitHubClient` to `Git Client Infrastructure`, `TestProtocolAllIntegrity`, `PR Service and Response Models`, `Check Cleanup Service`, `load_session_id`, `Codeagent Execution Lifecycle`, `flow_status_helpers.py`, `._has_tmux_session`, `start`, `update`, `conftest.py`, `get_git_diff_summary`, `record_dispatch_failure_if_unexpected`, `orchestra_log.py`, `SystemError`, `SQLiteClient`, `SignatureService`, `PRReviewBriefingService`, `TestVerifyCurrentFlow`, `ReviewObservation`, `FlowCleanupService`, `LocService`, `_HasConnection`, `resolve_command_branch`, `base`, `GitPathProtocol`, `_make_service`, `IssueLink`, `test_spec_kit_bridge.py`, `test_sqlite_client_fresh_db.py`, `get_adapter`, `TestHandoffAdvancedCommands`, `enable_method_trace`, `build_review_observation`, `HandoffStorage`, `ReviewRunResult`, `is_queue_dirty`, `execute_check_mode`, `status`, `TaskService`, `ErrorTrackingService`, `FlowStatusResponse`, `MockDispatchCoordinator`, `TestAutoFixBranch`, `FlowService`, `ask`, `resolve_pre_push_scope`, `CheckCleanupService`, `get_source_root`?**
-  _High betweenness centrality (0.052) - this node is a cross-community bridge._
-- **Why does `IssueInfo` connect `IssueInfo` to `build_manager_sync_request`, `Domain Dispatch Coordination`, `finalize_review_output`, `test_flow_rebuild_command.py`, `test_qualify_gate_blocked_issue.py`, `Config and Sync Rules`, `Domain Protocols and Capacity`, `Store Context and Governance`, `FlowBootstrapProtocol`, `get_convention`, `CodeagentResult`, `FlowManager`, `record_dispatch_failure_if_unexpected`, `CoordinationResolver`, `check_worktree_health`, `status_query.py`, `IssueDispatchPolicy`, `test_task_intake_blocked.py`, `DispatchQueueCollectionService`, `OrchestrationFacade`, `QueueEntry`, `resolve_priority`, `DomainEvent`, `TestPlannerNoOpGate`, `TestReviewerNoOpGate`, `TestTransitionRules`, `ExecutionRequest`, `make_health_coordinator`, `QualifyGateService`, `SupervisorIssueIdentified`, `promote_progressed_entries`, `resolve_milestone_rank`, `HandoffRecord`, `IssueRoleSyncSpec`, `PlanRequest`, `make_coordinator`, `AdapterManifest`, `Protocol`, `.render`, `TestRunQualifyGate`, `test_dispatch_safety_gap.py`, `resolve_roadmap_rank`, `GovernanceScanStarted`, `build_supervisor_handoff_payload`, `test_vibe_task_label.py`, `TestTransientErrorLogging`, `QueuePersistenceService`, `select_ready_issues_from_collected_issues`, `FlowService`?**
-  _High betweenness centrality (0.039) - this node is a cross-community bridge._
-- **Are the 361 inferred relationships involving `SQLiteClient` (e.g. with `BlockedFlow` and `get_blocked_flows()`) actually correct?**
-  _`SQLiteClient` has 361 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `SQLiteClient` connect `SQLiteClient` to `PR Service and Response Models`, `Issue Orchestration State Machine`, `Check Cleanup Service`, `Store Context and Governance`, `test_concurrent_connection_creation_no_thread_error`, `Codeagent Execution Lifecycle`, `TestConfirmedTransitionTransaction`, `._has_tmux_session`, `update`, `IssueFlowService`, `SQLiteFlowStateRepo`, `FlowProjectionService`, `ExecutionLaunchResult`, `JobActor`, `DomainEvent`, `control_plane.py`, `GitPathProtocol`, `run_command`, `CapacityService`, `ExecutionRequest`, `test_sqlite_client_fresh_db.py`, `TestHandoffAdvancedCommands`, `HandoffService`, `enable_method_trace`, `QualifyGateService`, `FlowQueryProtocol`, `BlockedStateService`, `EventPublisher`, `HandoffStorage`, `init_schema`, `IssueRoleSyncSpec`, `GhIssueLabelPort`, `execute_check_mode`, `TaskService`, `issue_state_from_payload`, `ErrorTrackingService`, `FlowStatusResponse`, `TestHasRecentSpecificError`, `GitHubClient`, `ExternalEventRecorder`, `FlowService`, `RecentPRCache`, `FlowStatusResolver`, `HandoffStatusResult`, `CheckCleanupService`, `SQLiteTransitionHistoryRepo`, `PRMetadata`, `_utcnow_iso`, `TestIssueTitleCacheIntegration`, `_resolve_shared_artifact`, `internal_manager_dispatch`, `conftest.py`, `FlowManager`, `CoordinationResolver`, `test_github_client_prs.py`, `SQLiteSessionRepo`, `test_aup_rejection.py`, `TestSnapshotIssuePoolBoundary`, `StateVerificationService`, `.vibe_center`, `SQLiteQueueRepo`, `_make_service`, `test_flow_idempotent_create.py`, `ProfileConvention`, `FailedGate`, `test_spec_kit_bridge.py`, `test_handoff_file_ops.py`, `get_store`, `find_available_port`, `TriggerableRoleDefinitionProtocol`, `GovernanceScanStarted`, `TestRetryCounterPersistence`, `TestQueueExhaustedRefresh`, `test_pr_lifecycle_cache.py`, `TestAutoFixBranch`, `test_flow_events.py`, `execute_manual_run`, `.get_instance`, `_reset_registry`, `finalize_review_output`, `SQLiteEventRepo`, `load_session_id`, `FlowBootstrapProtocol`, `record_dispatch_failure_if_unexpected`, `MockIssueState`, `.notify_downstream`, `IssueFailed`, `WorktreeManager`, `conftest.py`, `test_resume_normalization_failure_keeps_body_and_cache_blocked`, `TestExtendedRoles`, `TestDoneEligibility`, `apply_unified_noop_gate`, `audit-blocked-flows.py`, `test_sqlite_fd_exhaustion.py`, `Path`, `test_error_block_decoupling.py`, `_make_check_pr_service`?**
+  _High betweenness centrality (0.095) - this node is a cross-community bridge._
+- **Why does `OrchestraConfig` connect `FlowManager` to `build_manager_sync_request`, `Domain Dispatch Coordination`, `test_flow_rebuild_command.py`, `test_qualify_gate_blocked_issue.py`, `ExecutionRolePolicyService`, `Config and Sync Rules`, `Issue Orchestration State Machine`, `build_governance_recipe`, `show`, `Store Context and Governance`, `conftest.py`, `TestRemoteCheckIntegration`, `GovernanceConfig`, `._has_tmux_session`, `start`, `IssueFlowService`, `CoordinationResolver`, `classify_task_issues_for_rendering`, `MockIssueState`, `SQLiteClient`, `_resolve_branch_arg`, `make_config`, `make_config`, `TestFlowServiceAbort`, `DispatchQueueCollectionService`, `TestSnapshotIssuePoolBoundary`, `_make_config`, `OrchestraConfig`, `OrchestrationFacade`, `TestRemoteLabelCheck`, `governance_utils.py`, `CapacityService`, `append_orchestra_event`, `OrchestraStatusService`, `load_config`, `ExecutionRequest`, `FailedGate`, `build_governance_snapshot_context`, `test_supervisor_scan.py`, `QualifyGateService`, `status`, `promote_progressed_entries`, `WorktreeManager`, `ensure_plan_file_exists`, `make_coordinator`, `GhIssueLabelPort`, `AdapterManifest`, `apply_env_overrides`, `run_issue_role_async`, `OrchestraSnapshot`, `TaskService`, `TestRunQualifyGate`, `fetch_serve_status_data`, `TestGovernanceMaterials`, `TriggerableRoleDefinitionProtocol`, `GovernanceScanStarted`, `build_supervisor_handoff_payload`, `test_env_override.py`, `load_governance_material_catalog`, `TestOverrideRulesRegistry`, `TestTransientErrorLogging`, `MockDispatchCoordinator`, `collect_label_anomalies`, `select_ready_issues_from_collected_issues`, `ServeStatusService`, `ask`, `HandoffStatusResult`, `make_context_builder`?**
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
+- **Why does `GitClient` connect `SystemError` to `finalize_review_output`, `Git Client Infrastructure`, `TestProtocolAllIntegrity`, `PR Service and Response Models`, `Check Cleanup Service`, `load_session_id`, `resolve_issue_branch_input`, `FlowBootstrapProtocol`, `Codeagent Execution Lifecycle`, `flow_status_helpers.py`, `internal_manager_dispatch`, `.test_cache_hit_skips_api_call`, `start`, `update`, `IssueFlowService`, `FlowManager`, `get_git_diff_summary`, `MockIssueState`, `conftest.py`, `SignatureService`, `PRReviewBriefingService`, `TestVerifyCurrentFlow`, `TestDoneEligibility`, `ReviewObservation`, `FlowCleanupService`, `LocService`, `_HasConnection`, `IssueFailed`, `base`, `GitPathProtocol`, `append_orchestra_event`, `_make_service`, `IssueLink`, `test_sqlite_client_fresh_db.py`, `HandoffService`, `get_adapter`, `TestHandoffAdvancedCommands`, `enable_method_trace`, `StatusQueryService`, `build_review_observation`, `BaseResolutionUsecase`, `test_handoff_file_ops.py`, `HandoffStorage`, `init_schema`, `FlowStatePort`, `IssueRoleSyncSpec`, `is_queue_dirty`, `GhIssueLabelPort`, `execute_check_mode`, `status`, `find_available_port`, `TaskService`, `FlowStatusResponse`, `GitHubClient`, `_make_check_pr_service`, `CheckCleanupService`, `TestAutoFixBranch`, `FlowService`, `resolve_pre_push_scope`, `PromptRecipe`, `get_source_root`?**
+  _High betweenness centrality (0.044) - this node is a cross-community bridge._
+- **Are the 359 inferred relationships involving `SQLiteClient` (e.g. with `BlockedFlow` and `get_blocked_flows()`) actually correct?**
+  _`SQLiteClient` has 359 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 172 inferred relationships involving `OrchestraConfig` (e.g. with `test_flow_rebuild_invokes_explicit_rebuild()` and `TestAnalyzeOrchestraConfigSources`) actually correct?**
   _`OrchestraConfig` has 172 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 129 inferred relationships involving `GitClient` (e.g. with `get_adapter()` and `._run_pytest_cov()`) actually correct?**

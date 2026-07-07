@@ -193,5 +193,9 @@ alias
 # Roadmap analysis cache (local only)
 .agent/context/memory.md
 package-lock.json
+
 # Continue IDE local cache
 .continue/
+
+# mtime-based manifest (invalid after git clone)
+graphify-out/manifest.json
