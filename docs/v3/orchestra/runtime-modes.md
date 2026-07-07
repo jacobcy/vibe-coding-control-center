@@ -53,7 +53,7 @@ HeartbeatServer (event loop)
 ### Example
 
 ```bash
-# Start server with defaults from config/settings.yaml
+# Start server with defaults from config/v3/settings.yaml
 vibe3 serve start
 
 # Debug mode (60s heartbeat, current branch as base)
@@ -264,7 +264,7 @@ If both modes run simultaneously:
 
 ## Configuration
 
-Both modes share the same configuration in `config/settings.yaml`:
+Both modes share the same configuration in `config/v3/settings.yaml`:
 
 ```yaml
 orchestra:

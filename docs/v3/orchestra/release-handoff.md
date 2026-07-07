@@ -17,7 +17,7 @@ Orchestra 采用**主动轮询 + 被动 webhook 混合架构**：
 - Webhook 事件处理：通过 `POST /webhook/github` 接收 GitHub 事件，验签后由 Orchestra Driver 直接路由到对应 handler
 - 所有角色（manager / planner / executor / reviewer）均通过 `GlobalDispatchCoordinator` 冻结队列统一派发，无独立的 service 模块
 
-### 关键配置（`config/settings.yaml`）
+### 关键配置（`config/v3/settings.yaml`）
 - `orchestra.enabled: true`
 - `orchestra.assignee_dispatch.enabled: true`
 - `orchestra.pr_review_dispatch.enabled: true`

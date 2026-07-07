@@ -28,7 +28,7 @@ Agent 工作流适用于：
 
 - ✅ `codeagent-wrapper` 已安装（位于 `~/.claude/bin/codeagent-wrapper`）
 - ✅ 已配置 API keys（Claude API 或其他）
-- ✅ 已配置 `config/settings.yaml` 中的 `run.agent_config`
+- ✅ 已配置 `config/v3/settings.yaml` 中的 `run.agent_config`
 
 ### 1.2 配置文件
 

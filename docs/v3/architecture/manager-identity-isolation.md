@@ -73,7 +73,7 @@ check_manager_token() {
 
     # Cross-check with settings.yaml bot_username
     local expected_username
-    expected_username=$(grep "bot_username:" config/settings.yaml | awk '{print $2}' 2>/dev/null)
+    expected_username=$(grep "bot_username:" config/v3/settings.yaml | awk '{print $2}' 2>/dev/null)
 
     if [ -n "$expected_username" ] && [ "$username" != "$expected_username" ]; then
         print_fail "Identity mismatch (expected: $expected_username, got: $username)"
@@ -443,7 +443,7 @@ def render_task_comments(
 
 ### Phase 3: Configuration (Parallel)
 - [x] Add `token_env` field to `AssigneeDispatchConfig`
-- [x] Update `config/settings.yaml` documentation
+- [x] Update `config/v3/settings.yaml` documentation
 - [x] Test with and without token configuration
 
 ### Phase 4: Role Isolation (Core)
@@ -572,7 +572,7 @@ def test_manager_uses_isolated_client():
 ### Multi-Role Token Isolation
 
 ```yaml
-# config/settings.yaml
+# config/v3/settings.yaml
 orchestra:
   assignee_dispatch:
     token_env: "VIBE_MANAGER_GITHUB_TOKEN"

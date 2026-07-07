@@ -2,11 +2,11 @@
 
 ## 配置真源原则
 
-**config/settings.yaml 是唯一配置真源**。
+**config/v3/settings.yaml 是唯一配置真源**。
 
 ### 设计原则
 
-1. **单一真源**：所有配置值都从 `config/settings.yaml` 读取
+1. **单一真源**：所有配置值都从 `config/v3/settings.yaml` 读取
 2. **最小安全默认值**：Pydantic 模型提供宽松的默认值，仅用于降级场景
 3. **类型安全**：Pydantic 模型提供类型检查和验证
 
@@ -26,7 +26,7 @@ print(config.code_limits.v3_python.total_loc)  # 从 YAML 读取
 ```python
 from vibe3.config.settings import VibeConfig
 
-config = VibeConfig.get_defaults()  # 从 config/settings.yaml 读取
+config = VibeConfig.get_defaults()  # 从 config/v3/settings.yaml 读取
 ```
 
 #### 从自定义路径读取
@@ -43,13 +43,13 @@ config = VibeConfig.from_yaml(Path("custom/config.yaml"))
 `get_config()` 按以下顺序查找配置文件：
 
 1. `.vibe/config.yaml` - 项目特定配置
-2. `config/settings.yaml` - 默认配置（推荐）
+2. `config/v3/settings.yaml` - 默认配置（推荐）
 3. `~/.vibe/config.yaml` - 全局配置
 4. Pydantic 最小安全默认值 - 降级场景
 
 ### 修改配置
 
-编辑 `config/settings.yaml`：
+编辑 `config/v3/settings.yaml`：
 
 ```yaml
 code_limits:
@@ -81,7 +81,7 @@ export VIBE_TEST_COVERAGE_SERVICES=85
 - `max_file_loc: 500` - 单文件行数限制
 - `test_file_loc.services: 500` - 测试文件行数限制
 
-这些默认值故意设置得比较宽松，避免阻止正常开发。**生产环境应该使用 `config/settings.yaml`**。
+这些默认值故意设置得比较宽松，避免阻止正常开发。**生产环境应该使用 `config/v3/settings.yaml`**。
 
 ### 注意事项
 

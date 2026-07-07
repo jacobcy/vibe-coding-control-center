@@ -125,16 +125,18 @@ Test files often need more flexibility:
 
 Apply same thresholds but consider test-specific exceptions when justified.
 
-## Alignment with Governance Budget
+## Alignment with LOC Limits Configuration
 
-This LOC governance aligns with `.agent/governance.yaml` budget:
+This LOC governance aligns with `config/v3/loc_limits.yaml`:
 
 ```yaml
-budgets:
-  file_max: 300  # Maps to warning_threshold
+code_limits:
+  single_file_loc:
+    warning_threshold: 300    # 超标触发 WARNING（建议重构）
+    ci_block_threshold: 400   # 超标触发 CI ERROR（阻塞 pipeline）
 ```
 
-The `ci_block_threshold: 400` provides buffer for exceptions while maintaining the governance goal of `file_max: 300`.
+The `ci_block_threshold: 400` provides buffer for exceptions while maintaining the governance goal of `warning_threshold: 300`.
 
 ## Monitoring and Metrics
 
@@ -155,4 +157,3 @@ The `ci_block_threshold: 400` provides buffer for exceptions while maintaining t
 - Configuration: `config/v3/loc_limits.yaml`
 - Hook scripts: `scripts/hooks/check-per-file-loc.sh`, `check-test-file-loc.sh`
 - Parser: `scripts/hooks/loc_settings.py`
-- Governance budget: `.agent/governance.yaml`
