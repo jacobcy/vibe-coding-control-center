@@ -56,7 +56,7 @@ hooks:
   - extension: vibe-spec-bridge
     command: speckit.vibe-spec-bridge.publish-spec
     enabled: true
-    optional: true
+    optional: false
     priority: 10
     prompt: Publish the generated spec into the Vibe flow?
     description: Record the canonical spec.md as spec_ref via `vibe3 handoff spec`
@@ -65,7 +65,7 @@ hooks:
   - extension: vibe-spec-bridge
     command: speckit.vibe-spec-bridge.publish-plan
     enabled: true
-    optional: true
+    optional: false
     priority: 10
     prompt: Publish the generated plan into the Vibe flow?
     description: Record plan.md as plan_ref via `vibe3 handoff plan`
