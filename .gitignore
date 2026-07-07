@@ -177,6 +177,7 @@ graphify-out/.graphify_python
 graphify-out/.graphify_root
 graphify-out/.graphify_uncached.txt
 graphify-out/cost.json
+graphify-out/20*/
 # Claude: track project config, exclude local commands and skills
 .claude/commands/
 .claude/skills/
