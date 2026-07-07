@@ -38,16 +38,20 @@ def format_shell_output(config: dict[str, Any]) -> str:
     lines.append("# REQUIRED_TOOLS")
     if "tools" in config and "required" in config["tools"]:
         for tool in config["tools"]["required"]:
+            expected_output = tool.get("expected_output", "")
             lines.append(
-                f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}"
+                f"{tool['name']}|{tool['check']}|{tool['install']}|"
+                f"{tool['description']}|{expected_output}"
             )
 
     # OPTIONAL_TOOLS
     lines.append("# OPTIONAL_TOOLS")
     if "tools" in config and "optional" in config["tools"]:
         for tool in config["tools"]["optional"]:
+            expected_output = tool.get("expected_output", "")
             lines.append(
-                f"{tool['name']}|{tool['check']}|{tool['install']}|{tool['description']}"
+                f"{tool['name']}|{tool['check']}|{tool['install']}|"
+                f"{tool['description']}|{expected_output}"
             )
 
     # REQUIRED_PLUGINS

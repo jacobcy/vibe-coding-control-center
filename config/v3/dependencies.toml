@@ -27,6 +27,7 @@ optional = [
   { name = "direnv", check = "direnv version", install = "brew install direnv", description = "自动环境加载" },
   { name = "tailscale", check = "command -v tailscale", install = "brew install tailscale", description = "Tailscale VPN（远程开发）" },
   { name = "ncat", check = "ncat --version", install = "brew install nmap", description = "SSH ProxyCommand（远程开发）" },
+  { name = "graphify", check = "graphify --version", expected_output = "graphify 0.9.8", install = "uv tool install --force graphifyy==0.9.8", description = "代码知识图谱（项目固定版本）" },
 ]
 
 # ── Plugins ────────────────────────────────────────────────────────────

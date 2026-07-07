@@ -17,14 +17,24 @@ fi
 _doctor_check_tool() {
     local name="$1" check="$2"
     local install="$3" description="$4"
+    local expected_output="${5:-}"
     local output=""
     local exit_status=0
 
     output="$(zsh -c "$check" 2>&1)"
     exit_status=$?
 
+    local first_line="${output%%$'\n'*}"
+
+    if [[ $exit_status -eq 0 && -n "$expected_output" && "$first_line" != "$expected_output" ]]; then
+        printf "  ${YELLOW}!${NC} %-15s 版本不匹配\n" "$name"
+        echo "      当前: ${first_line:-unknown}"
+        echo "      期望: $expected_output"
+        echo "      安装建议: $install"
+        return 1
+    fi
+
     if [[ $exit_status -eq 0 ]]; then
-        local first_line="${output%%$'\n'*}"
         printf "  ${GREEN}✓${NC} %-15s %s\n" "$name" "${first_line:-installed}"
         return 0
     fi
@@ -58,8 +68,8 @@ vibe_doctor_essential() {
             continue
         fi
         if $in_required && [[ -n "$line" ]]; then
-            IFS='|' read -r name check install description <<< "$line"
-            _doctor_check_tool "$name" "$check" "$install" "$description" || ((missing+=1))
+            IFS='|' read -r name check install description expected_output <<< "$line"
+            _doctor_check_tool "$name" "$check" "$install" "$description" "$expected_output" || ((missing+=1))
         fi
     done <<< "$config_output"
 
@@ -159,8 +169,8 @@ vibe_doctor() {
             continue
         fi
         if $in_required && [[ -n "$line" ]]; then
-            IFS='|' read -r name check install description <<< "$line"
-            _doctor_check_tool "$name" "$check" "$install" "$description" || ((missing+=1))
+            IFS='|' read -r name check install description expected_output <<< "$line"
+            _doctor_check_tool "$name" "$check" "$install" "$description" "$expected_output" || ((missing+=1))
         fi
     done <<< "$config_output"
     echo ""
@@ -178,8 +188,8 @@ vibe_doctor() {
             continue
         fi
         if $in_optional && [[ -n "$line" ]]; then
-            IFS='|' read -r name check install description <<< "$line"
-            _doctor_check_tool "$name" "$check" "$install" "$description" || ((optional_missing+=1))
+            IFS='|' read -r name check install description expected_output <<< "$line"
+            _doctor_check_tool "$name" "$check" "$install" "$description" "$expected_output" || ((optional_missing+=1))
         fi
     done <<< "$config_output"
     echo ""
