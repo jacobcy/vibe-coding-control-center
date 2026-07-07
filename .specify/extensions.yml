@@ -1,9 +1,20 @@
 installed:
 - superspec
+- vibe-explore
 - vibe-spec-bridge
 settings:
   auto_execute_hooks: true
 hooks:
+  before_specify:
+  - extension: vibe-explore
+    command: speckit.vibe-explore.explore
+    enabled: true
+    optional: false
+    priority: 10
+    prompt: Gather context before specifying?
+    description: Query graphify, claude-mem, accepted ADRs, and existing specs; emit
+      findings as ephemeral evidence for spec writing (not a handoff artifact).
+    condition: null
   after_tasks:
   - extension: superspec
     command: speckit.superspec.tasks
