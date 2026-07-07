@@ -1,0 +1,12 @@
+# Transient agent working files
+.agent/
+.codex/
+.serena/
+
+# Debug / temp / graphify output
+debug/
+temp/
+graphify-out/
+
+# GitHub CI templates (not project knowledge)
+.github/
