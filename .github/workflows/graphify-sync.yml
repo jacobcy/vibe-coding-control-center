@@ -1,0 +1,103 @@
+name: Graphify Sync
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "graphify-out/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: graphify-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Refresh knowledge graph
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require Graphify automation token
+        env:
+          GRAPHIFY_SYNC_TOKEN: ${{ secrets.GRAPHIFY_SYNC_TOKEN }}
+        run: |
+          if [[ -z "$GRAPHIFY_SYNC_TOKEN" ]]; then
+            echo "GRAPHIFY_SYNC_TOKEN is required so generated PRs trigger required CI checks." >&2
+            exit 1
+          fi
+
+      - name: Checkout main
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GRAPHIFY_SYNC_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+
+      - name: Install pinned Graphify
+        run: uv tool install graphifyy==0.9.8
+
+      - name: Refresh graph
+        run: graphify update .
+
+      - name: Stage tracked graph artifacts
+        id: changes
+        shell: bash
+        run: |
+          git add -A -- \
+            graphify-out/.graphify_labels.json \
+            graphify-out/GRAPH_REPORT.md \
+            graphify-out/graph.json \
+            graphify-out/manifest.json
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update Graphify sync pull request
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GRAPHIFY_SYNC_TOKEN }}
+        shell: bash
+        run: |
+          SYNC_BRANCH="automation/graphify-sync"
+          PR_BODY=$(cat <<'EOF'
+          Automated Graphify artifact refresh after changes reached main.
+
+          ## Contributors
+
+          github-actions[bot], graphify/0.9.8
+          EOF
+          )
+          PUSH_ARGS=()
+          if git ls-remote --exit-code --heads origin "$SYNC_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH"
+            PUSH_ARGS=(--force-with-lease="refs/heads/$SYNC_BRANCH")
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$SYNC_BRANCH"
+          git commit -m "chore(graphify): sync knowledge graph"
+          git push "${PUSH_ARGS[@]}" origin HEAD:"refs/heads/$SYNC_BRANCH"
+
+          PR_NUMBER=$(gh pr list \
+            --state open \
+            --head "$SYNC_BRANCH" \
+            --json number \
+            --jq '.[0].number // empty')
+          if [[ -n "$PR_NUMBER" ]]; then
+            gh pr edit "$PR_NUMBER" \
+              --title "chore(graphify): sync knowledge graph" \
+              --body "$PR_BODY"
+          else
+            gh pr create \
+              --base main \
+              --head "$SYNC_BRANCH" \
+              --title "chore(graphify): sync knowledge graph" \
+              --body "$PR_BODY"
+          fi

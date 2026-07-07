@@ -131,6 +131,7 @@ name = "demo"
 check = "demo --version"
 install = "brew install demo"
 description = "Demo tool"
+expected_output = "demo 1.2.3"
 """,
         encoding="utf-8",
     )
@@ -149,3 +150,30 @@ description = "Demo tool"
     config = module.load_dependencies()
 
     assert config["tools"]["required"][0]["name"] == "demo"
+    assert (
+        "demo|demo --version|brew install demo|Demo tool|demo 1.2.3"
+        in module.format_shell_output(config)
+    )
+
+
+def test_dependencies_pin_graphify_for_doctor() -> None:
+    """Doctor should use one repository-owned Graphify version declaration."""
+    module_path = (
+        Path(__file__).resolve().parents[3] / "scripts/vibe-read-dependencies.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "vibe_read_dependencies_graphify", module_path
+    )
+    if spec is None or spec.loader is None:
+        raise AssertionError("Failed to load dependencies helper")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    config = module.load_dependencies()
+    graphify = next(
+        tool for tool in config["tools"]["optional"] if tool["name"] == "graphify"
+    )
+
+    assert graphify["check"] == "graphify --version"
+    assert graphify["expected_output"] == "graphify 0.9.8"
+    assert graphify["install"] == "uv tool install --force graphifyy==0.9.8"

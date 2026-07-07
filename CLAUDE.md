@@ -363,4 +363,7 @@ Vibe 3.0 提供统一的基础设施服务，支持所有执行角色（manager/
 - **代码查询优先走图**：`graphify query "<问题>"` 返回带上下文的子图，比 grep 更精准
 - **关系/路径查询**：`graphify path "<A>" "<B>"` — 两概念间最短路径；`graphify explain "<节点ID>"` — 节点解释
 - **架构概览**：`graphify-out/GRAPH_REPORT.md` 包含社区标签、god nodes 和意外连接分析
-- **代码修改后更新**：`graphify update .` — 增量 AST 重建（免费，不消耗 API）
+- **功能分支不提交 `graphify-out/`**：本地 hook 产生的图谱改动不进入普通功能 PR
+- **合并后统一更新**：`Graphify Sync` workflow 在非图谱改动进入 `main` 后使用固定版本重建，并维护独立的 generated-artifact PR
+- **人工更新仅用于诊断**：可运行 `graphify update .` 验证图谱，但不要把生成物混入功能提交
+- **自动 PR 凭据**：必须配置 secret `GRAPHIFY_SYNC_TOKEN`（GitHub App/PAT，具备 contents 与 pull requests 写权限）；workflow 在缺失时直接失败，禁止回退到无法正常触发 required CI 的 `GITHUB_TOKEN`
