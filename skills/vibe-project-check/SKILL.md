@@ -46,7 +46,7 @@ description: Use after `vibe init` to verify target-project configuration comple
 - 配置修改后，验证配置是否有效
 - 问题诊断时，作为第一道环境检查
 
-**注意**：此 skill 可在任意 repo 中运行。Phase 1–4 检查 vibe-center 项目配置；Phase 5–8 检查跨项目 readiness。
+**注意**：此 skill 可在任意 repo 中运行。Phase 1–4 检查 vibe-center 项目配置；Phase 5–8 检查跨项目 readiness；Phase 9 检查第三方工具链合规（消费 `plugin-setup-standard.md`）。
 
 **完成后状态**：输出完整的检查报告，所有配置项已验证或补全，项目可以正常运行。
 
@@ -248,6 +248,10 @@ vibe3 scan all --dry-run
 ```bash
 uv run python --version
 test -f pyproject.toml && echo "pyproject.toml exists" || echo "pyproject.toml missing"
+
+# 依赖安装探针：验证核心依赖真装了（不只看 pyproject.toml 存在）
+# uv sync --check 不存在，用 import 探针代替
+uv run python -c "import typer, rich, pydantic, pydantic_settings, loguru; print('deps: ok')" 2>&1 || echo "BROKEN: 核心依赖未装，运行 uv sync"
 ```
 
 **Step 4.3: 检查工具链依赖**
@@ -415,9 +419,12 @@ git rev-parse --abbrev-ref HEAD >/dev/null 2>&1 || echo "MISSING: cannot determi
 **Step 7.1: 检查基础工具链**
 
 ```bash
-# 检查必需工具
-vibe doctor --essential
+# 全量 doctor：覆盖 essential + 可选工具 + claude-plugins + role token 警告
+# （--essential 只查 7 个核心 CLI，会漏掉 Manager Token 降级、plugin 状态等）
+vibe doctor
 ```
+
+> 注意 `vibe doctor` 全量会输出 role-specific token 警告（如 "Manager Token Not configured, 双层防护降级为单层"）。该警告应纳入汇总报告，不要忽略。
 
 **Step 7.2: 检查密钥配置**
 
@@ -452,6 +459,16 @@ case "$ADAPTER" in
     ;;
   gemini)
     command -v gemini >/dev/null 2>&1 || echo "MISSING: gemini CLI not found"
+    ;;
+  *)
+    # 自定义 adapter profile（如 vibe-center）：从 backend 配置推断实际 CLI
+    # 读 config/keys.env 或 ~/.vibe/config/keys.env 的 VIBE_BACKEND_* 字段
+    BACKEND=$(grep -hE '^VIBE_(DEFAULT_)?BACKEND=' config/keys.env ~/.vibe/config/keys.env 2>/dev/null | head -1 | cut -d= -f2)
+    case "$BACKEND" in
+      claude) command -v claude >/dev/null 2>&1 || echo "MISSING: claude CLI (backend=$BACKEND)" ;;
+      codex) command -v codex >/dev/null 2>&1 || echo "MISSING: codex CLI (backend=$BACKEND)" ;;
+      *) echo "NOTE: custom adapter='$ADAPTER' backend='$BACKEND'，手动确认对应 CLI" ;;
+    esac
     ;;
 esac
 ```
@@ -529,6 +546,94 @@ fi
 
 ---
 
+### Phase 9: 第三方工具链合规（消费 plugin-setup-standard）
+
+**先读真源**：`docs/standards/plugin-setup-standard.md`。该标准的"总览"表 + 各工具 §验证 段落是检查依据。本 phase 跑标准中文档化的验证命令矩阵，**不重新定义安装矩阵**。
+
+按工具逐项验证，结果分三类：
+
+- **MISSING/BROKEN**：工具未装、命令失败、doctor 报错
+- **KNOWN_ISSUE_VIOLATION**：命中标准"已知上游问题"且违反规避策略（如端口漂移）
+- **VERSION_DRIFT**：实际版本与标准 pin 不一致（提示对齐方向，不自动升降级）
+
+**Step 9.1: CLI 工具版本核对**
+
+```bash
+# 标准 §总览 pin 版本：rtk 0.43.0 / graphify 0.9.8 / specify 0.12.4
+for cmd in rtk graphify specify openspec; do
+  if command -v "$cmd" >/dev/null 2>&1; then
+    echo "$cmd: $(${cmd} --version 2>&1 | head -1)"
+  else
+    echo "MISSING: $cmd CLI not found"
+  fi
+done
+```
+
+**Step 9.2: claude-mem 运行时（含已知端口漂移检查）**
+
+```bash
+# 版本 + 状态
+npx claude-mem@latest status 2>&1 | grep -iE "version|port|pid" || echo "BROKEN: claude-mem status failed"
+
+# 已知问题：端口漂移（标准 §claude-mem doctor 端口漂移说明）
+# doctor 在某些路径用公式端口 37700 + (uid % 100)，而非 settings.json 的 CLAUDE_MEM_WORKER_PORT
+UID_NUM=$(id -u)
+FORMULA_PORT=$((37700 + UID_NUM % 100))
+SETTINGS_PORT=$(jq -r '.CLAUDE_MEM_WORKER_PORT' ~/.claude-mem/settings.json 2>/dev/null || echo "")
+if [ -n "$SETTINGS_PORT" ] && [ "$SETTINGS_PORT" != "$FORMULA_PORT" ]; then
+  echo "KNOWN_ISSUE_VIOLATION: claude-mem port drift (formula=$FORMULA_PORT, settings=$SETTINGS_PORT)"
+  echo "  规避: 将 settings.json 端口改为 $FORMULA_PORT 后 restart worker，否则 doctor 误报 Worker no response"
+fi
+
+# doctor 综合健康（All required checks passed 才算 ok）
+npx claude-mem@latest doctor 2>&1 | grep -iE "✗|✓|passed|failed" | head -10
+```
+
+**Step 9.3: Claude plugins 状态**
+
+```bash
+# 标准 §总览 pin：claude-mem 13.10.2 / superpowers 6.1.0 / codex 1.0.2 / claude-hud 0.3.0
+claude plugin list 2>&1 | grep -iE "claude-mem|superpowers|codex|claude-hud|context7" || echo "BROKEN: claude plugin list empty"
+```
+
+**Step 9.4: Codex claude-mem 集成（已知 marketplace 兼容问题）**
+
+```bash
+# 标准 §claude-mem Codex 兼容：13.10.2 用 marketplace plugin 方式
+# 已知问题：npx install --ide codex-cli 注册本地路径 marketplace，Codex 要求 Git 源会失败
+codex plugin list 2>&1 | grep "claude-mem@" | head -1 || echo "MISSING: claude-mem not installed in Codex"
+
+# 若 plugin not installed，检查 marketplace 是否误注册为本地路径
+codex plugin marketplace list 2>&1 | grep claude-mem
+# 修复路径见标准 §claude-mem Codex 兼容（Git marketplace 方式）
+```
+
+**Step 9.5: MCP servers 与 key**
+
+```bash
+# exa：标准 §exa search，key 从环境变量读
+test -n "$EXA_API_KEY" && echo "exa: EXA_API_KEY present" || echo "MISSING: EXA_API_KEY"
+# context7：作为 Claude plugin 或 Codex MCP
+claude plugin list 2>&1 | grep -q context7 && echo "context7: ok (plugin)" || echo "WARNING: context7 plugin not found"
+```
+
+**Step 9.6: 版本漂移判定**
+
+对每项实际版本与标准 pin 比对。漂移时不自动升降级，输出建议并询问用户对齐方向：
+- 实际 > pin 且功能正常 → 提示"保最新 + 更新标准 pin"或"降到 pin"
+- 实际 < pin → 提示"升级到 pin"或"降 pin 到实际"
+
+**修复操作**：
+
+按分类分流，**不自行修复上游问题**：
+- **MISSING/BROKEN** → 引导按标准 §对应工具 的官方安装命令修复；claude-mem doctor 失败先跑 `npx claude-mem@latest repair`
+- **KNOWN_ISSUE_VIOLATION** → 按标准规避策略告警，询问用户是否应用（如端口对齐需 restart worker，有短暂中断）
+- **VERSION_DRIFT** → 询问对齐方向，确认后才动手；superpowers 等跨 session 工具默认保最新 + 更新 pin
+
+**验证**: 所有工具 `--version` / `status` 正常，claude-mem doctor 全绿，无 KNOWN_ISSUE_VIOLATION；残留漂移明确列出并记录用户决策。
+
+---
+
 ## Guardrails（交互原则）
 
 1. **渐进式检查**：一个检查接一个检查，不会"停止"
@@ -566,6 +671,8 @@ fi
 - TARGET_CONFIG_INVALID → "编辑 `.vibe/settings.yaml` 修复格式"
 - BACKEND_OR_KEY_MISSING → "安装缺失的后端 CLI 或运行 `vibe keys init`"
 - PROMPT_READINESS_GAP → "检查 flow 绑定、issue 分支名与 prompt 资产完整性"
+- TOOLCHAIN_DRIFT → "Phase 9：实际版本与 plugin-setup-standard pin 不一致，按建议对齐"
+- KNOWN_ISSUE_VIOLATION → "Phase 9：命中标准已知上游问题且违反规避策略（如 claude-mem 端口漂移）"
 
 ### 项目状态
 你的项目现在可以：
@@ -586,6 +693,7 @@ fi
 - Issue #1924: global runtime distribution
 - Issue #1925: config loading with target override
 - Issue #1905: internal manager dry-run/show-prompt
+- Issue #3322: Phase 9 第三方工具链合规检查（消费 plugin-setup-standard）
 - CLAUDE.md: Skill-First 原则
 - 现有 skill: `vibe-onboard`, `vibe-check`
 - 设计文档: `docs/superpowers/specs/2026-06-02-vibe-project-check-redesign.md`
