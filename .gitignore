@@ -150,6 +150,8 @@ docs/superpowers/
 .specify/extensions/*
 !.specify/extensions/vibe-spec-bridge/
 .specify/extensions/vibe-spec-bridge/.specify-dev/
+!.specify/extensions/vibe-explore/
+.specify/extensions/vibe-explore/.specify-dev/
 .specify/scripts/
 .specify/integrations/
 .specify/init-options.json
