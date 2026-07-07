@@ -62,7 +62,6 @@ Flow Service 模块负责管理 Flow 的完整生命周期，包括：
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | `cleanup.py` | 480 | Flow 清理服务（cleanup、LiveSessionsDetectedError） |
-| `abandon.py` | 156 | Flow 放弃服务（abandon flow） |
 | `timeline.py` | 201 | Flow 时间线服务（timeline events） |
 
 ### 辅助工具
@@ -108,7 +107,6 @@ Flow Service 模块负责管理 Flow 的完整生命周期，包括：
 - `FlowRecoveryService` — Flow 恢复服务
 - `FlowCleanupService` — Flow 清理服务
 - `FlowRebuildUsecase` — Flow 重建用例
-- `AbandonFlowService` — Flow 放弃服务 ⚠️ **Finding**: 0 external references (dead code candidate)
 - `LiveSessionsDetectedError` — 活跃会话检测异常
 - `FlowTimelineService` — Flow 时间线服务
 
@@ -175,7 +173,7 @@ Flow Service 模块负责管理 Flow 的完整生命周期，包括：
 
 ### Dead Code Candidate
 
-- `AbandonFlowService` — 公开导出但无外部引用（需 follow-up 验证是否可移除）
+- _无_（`AbandonFlowService` 已于 #3303 移除）
 
 ### 反模式
 
