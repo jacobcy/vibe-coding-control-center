@@ -8,8 +8,6 @@ Import paths:
     # Recommended (explicit source)
     from vibe3.clients.protocols.flow import FlowReader, FlowStatePort
 
-    # Backward compatible (package re-export)
-    from vibe3.clients.protocols import FlowReader, FlowStatePort
 """
 
 from __future__ import annotations
