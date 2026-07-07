@@ -28,7 +28,7 @@ findings=0
 for cmd in "${vibe_commands[@]}"; do
   subcommand="$(printf '%s\n' "$cmd" | awk '{print $2}')"
 
-  if ! (cd "$repo_root" && uv run python src/vibe3/cli.py "$subcommand" --help >/dev/null 2>&1); then
+  if ! (cd "$repo_root" && ./bin/vibe "$subcommand" --help >/dev/null 2>&1); then
     echo "Capability Gap: $skill_file -> $cmd"
     findings=1
   fi

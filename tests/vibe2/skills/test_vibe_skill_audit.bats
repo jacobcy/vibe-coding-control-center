@@ -36,6 +36,28 @@ EOF
   [[ "$output" =~ "bin/vibe nonsense launch" ]]
 }
 
+@test "vibe-skill-audit validates bin vibe commands against the V2 CLI" {
+  local fixture
+  fixture="$(mktemp -d)"
+
+  cat > "$fixture/fake-skill.md" <<'EOF'
+---
+name: fake-vibe-skill
+description: Fake skill for testing
+---
+
+# Fake
+
+Run `bin/vibe keys check`.
+EOF
+
+  run bash "$REPO_ROOT/skills/vibe-skill-audit/scripts/audit-skill-references.sh" \
+    "$fixture/fake-skill.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "No findings" ]]
+}
+
 @test "vibe-skill-audit requires workflow gates instead of prompt-only constraints" {
   run grep -F "Gate 优先于提示" \
     "$REPO_ROOT/skills/vibe-skill-audit/SKILL.md"

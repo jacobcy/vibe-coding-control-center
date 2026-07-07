@@ -79,7 +79,7 @@ fi
 # ── 1. Install approved third-party skills from ~/.vibe/skills.json ──────────
 # IMPORTANT: Skills installation should NOT be blocked by openspec/pre-commit issues
 if [ -f "$VIBE_SKILLS_CONFIG" ] && command -v jq &> /dev/null; then
-  echo "📦 Installing approved third-party skills from ~/.vibe/skills.json..."
+  echo "📦 Installing approved third-party skills from $VIBE_SKILLS_CONFIG..."
 
   global_agents=$(jq -r '.global.agents // [] | join(" ")' "$VIBE_SKILLS_CONFIG")
   jq -c '.global.packages[]?' "$VIBE_SKILLS_CONFIG" | while read -r pkg; do
@@ -138,7 +138,7 @@ elif command -v openspec &> /dev/null; then
   fi
 else
   echo -e "\033[1;33m⚠️  Warning: 'openspec' not found. Skipping (non-blocking).\033[0m"
-  echo "   Install via: pnpm add -g @openspec/tools"
+  echo "   Install via: npm install -g @fission-ai/openspec"
   echo "   Run 'vibe doctor' to check optional tools status"
 fi
 

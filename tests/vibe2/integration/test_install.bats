@@ -4,6 +4,42 @@ setup() {
   export VIBE_ROOT="$BATS_TEST_DIRNAME/../../.."
 }
 
+@test "init installs configured Codex skills and links project skills for Claude and Codex" {
+  local fixture bin_dir home_dir npx_log
+  fixture="$(mktemp -d)"
+  bin_dir="$fixture/bin"
+  home_dir="$fixture/home"
+  npx_log="$fixture/npx.log"
+
+  mkdir -p "$bin_dir" "$home_dir" "$fixture/config/v3" \
+    "$fixture/skills/vibe-demo"
+  printf '%s\n' '---' 'name: vibe-demo' 'description: test' '---' \
+    > "$fixture/skills/vibe-demo/SKILL.md"
+  cat > "$fixture/config/v3/skills.json" <<'JSON'
+{"global":{"agents":["codex"],"packages":[{"source":"example/caveman","skills":["caveman"]}]},"project":{"agents":["codex","claude-code"],"packages":[]}}
+JSON
+
+  cat > "$bin_dir/npx" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$NPX_LOG"
+exit 0
+SH
+  for command in openspec pre-commit; do
+    printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$bin_dir/$command"
+  done
+  chmod +x "$bin_dir/npx" "$bin_dir/openspec" "$bin_dir/pre-commit"
+
+  run env HOME="$home_dir" NPX_LOG="$npx_log" PATH="$bin_dir:$PATH" \
+    bash -c 'cd "'"$fixture"'" && bash "'"$VIBE_ROOT"'/scripts/init.sh"'
+
+  [ "$status" -eq 0 ]
+  grep -F 'skills add example/caveman -g --agent codex --skill caveman -y' "$npx_log"
+  [ -L "$fixture/.claude/skills/vibe-demo" ]
+  [ -L "$fixture/.codex/skills/vibe-demo" ]
+  [ "$(readlink "$fixture/.claude/skills/vibe-demo")" = "../../skills/vibe-demo" ]
+  [ "$(readlink "$fixture/.codex/skills/vibe-demo")" = "../../skills/vibe-demo" ]
+}
+
 @test "init installs tracked project extension through local dev source" {
   local fixture bin_dir home_dir specify_log
   fixture="$(mktemp -d)"
