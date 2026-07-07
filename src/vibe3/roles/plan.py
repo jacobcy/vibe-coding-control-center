@@ -337,13 +337,15 @@ def resolve_spec_plan_input(
     branch: str,
     *,
     file: Path | None = None,
+    spec_ref: str | None = None,
 ) -> PlanSpecInput:
-    """Resolve spec planning input from file or flow spec_ref.
+    """Resolve spec planning input from an explicit value or flow spec_ref.
 
     Priority:
     1. Explicit --file from CLI
-    2. Flow's existing spec_ref (if available)
-    3. Error if none available
+    2. Explicit read-only spec_ref from CLI
+    3. Flow's existing spec_ref (if available)
+    4. Error if none available
     """
     from vibe3.services.flow import FlowService
     from vibe3.services.shared import SpecRefService
@@ -368,25 +370,30 @@ def resolve_spec_plan_input(
             spec_path=spec_path,
         )
 
-    # Case 2: Try flow's spec_ref as default
-    flow_service = FlowService()
-    flow = flow_service.get_flow_status(branch)
+    # Case 2: explicit read-only ref; otherwise use flow's stored ref.
+    selected_ref = spec_ref
+    source = "Explicit spec_ref"
+    if selected_ref is None:
+        flow_service = FlowService()
+        flow = flow_service.get_flow_status(branch)
+        selected_ref = flow.spec_ref if flow else None
+        source = "Flow spec_ref"
 
-    if flow and flow.spec_ref:
+    if selected_ref:
         spec_service = SpecRefService()
-        spec_info = spec_service.parse_spec_ref(flow.spec_ref)
+        spec_info = spec_service.parse_spec_ref(selected_ref)
 
         # Validate spec_ref exists
-        is_valid, error = spec_service.validate_spec_ref(flow.spec_ref, branch=branch)
+        is_valid, error = spec_service.validate_spec_ref(selected_ref, branch=branch)
         if not is_valid:
-            raise ValueError(f"Flow spec_ref invalid: {error}")
+            raise ValueError(f"{source} invalid: {error}")
 
         # Get spec content
         spec_content = spec_service.get_spec_content_for_prompt(
             spec_info, branch=branch
         )
         if not spec_content:
-            raise ValueError(f"Failed to read spec content from {flow.spec_ref}")
+            raise ValueError(f"Failed to read spec content from {selected_ref}")
 
         # Determine spec_path based on kind
         spec_path = (

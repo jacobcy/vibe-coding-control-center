@@ -145,7 +145,11 @@ docs/superpowers/
 # Spec-Kit (specify CLI + superspec bridge)
 # Track: constitution, specs, templates, workflows
 # Ignore: installed extension code, helper scripts, regenerable caches, and manifests
-.specify/extensions/
+# Exception: project-owned extensions ship in-tree (spec 012 US3, FR-014) —
+# external cloned extensions (superspec etc.) stay ignored.
+.specify/extensions/*
+!.specify/extensions/vibe-spec-bridge/
+.specify/extensions/vibe-spec-bridge/.specify-dev/
 .specify/scripts/
 .specify/integrations/
 .specify/init-options.json

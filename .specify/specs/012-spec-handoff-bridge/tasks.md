@@ -1,10 +1,10 @@
 # Tasks: Spec Artifact Handoff Bridge
 
-**Input**: `spec.md` (012-spec-handoff-bridge), [ADR-0006](../../../docs/decisions/0006-spec-artifact-handoff-contract.md) (`proposed`), [issue #3310](https://github.com/jacobcy/vibe-coding-control-center/issues/3310)
+**Input**: `spec.md` (012-spec-handoff-bridge), [ADR-0006](../../../docs/decisions/0006-spec-artifact-handoff-contract.md) (`proposed`), parent [issue #3310](https://github.com/jacobcy/vibe-coding-control-center/issues/3310), implementation [issue #3312](https://github.com/jacobcy/vibe-coding-control-center/issues/3312)
 
-> **⚠️ Plan provenance**: `plan.md` is **not yet generated** (progress.yml `plan: pending`). This task list was decomposed **directly from `spec.md` + ADR-0006 Decision/Consequences + issue #3310 Required design**, applying the `superpowers:writing-plans` decomposition methodology onto the spec-kit tasks template. Before `implement`, either (a) backfill `plan.md` via `/speckit-superspec-plan`, or (b) treat this file as the plan-of-record and reconcile at `/speckit-superspec-review`. File paths and line anchors below reflect the **explored baseline** (commit `306ef3b4`); re-anchor line numbers at implementation time.
+> **Plan provenance**: [`plan.md`](./plan.md) was backfilled during PR #3314 review from `spec.md`, ADR-0006, issue #3312, and this task decomposition. Its ADR Consideration records the accepted snapshot and actual-diff reconciliation. File paths and line anchors below originated at explored baseline `306ef3b4` and must be re-anchored against the implementation diff.
 
-**Prerequisites**: spec.md ✓, ADR-0006 ✓ (proposed), plan.md ✗ (see above), constitution ✓ (`.specify/memory/constitution.md`)
+**Prerequisites**: spec.md ✓, ADR-0006 ✓ (proposed), plan.md ✓, constitution ✓ (`.specify/memory/constitution.md`)
 
 **Tests**: This feature changes shared-state write/validation/recovery contracts — tests are **mandatory** (spec SC-006, constitution principle III). Every implementation task is `[TDD]`.
 
@@ -129,20 +129,20 @@ Verbatim from spec.md / ADR-0006 / CLAUDE.md HARD RULES — every task inherits 
 
 ### Tests for User Story 2 (write FIRST)
 
-- [ ] T040 [TDD] [US2] Recovery-classification test in `tests/vibe3/services/test_flow_consistency.py`
+- [x] T040 [TDD] [US2] Recovery-classification test in `tests/vibe3/services/test_flow_consistency.py`
   - Covers spec US2 scenarios 1/2/3: missing historical artifact → artifact blocker (not rebuild); role-output absence stays under no-op gate; runtime exception stays under FailedGate.
 
 ### Implementation for User Story 2
 
-- [ ] T041 [TDD] [REVIEW] [US2] Introduce `artifact_blocker` classification (FR-010/011/013)
+- [x] T041 [TDD] [REVIEW] [US2] Introduce `artifact_blocker` classification (FR-010/011/013)
   - Files: Modify `src/vibe3/services/flow/consistency.py:41-100` — the current `MISSING_REF` branch (`:91-98`) classifies as rebuild; split into: physical scene damage (worktree/flow corruption → rebuild) vs. missing historical artifact (→ artifact repair blocker). Add a new `FlowConsistencyCode` (e.g. `MISSING_ARTIFACT`) with `needs_rebuild=False`.
   - Interfaces: Produces the artifact-blocker signal consumed by recovery/serve layer.
-- [ ] T042 [TDD] [US2] Include `spec_ref` in consistency checking (FR-010)
+- [x] T042 [TDD] [US2] Include `spec_ref` in consistency checking (FR-010)
   - Files: Modify `src/vibe3/services/flow/consistency.py:81` — add `spec_ref` to the checked ref tuple, sharing one resolution contract with plan/report/audit (do not special-case).
   - Test: missing spec file in healthy worktree → `MISSING_ARTIFACT`, not rebuild.
-- [ ] T043 [TDD] [P] [US2] Keep RoleOutputContract / no-op gate authoritative for absent role output (FR-012)
+- [x] T043 [TDD] [P] [US2] Keep RoleOutputContract / no-op gate authoritative for absent role output (FR-012)
   - Files: `src/vibe3/config/role_policy.py:56-63`, `src/vibe3/execution/noop_gate.py:223-256`. No behavior change expected — add regression tests proving a role that omits required output (e.g. planner missing `plan_ref`) still hits the no-op gate, NOT the artifact blocker.
-- [ ] T044 [TDD] [P] [US2] Keep FailedGate separate from artifact blocked state (FR-013)
+- [x] T044 [TDD] [P] [US2] Keep FailedGate separate from artifact blocked state (FR-013)
   - Files: `src/vibe3/domain/failed_gate.py:20-298`. Regression test: a runtime/system error still routes through FailedGate; artifact absence never triggers `E_MODEL_*`/`E_API_*` gate transitions.
   - **Checkpoint**: US2 independently testable — a missing artifact can no longer destroy a healthy worktree (SC-002).
 
@@ -156,19 +156,19 @@ Verbatim from spec.md / ADR-0006 / CLAUDE.md HARD RULES — every task inherits 
 
 ### Tests for User Story 3 (write FIRST)
 
-- [ ] T050 [TDD] [US3] Extension metadata + hook fixture tests in `tests/vibe3/extensions/test_spec_kit_bridge.py` (new)
+- [x] T050 [TDD] [US3] Extension metadata + hook fixture tests in `tests/vibe3/extensions/test_spec_kit_bridge.py` (new)
   - Covers spec US3 scenarios 1-4: after specify→spec, after plan→plan_ref, impl/review→report/audit, direct-superspec exit publishes; idempotent when both paths observe same artifact (FR-018).
 
 ### Implementation for User Story 3
 
-- [ ] T051 [REVIEW] [US3] Design project-owned spec-kit extension layout (FR-014/015/016)
+- [x] T051 [REVIEW] [US3] Design project-owned spec-kit extension layout (FR-014/015/016)
   - Files: Create `.specify/extensions/vibe-spec-bridge/` (project-owned, NOT modifying `.specify/extensions/superspec/`). Define `extension.yml` with lifecycle hooks: `after_specify -> spec`, `after_plan -> plan`, implementation completion `-> report`, review completion `-> audit`. Each hook calls **public** Vibe handoff commands only (G7).
   - Note: existing `.specify/extensions/superspec/extension.yml:64-78` only defines `after_tasks/before_implement/after_implement` — the new `after_specify/after_plan` hooks are additive and live in the project-owned extension.
-- [ ] T052 [TDD] [US3] Implement `after_specify` → `handoff spec` and `after_plan` → `handoff plan` adapters (FR-015)
+- [x] T052 [TDD] [US3] Implement `after_specify` → `handoff spec` and `after_plan` → `handoff plan` adapters (FR-015)
   - Files: adapter scripts under `.specify/extensions/vibe-spec-bridge/hooks/`. Each resolves the generated `.specify/specs/<NNN>/spec.md` / `plan.md` and invokes the public writer (T032 / existing `handoff plan`).
-- [ ] T053 [TDD] [P] [US3] Implement implementation → `report` and review → `audit` adapters (FR-015)
+- [x] T053 [TDD] [P] [US3] Implement implementation → `report` and review → `audit` adapters (FR-015)
   - Files: same hook dir; call existing `handoff report` / `handoff audit` writers (`handoff_write.py:279,358`).
-- [ ] T054 [TDD] [US3] Direct-superspec exit contract (FR-017/018)
+- [x] T054 [TDD] [US3] Direct-superspec exit contract (FR-017/018)
   - Files: a repository-owned bridge command (e.g. a thin `vibe3 handoff publish-spec-kit` or an exit rule document + adapter) that superspec skills invoke when bypassing core hooks. Must produce idempotent events when both this and the hook path observe the same artifact.
   - **Checkpoint**: US3 independently testable — fixture spec-kit workflow publishes all four artifact kinds without editing external source trees (SC-003).
 
@@ -272,4 +272,4 @@ Verbatim from spec.md / ADR-0006 / CLAUDE.md HARD RULES — every task inherits 
 - Every implementation task is `[TDD]` (constitution principle III; superspec `before_implement` hook enforces Red-Green-Refactor).
 - Adapters touch `.specify/extensions/vibe-spec-bridge/` only — never `.specify/extensions/superspec/` or external sources (G7).
 - Shared-state writes always via public handoff commands (HARD RULE #2); never raw `.git/vibe3` access.
-- If `plan.md` is backfilled later, reconcile this file against it at `/speckit-superspec-review` — do not maintain two divergent task lists (constitution principle II).
+- Keep this task list reconciled with `plan.md`; do not maintain two divergent planning artifacts (constitution principle II).

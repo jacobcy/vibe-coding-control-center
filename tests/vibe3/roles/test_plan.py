@@ -183,6 +183,30 @@ class TestResolveSpecPlanInputDefaultSpecRef:
         assert "Issue #789" in result.description
         assert result.spec_path is None
 
+    def test_explicit_issue_ref_overrides_flow_without_mutation(self) -> None:
+        """A read-only issue override must supply its own planning content."""
+        mock_spec_info = MagicMock()
+        mock_spec_info.kind = "issue"
+        mock_spec_info.issue_number = 123
+        mock_spec_info.file_path = None
+
+        with (
+            patch("vibe3.services.flow.FlowService") as mock_fs,
+            patch("vibe3.services.shared.SpecRefService") as mock_ss,
+        ):
+            mock_ss.return_value.parse_spec_ref.return_value = mock_spec_info
+            mock_ss.return_value.validate_spec_ref.return_value = (True, "")
+            mock_ss.return_value.get_spec_content_for_prompt.return_value = (
+                "Issue: #123\nTitle: Explicit override"
+            )
+
+            result = resolve_spec_plan_input("test-branch", spec_ref="#123")
+
+        mock_fs.assert_not_called()
+        mock_ss.return_value.parse_spec_ref.assert_called_once_with("#123")
+        assert "Issue: #123" in result.request.task_guidance
+        assert result.spec_path is None
+
     def test_no_explicit_input_raises_when_no_flow_spec_ref(self) -> None:
         """Raise ValueError when no explicit input and flow has no spec_ref."""
         mock_flow = MagicMock()

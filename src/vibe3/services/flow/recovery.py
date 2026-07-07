@@ -7,7 +7,8 @@ Decision tree:
   consistency OK           --> resume only (clear label + body + DB)
   MISSING_RECORDED_WORKTREE --> fix (backfill DB) + resume
   MISSING_WORKTREE          --> rebuild (delete + bootstrap) + resume
-  MISSING_REF               --> manual: guide user; auto: rebuild + resume
+  MISSING_ARTIFACT          --> manual: raise (guide rebind/regenerate);
+                                auto: keep blocked (do NOT rebuild healthy scene)
 """
 
 from __future__ import annotations
@@ -36,6 +37,10 @@ class RecoveryAction(StrEnum):
     RESUME_ONLY = "resume_only"
     FIX_AND_RESUME = "fix_and_resume"
     REBUILD = "rebuild"
+    # A recorded artifact disappeared in a healthy worktree. The scene is NOT
+    # rebuilt; it stays blocked waiting for explicit rebind/regeneration
+    # (spec 012 US2, SC-002).
+    ARTIFACT_BLOCKED = "artifact_blocked"
 
 
 @dataclass
@@ -94,6 +99,9 @@ class FlowRecoveryService:
             return (RecoveryAction.RESUME_ONLY, consistency)
         if consistency.fix_action:
             return (RecoveryAction.FIX_AND_RESUME, consistency)
+        if consistency.code == FlowConsistencyCode.MISSING_ARTIFACT:
+            # Healthy worktree, missing historical artifact: never rebuild.
+            return (RecoveryAction.ARTIFACT_BLOCKED, consistency)
         if consistency.needs_rebuild:
             return (RecoveryAction.REBUILD, consistency)
         return (RecoveryAction.RESUME_ONLY, consistency)
@@ -178,6 +186,23 @@ class FlowRecoveryService:
                     f"Applied fix ({consistency.fix_action}); "
                     "cleared blocked markers"
                 ),
+            )
+
+        if consistency.code == FlowConsistencyCode.MISSING_ARTIFACT:
+            # A recorded artifact disappeared in a healthy worktree: NEVER rebuild
+            # the scene. Manual path guides the user to rebind/regenerate; auto path
+            # keeps the flow blocked for repair (no resume, no rebuild) — spec 012
+            # US2, SC-002.
+            if not auto:
+                raise UserError(
+                    f"Artifact repair blocker: {consistency.reason}. "
+                    "通过 `vibe3 handoff <spec|plan|report|audit> <path>` "
+                    "重新绑定或重新生成制品。"
+                )
+            return RecoveryResult(
+                action=RecoveryAction.ARTIFACT_BLOCKED,
+                success=False,
+                detail=f"Artifact blocker (scene kept blocked): {consistency.reason}",
             )
 
         if consistency.needs_rebuild:

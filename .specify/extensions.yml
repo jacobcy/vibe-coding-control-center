@@ -1,5 +1,6 @@
 installed:
 - superspec
+- vibe-spec-bridge
 settings:
   auto_execute_hooks: true
 hooks:
@@ -31,4 +32,39 @@ hooks:
     priority: 10
     prompt: Run Superpowers review against the specification and implementation?
     description: Review implementation against the spec, plan, tasks, and constitution
+    condition: null
+  - extension: vibe-spec-bridge
+    command: speckit.vibe-spec-bridge.publish-report
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Publish the implementation report into the Vibe flow?
+    description: Record the report as report_ref via `vibe3 handoff report`
+    condition: null
+  after_specify:
+  - extension: vibe-spec-bridge
+    command: speckit.vibe-spec-bridge.publish-spec
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Publish the generated spec into the Vibe flow?
+    description: Record the canonical spec.md as spec_ref via `vibe3 handoff spec`
+    condition: null
+  after_plan:
+  - extension: vibe-spec-bridge
+    command: speckit.vibe-spec-bridge.publish-plan
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Publish the generated plan into the Vibe flow?
+    description: Record plan.md as plan_ref via `vibe3 handoff plan`
+    condition: null
+  after_review:
+  - extension: vibe-spec-bridge
+    command: speckit.vibe-spec-bridge.publish-audit
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Publish the review audit into the Vibe flow?
+    description: Record the audit as audit_ref via `vibe3 handoff audit`
     condition: null

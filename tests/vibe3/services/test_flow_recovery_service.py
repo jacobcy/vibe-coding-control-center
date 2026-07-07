@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.exceptions import UserError
 from vibe3.services.flow.recovery import (
     FlowRecoveryService,
     RecoveryAction,
@@ -60,7 +61,10 @@ class TestClassifyRecovery:
         action, _ = svc.classify("task/issue-1")
         assert action == RecoveryAction.FIX_AND_RESUME
 
-    def test_missing_ref_returns_rebuild(self):
+    def test_missing_artifact_classifies_as_artifact_blocked(self):
+        """A missing recorded artifact in a healthy worktree classifies as
+        ARTIFACT_BLOCKED, never REBUILD (spec 012 US2 SC-002 — a missing
+        artifact never causes automatic destruction of a healthy worktree)."""
         svc = _make_service(
             worktree_path=Path("/wt/task/issue-1"),
             flow_state={
@@ -72,8 +76,10 @@ class TestClassifyRecovery:
             "vibe3.services.flow.consistency.check_ref_exists",
             return_value=("docs/plans/missing.md", False),
         ):
-            action, _ = svc.classify("task/issue-1")
-        assert action == RecoveryAction.REBUILD
+            action, consistency = svc.classify("task/issue-1")
+        assert action == RecoveryAction.ARTIFACT_BLOCKED
+        assert consistency is not None
+        assert consistency.ref_field == "plan_ref"
 
 
 class TestRecover:
@@ -141,6 +147,57 @@ class TestRecover:
                 reason="manual",
                 auto=False,
             )
+
+    def test_missing_artifact_manual_raises_to_guide_rebind(self):
+        """Manual recovery of a missing artifact raises UserError guiding
+        rebind/regeneration — it must NOT rebuild the healthy scene."""
+        svc = _make_service(
+            worktree_path=Path("/wt/task/issue-1"),
+            flow_state={
+                "worktree_path": "/wt/task/issue-1",
+                "plan_ref": "docs/plans/missing.md",
+            },
+        )
+        with patch(
+            "vibe3.services.flow.consistency.check_ref_exists",
+            return_value=("docs/plans/missing.md", False),
+        ):
+            with pytest.raises(UserError, match="Artifact repair blocker"):
+                svc.recover(
+                    branch="task/issue-1",
+                    issue_number=1,
+                    reason="manual resume",
+                    auto=False,
+                )
+
+    def test_missing_artifact_auto_keeps_blocked_without_rebuild(self):
+        """Auto recovery of a missing artifact neither rebuilds nor clears
+        blocked markers — the scene stays blocked waiting for artifact repair."""
+        svc = _make_service(
+            worktree_path=Path("/wt/task/issue-1"),
+            flow_state={
+                "worktree_path": "/wt/task/issue-1",
+                "plan_ref": "docs/plans/missing.md",
+            },
+        )
+        with (
+            patch(
+                "vibe3.services.flow.consistency.check_ref_exists",
+                return_value=("docs/plans/missing.md", False),
+            ),
+            patch.object(svc, "_do_rebuild") as mock_rebuild,
+            patch.object(svc, "_do_resume") as mock_resume,
+        ):
+            result = svc.recover(
+                branch="task/issue-1",
+                issue_number=1,
+                reason="auto recovery",
+                auto=True,
+            )
+        mock_rebuild.assert_not_called()
+        mock_resume.assert_not_called()
+        assert result.action == RecoveryAction.ARTIFACT_BLOCKED
+        assert not result.success
 
     def test_auto_rebuild_fails_when_rebuilt_worktree_is_missing(self):
         svc = _make_service(worktree_path=None, flow_state={})

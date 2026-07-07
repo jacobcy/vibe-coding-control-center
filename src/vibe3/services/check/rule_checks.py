@@ -368,6 +368,16 @@ def rule_flow_consistency_recovery(ctx: CheckContext, svc: Any) -> CheckResult |
             auto=True,
             ensure_worktree=True,
         )
+        if result.action == RecoveryAction.ARTIFACT_BLOCKED:
+            # US2 (spec 012, SC-002): a recorded spec/plan/report/audit file
+            # disappeared in a healthy worktree. The scene is NEVER rebuilt
+            # automatically — recover() kept it blocked. Report so the user
+            # can rebind via the public handoff surface (no rebuild hint).
+            ctx.issues.append(
+                f"{consistency_error}. Artifact repair blocker: rebind via "
+                "`vibe3 handoff <spec|plan|report|audit> <path>`."
+            )
+            return None
         logger.info(
             "Auto-recovered inconsistent flow",
             branch=ctx.branch,
