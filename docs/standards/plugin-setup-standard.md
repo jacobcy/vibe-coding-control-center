@@ -27,7 +27,7 @@ related_docs:
 - [第三方代码审查: codex](#codex)
 - [状态悬浮栏: claude-hud](#claude-hud)
 - [工具链部署: openspec + opsx](#openspec--opsx)
-- [项目技能: vibe-*](#vibe-)
+- [项目技能: vibe-*](#vibe-项目技能)
 
 ---
 
@@ -46,7 +46,7 @@ related_docs:
 | openspec/opsx | npm + skills | - | ✅ | `npm install -g @fission-ai/openspec` | ✅ |
 | vibe skills | skills | - | ✅ 项目内兼容 | `scripts/init.sh` 同步到 `.claude/skills/` 和 `.codex/skills/` | ✅ |
 | exa search | MCP server | 3.3.9 | ✅ | `mcpServers` config | ✅ |
-| context7 | plugin / MCP server | unknown | ✅ 通过 MCP | Claude plugin / `codex mcp add` | ✅ |
+| context7 | plugin / MCP server | - | ✅ 通过 MCP | Claude plugin / `codex mcp add` | ✅ |
 
 ---
 
@@ -200,8 +200,8 @@ Rust Token Killer — 命令行代理，减少 60-90% tokens。
 ### 安装
 
 ```bash
-# brew
-brew install rtk  # 或对应包管理器
+# macOS (Homebrew, primary)
+brew install rtk
 ```
 
 ### Hook 配置
@@ -226,7 +226,7 @@ brew install rtk  # 或对应包管理器
 ### 验证
 
 ```bash
-rtk --version        # → 0.42.4
+rtk --version        # → 0.43.0
 rtk gain             # 显示 token 节省统计
 ```
 
@@ -259,7 +259,7 @@ npx skills add JuliusBrussee/caveman -a codex
 
 Codex 不使用 Claude plugin 的 SessionStart hook。上游安装矩阵把 Codex 标为 per-session 激活：安装 skill 后，在新 session 中输入 `/caveman`，或直接说 `use caveman` / `talk like caveman`。Codex 支持 `$` skill mention 时也可显式调用 `$caveman`。
 
-本仓库的 manifest 将 Caveman 作为 Codex 全局第三方 skill 安装到 `~/.agents/skills/`。`scripts/init.sh` 只把项目自有的 `skills/vibe-*` 链接到 `.codex/skills/`，不会为 Caveman 创建 repo-local namespaced 副本。
+本仓库的 manifest 将 Caveman 作为 Codex 全局第三方 skill 安装到 `~/.agents/skills/`。`scripts/init.sh` 只把项目自有的 `skills/vibe-*` 链接到 `.codex/skills/`，不会为 Caveman 创建 repo-local namespaced 副本。manifest 以 source 方式安装、跟踪上游 latest，不 pin 固定版本；总览表中 `0.1.0` 为撰写时快照，可能随上游更新而变化。
 
 ### 激活
 
@@ -335,8 +335,8 @@ graphify 自动安装 `post-commit` 和 `post-checkout` hooks 到仓库共享 ho
 
 ```
 <项目根>/hooks/
-├── post-commit      # 提交后后台重建图谱
-├── post-checkout    # 切换分支后重建
+- post-commit      # 提交后后台重建图谱
+- post-checkout    # 切换分支后重建
 ```
 
 hooks 位置由 git worktree `--git-common-dir` 决定，所有 worktree 共享。
@@ -628,7 +628,7 @@ openspec update
 
 ---
 
-## vibe-* 项目技能
+## vibe 项目技能
 
 项目自有技能，由 `scripts/init.sh` 同时 symlink 到 `.claude/skills/` 与 `.codex/skills/`。
 
@@ -714,6 +714,8 @@ API key 从环境变量读取，在 `settings.json` 的 `env` 字段设置：
   }
 }
 ```
+
+`headers` 中的 `${EXA_API_KEY}` 读取变量值，`env` 块定义该变量；两者配合生效。
 
 **npm 包方式**（备选，需要 API key）：
 

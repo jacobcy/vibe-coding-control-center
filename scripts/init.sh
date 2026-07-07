@@ -138,7 +138,7 @@ elif command -v openspec &> /dev/null; then
   fi
 else
   echo -e "\033[1;33m⚠️  Warning: 'openspec' not found. Skipping (non-blocking).\033[0m"
-  echo "   Install via: pnpm add -g @openspec/tools"
+  echo "   Install via: npm install -g @fission-ai/openspec"
   echo "   Run 'vibe doctor' to check optional tools status"
 fi
 
