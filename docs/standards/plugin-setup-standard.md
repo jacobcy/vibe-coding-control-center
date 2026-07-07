@@ -36,7 +36,7 @@ related_docs:
 | 工具 | 类型 | 版本 | Codex 兼容 | 安装方式 | 状态 |
 |------|------|------|------------|---------|------|
 | claude-mem | plugin | 13.10.2 | ✅ | `npx claude-mem install` / `claude plugin install` | ✅ |
-| rtk | CLI | 0.42.4 | N/A (独立 CLI) | brew/npm/cargo | ✅ |
+| rtk | CLI | 0.43.0 | N/A (独立 CLI) | brew/npm/cargo | ✅ |
 | caveman | plugin | 0.1.0 | ✅ | `npx skills add JuliusBrussee/caveman -a codex` | ✅ |
 | graphify | CLI + skill | 0.9.8 | ✅ | `uv tool install graphifyy` | ✅ |
 | spec-kit (specify) | CLI + skill | 0.12.4 | ✅ | `uv tool install specify-cli` | ✅ |
