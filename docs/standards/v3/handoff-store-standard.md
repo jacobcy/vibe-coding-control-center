@@ -23,7 +23,7 @@ related_docs:
 它只负责记录：
 
 - flow 责任链
-- `plan / run / review` 阶段 ref（存储列名仍为 `plan_ref / report_ref / audit_ref`）
+- `plan / run / review` 阶段 ref（存储列名仍为 `spec_ref / plan_ref / report_ref / audit_ref`）
 - `planner / executor / reviewer` 署名
 - 最小阻塞与下一步信息
 - 共享 handoff 中间态文件的位置约定
@@ -364,6 +364,7 @@ CREATE TABLE flow_events (
 
 **Handoff 记录**：
 - `handoff init` - 初始化当前 branch 的 handoff 文档
+- `handoff spec` - 记录 spec handoff 到 `spec_ref`（ADR-0006 canonical-path contract）
 - `handoff plan` - 记录 plan handoff
 - `handoff report` - 记录 run handoff 到 `report_ref`
 - `handoff audit` - 记录 review handoff 到 `audit_ref`

@@ -182,20 +182,24 @@ Verbatim from spec.md / ADR-0006 / CLAUDE.md HARD RULES — every task inherits 
 
 ### Tests for User Story 4 (write FIRST)
 
-- [ ] T060 [TDD] [US4] Planner prompt provenance tests in `tests/vibe3/roles/test_plan_prompt.py`
+- [x] T060 [TDD] [US4] Planner prompt provenance tests in `tests/vibe3/roles/test_plan_spec_consumption.py`
   - Covers spec US4 scenarios 1-4: valid spec contributes content; absent spec legal; unreadable recorded spec → blocker; memory labeled advisory cannot override truth.
+  - Done: 7 tests verify FR-019 (absent=legal / valid=content / unreadable=blocker), FR-020 (ADR recall), FR-021 (evidence limitation), FR-022 (memory advisory), FR-023 (dev/task independence).
 
 ### Implementation for User Story 4
 
-- [ ] T061 [TDD] [REVIEW] [US4] Planner must read recorded spec; distinguish absent vs unreadable (FR-019)
-  - Files: Modify `src/vibe3/roles/plan.py:136-146,151-177` (`build_plan_prompt`). Currently it injects spec only when `spec_ref` truthy. Change: if `spec_ref` is set but unreadable (missing/un-resolvable via T012 contract), surface a **blocker** rather than silently skipping; if unset, continue with issue-only minimum (legal).
-- [ ] T062 [TDD] [P] [US4] ADR recall uses issue/spec semantics + accepted snapshot (FR-020)
-  - Files: `supervisor/policies/plan.md:86`, `supervisor/policies/review.md:127-147`, `skills/vibe-adr-recall/SKILL.md` (already delivered by #3308). Verify/enforce that recall reads `decides`/`scope` frontmatter of `status: accepted` ADRs against current issue/spec semantics; do not regress the low-code procedure.
-- [ ] T063 [TDD] [P] [US4] Memory retrieval is advisory + evidence-limitation reporting (FR-021/022)
-  - Files: planner material in `supervisor/policies/plan.md` and/or `src/vibe3/roles/plan.py`. When claude-memory tooling is available, retrieved observations are labeled advisory and MUST NOT override issue/spec/accepted-ADR/repository truth; when unavailable, report an evidence limitation instead of fabricating recall. (Baseline: claude-memory is currently NOT integrated — T063 adds the guarded advisory hook OR explicitly documents the evidence-limitation fallback.)
-- [ ] T064 [REVIEW] [US4] Confirm `dev/*` independence from `task/*` label lifecycle (FR-023)
-  - Files: regression test / policy assertion that human `dev/*` workflow choice does not alter `task/*` automated plan/run/review label transitions. Likely a documentation + guard assertion in `supervisor/policies/`.
-  - **Checkpoint**: US4 independently testable — annotated prompts prove valid spec + ADR context is consumed while optional absence remains supported (SC-004).
+- [x] T061 [TDD] [REVIEW] [US4] Planner must read recorded spec; distinguish absent vs unreadable (FR-019)
+  - Files: `src/vibe3/roles/plan.py:135-154`. Added `elif spec_info.kind == "file"` blocker section when spec_ref is set but the file is unreadable. Absent spec_ref (None) remains legal — the section simply doesn't appear.
+  - Done: `## Spec BLOCKED` surfaced for unreadable file specs; absent spec legal; valid spec content injected unchanged.
+- [x] T062 [TDD] [P] [US4] ADR recall uses issue/spec semantics + accepted snapshot (FR-020)
+  - Files: Added FR-020 annotation in `src/vibe3/roles/plan.py`. `supervisor/policies/plan.md:86` already instructs planner to run `vibe-adr-recall` skill (delivered by #3308). Low-code procedure verified — scans `status:accepted` ADR frontmatter.
+  - Done: FR-020 annotation in plan.py; supervisor policy verified; ADR recall test guards regression.
+- [x] T063 [TDD] [P] [US4] Memory retrieval is advisory + evidence-limitation reporting (FR-021/022)
+  - Files: `src/vibe3/roles/plan.py:159-180`. Added `subprocess` call to `claude-memory smart-search` wrapped in try/except. On availability: memory content labeled `[Advisory]` — cannot override issue/spec/accepted-ADR/repository truth. On unavailability: `## Evidence Limitation` section reports the gap.
+  - Done: advisory memory hook + evidence limitation fallback; test guards both paths.
+- [x] T064 [REVIEW] [US4] Confirm `dev/*` independence from `task/*` label lifecycle (FR-023)
+  - Files: Added `test_dev_branch_independence_from_task_lifecycle` in `tests/vibe3/roles/test_plan_spec_consumption.py`. Proves `_build_plan_task_guidance` produces identical output for `dev/issue-*` and `task/issue-*` branches.
+  - Done: FR-023 regression test confirms branch-convention-agnostic plan prompt.
 
 ---
 
