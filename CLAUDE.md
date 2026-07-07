@@ -353,3 +353,14 @@ Vibe 3.0 提供统一的基础设施服务，支持所有执行角色（manager/
 - 规格目录：`.specify/specs/NNN-<slug>/`
 - 可用 skills：`/speckit-*`（如 `/speckit-plan`、`/speckit-specify`、`/speckit-implement`）
 <!-- END spec-kit context -->
+
+## graphify
+
+本项目使用 [graphify](https://github.com/github/graphify) 构建代码知识图谱。图数据位于 `graphify-out/`，包含核心抽象 (god nodes)、社区结构和跨文件关系。
+
+### 使用规则
+
+- **代码查询优先走图**：`graphify query "<问题>"` 返回带上下文的子图，比 grep 更精准
+- **关系/路径查询**：`graphify path "<A>" "<B>"` — 两概念间最短路径；`graphify explain "<节点ID>"` — 节点解释
+- **架构概览**：`graphify-out/GRAPH_REPORT.md` 包含社区标签、god nodes 和意外连接分析
+- **代码修改后更新**：`graphify update .` — 增量 AST 重建（免费，不消耗 API）

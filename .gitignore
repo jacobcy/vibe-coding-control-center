@@ -171,6 +171,8 @@ docs/superpowers/
 .qoder/
 .augment/
 .codebuddy/
+# Graphify knowledge graph build artifacts (cache only)
+graphify-out/cache/
 # Claude: track project config, exclude local commands and skills
 .claude/commands/
 .claude/skills/
