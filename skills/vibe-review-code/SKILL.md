@@ -162,6 +162,18 @@ If the plan contains an `ADR Consideration` artifact, reconcile it against the a
 
 Verdict thresholds and the full rule set live in `@vibe/supervisor/policies/review.md` §0e.
 
+### 4.6 Reconcile Spec Completion
+
+If the flow has a `spec_ref`, verify the implementation against the spec before finalizing:
+
+- `vibe3 flow show` → confirm `spec_ref`; `vibe3 handoff show @spec` → read spec body. If no `spec_ref`, skip (issue-only task).
+- Extract **Functional Requirements** / **Success Criteria** from `spec.md`.
+- 对账 vs `vibe3 inspect base --json` actual changed paths — is each requirement covered by the diff?
+- Uncovered requirement → MAJOR (omission) or BLOCK (core requirement unmet).
+- Append a `Spec Completion Reconciliation` subsection to the review.
+
+Verdict thresholds live in `supervisor/policies/review.md` §0f.
+
 ### 5. Verify
 
 Run targeted verification proportional to risk:
