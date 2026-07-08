@@ -130,16 +130,29 @@ def test_explore_command_states_graceful_degradation() -> None:
     assert "limitation note" in text
 
 
-def test_explore_command_covers_four_sources() -> None:
-    """explore gathers from the four context sources defined in #3327."""
+def test_explore_command_covers_five_sources() -> None:
+    """explore gathers from the five context sources (#3327 + #3328/#3335):
+    graphify, mem-search, ADR, existing specs, exa."""
     text = _explore_command_text()
     for needle in (
         "graphify query",
-        "claude-memory smart search",
+        "/mem-search",
         "docs/decisions",
         ".specify/specs/",
+        "exa web_search",
     ):
         assert needle in text, f"missing context source: {needle}"
+
+
+def test_explore_command_uses_mem_search_3_layer() -> None:
+    """#3335: development history uses /mem-search 3-layer progressive disclosure
+    (search -> timeline -> get_observations), NOT the non-existent claude-memory CLI."""
+    text = _explore_command_text()
+    assert "/mem-search" in text
+    assert "get_observations" in text
+    assert "timeline" in text
+    # The broken `claude-memory smart search` CLI invocation must be gone
+    assert "claude-memory smart search" not in text
 
 
 # --- E. gitignore tracks the extension ----------------------------------------

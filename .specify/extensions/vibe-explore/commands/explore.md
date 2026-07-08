@@ -1,5 +1,5 @@
 ---
-description: Gather graphify/claude-mem/ADR/spec context before specify (ephemeral evidence, not a handoff artifact)
+description: Gather graphify/mem-search/ADR/spec/exa context before specify (ephemeral evidence, not a handoff artifact)
 ---
 
 # explore (before specify)
@@ -10,7 +10,7 @@ is the user's `/speckit-specify` argument (available in session context).
 **Output is ephemeral evidence** for spec writing — NOT a handoff artifact.
 No `explore_ref` is written; the handoff starting point remains `@spec`.
 
-## Gather (four sources, degrade gracefully)
+## Gather (five sources, degrade gracefully)
 
 For each source: if the tool is unavailable or returns nothing useful, emit a
 one-line limitation note and continue. Do NOT fail the hook — specify must
@@ -18,29 +18,49 @@ still proceed even when every tool is absent.
 
 ### 1. Code background (graphify)
 
-- `graphify query "<feature description>"` — relevant modules, community
-  structure, god nodes.
-- For likely cross-module impact: `graphify path "<entity A>" "<entity B>"`.
+- `graphify query "<feature description>"` — BFS over the code knowledge graph;
+  returns relevant modules, community structure, god nodes.
+- For a specific module of interest: `graphify explain "<NodeName>"` — the
+  node's calls/uses/methods (more precise than `query` for understanding one
+  component).
+- Note: `graphify path "<A>" "<B>"` requires exact node names and is unreliable
+  for ad-hoc concepts; prefer `query` + `explain`.
 - Skip with a note if `graphify-out/` is absent or graphify CLI unavailable.
 
-### 2. Development history (claude-mem)
+### 2. Development history (mem-search, 3-layer progressive disclosure)
 
-- `claude-memory smart search "<feature description>"` — prior decisions,
-  related past work, pitfalls.
-- Skip with a note if claude-memory is unavailable.
+Use the `/mem-search` skill. There is NO `claude-memory` CLI — claude-mem is
+accessed via the mem-search skill (which wraps the MCP search tools). Follow
+the 3-layer workflow to keep token cost low:
+
+1. `search` with the feature description → compact index (IDs + titles,
+   ~50-100 tokens/result)
+2. Review the index; pick 2-3 relevant IDs; optionally `timeline(anchor=<ID>)`
+   for surrounding context
+3. `get_observations([IDs])` — fetch full details ONLY for the filtered IDs
+
+Surface prior decisions, related past work, and pitfalls. Skip with a note if
+mem-search / claude-mem is unavailable.
 
 ### 3. Decision context (ADR)
 
 - Scan `docs/decisions/` for accepted ADRs whose frontmatter `scope` glob
   plausibly matches the feature's touch points; surface each match's
   `decides` summary.
-- This is a lightweight frontmatter scan — reference the `vibe-adr-recall`
-  skill's approach, do not reimplement its full reconciliation logic.
+- Lightweight frontmatter scan — reference the `vibe-adr-recall` skill's
+  approach, do not reimplement its full reconciliation logic.
 
 ### 4. Prior art / dedup (existing specs)
 
 - Scan `.specify/specs/*/spec.md` for related features (avoid duplicating an
   in-progress or already-specified feature).
+
+### 5. External prior art (exa, optional)
+
+- When the problem domain is unfamiliar or the feature resembles a known
+  external pattern, use `exa web_search` for how others solved similar
+  problems (best practices, prior art).
+- Skip if exa is unavailable, or when sources 1-4 already give enough context.
 
 ## Output (in-session, ephemeral)
 
@@ -51,16 +71,19 @@ Emit a single structured block for the specify agent to consume when writing
 ## Explore Findings (ephemeral evidence)
 
 ### Code background
-<graphify subgraph summary: key modules / communities / god nodes, or "skipped: ...">
+<graphify query/explain summary: key modules / communities / connections, or "skipped: ...">
 
 ### Development history
-<claude-mem hits: prior decisions / pitfalls, or "skipped: ...">
+<mem-search hits: prior decisions / pitfalls (3-layer filtered), or "skipped: ...">
 
 ### Decision context (ADRs)
 <relevant accepted ADRs + their `decides`, or "none matched">
 
 ### Prior specs
 <related existing specs, or "none">
+
+### External prior art
+<exa findings: external best practices / prior art, or "skipped: ...">
 
 ### Suggested spec considerations
 <2-3 bullets: constraints / risks / prior art the spec should account for>
@@ -76,5 +99,5 @@ Emit a single structured block for the specify agent to consume when writing
   continue; never fail the hook on tool absence.
 - Output is conversation context only; the specify agent folds the relevant
   parts into `spec.md` and the explore block is not persisted.
-- Aligns with constitution II (SSOT — reference graphify/memory/ADR, do not
+- Aligns with constitution II (SSOT — reference graphify/mem-search/ADR, do not
   reimplement) and IV (Bridge — reuse existing tools, Skill-First).

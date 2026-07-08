@@ -12,8 +12,9 @@ hooks:
     optional: false
     priority: 10
     prompt: Gather context before specifying?
-    description: Query graphify, claude-mem, accepted ADRs, and existing specs; emit
-      findings as ephemeral evidence for spec writing (not a handoff artifact).
+    description: Query graphify, mem-search, accepted ADRs, existing specs, and
+      exa; emit findings as ephemeral evidence for spec writing (not a handoff
+      artifact).
     condition: null
   after_tasks:
   - extension: superspec
