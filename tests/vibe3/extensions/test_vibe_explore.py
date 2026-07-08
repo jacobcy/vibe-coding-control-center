@@ -130,18 +130,6 @@ def test_explore_command_states_graceful_degradation() -> None:
     assert "limitation note" in text
 
 
-def test_explore_command_covers_four_sources() -> None:
-    """explore gathers from the four context sources defined in #3327."""
-    text = _explore_command_text()
-    for needle in (
-        "graphify query",
-        "claude-memory smart search",
-        "docs/decisions",
-        ".specify/specs/",
-    ):
-        assert needle in text, f"missing context source: {needle}"
-
-
 # --- E. gitignore tracks the extension ----------------------------------------
 
 

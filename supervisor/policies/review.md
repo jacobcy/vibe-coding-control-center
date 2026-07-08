@@ -249,6 +249,8 @@ vibe3 inspect base --json
 - 当 Python 文件的声明范围或直接 imports 能澄清 diff 时，可运行 `inspect files <file.py> --json`
 - 仅对删除、重命名、签名变化或 Kernel 文件中的关键符号运行 `inspect symbols <file.py>:<symbol> --json`
 - symbol 结果只表示已观察到的正向静态引用，`complete=false`；零观察不表示 unused
+- **代码结构影响**（graphify，可选）：变更涉及跨模块影响时，`graphify explain "<ChangedNode>"` 取该节点的 calls/uses/methods 连接，辅助判断变更波及面；`graphify query "<问题>"` 可找相关社区。工具不可用时记录限制后继续。
+- **历史 verdict**（claude-mem `mem-search`，3-layer，可选）：相似 issue/变更的历史 review 决策可参考时，`search` → 过滤相关 ID → `get_observations` 查历史 verdict/pitfall；Claude/Codex 入口按 common policy 的调用映射选择。memory 非真源，不覆盖当前 diff/ADR/inspect 证据。
 
 ### 5. 确认真源
 

@@ -35,7 +35,7 @@ related_docs:
 
 | 工具 | 类型 | 版本 | Codex 兼容 | 安装方式 | 状态 |
 |------|------|------|------------|---------|------|
-| claude-mem | plugin + hooks + MCP | 13.10.2 | ✅ 原生 Codex hooks；需保留本机去重补丁 | `npx claude-mem@latest install --ide codex-cli` | ✅ |
+| claude-mem | plugin + hooks + MCP | 13.10.2 | ✅ Codex marketplace plugin + `mcp-search`；不使用旧手工 hook 补丁 | Git marketplace 安装，见 §claude-mem Codex 兼容 | ✅ |
 | rtk | CLI | 0.43.0 | ⚠️ CLI 可用；Claude `PreToolUse` hook 不可复用 | brew/npm/cargo | ✅ |
 | caveman | plugin | 0.1.0 | ✅ | `npx skills add JuliusBrussee/caveman -a codex` | ✅ |
 | graphify | CLI + skill | 0.9.8 | ✅ | `uv tool install graphifyy` | ✅ |
@@ -716,10 +716,12 @@ API key 从环境变量读取，在 `settings.json` 的 `env` 字段设置：
 }
 ```
 
-**Codex** 使用 CLI 命令配置：
+**Codex** 使用 stdio MCP 配置。server 名固定为 `exa-search`，与 project-check 和实际工具前缀 `mcp__exa_search__*` 对齐：
 
 ```bash
-codex mcp add exa --url https://mcp.exa.ai/mcp
+codex mcp add exa-search --env EXA_API_KEY="$EXA_API_KEY" -- \
+  npx -y exa-mcp-server
+codex mcp get exa-search
 ```
 
 #### 优势

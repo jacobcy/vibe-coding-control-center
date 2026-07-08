@@ -73,7 +73,7 @@
 ## Context And File Hygiene
 
 - 不在终端直接喷大体量内容；优先摘要、截断、过滤。
-- 跨会话记忆使用 `claude-memory` MCP 工具：被动记忆通过 hooks 自动捕获 observations（`search`、`get_observations` 查询）；主动记忆通过 `build_corpus` 创建知识库，`prime_corpus` + `query_corpus` 查询。
+- 跨会话记忆用 `/claude-mem:mem-search` skill（封装 claude-mem MCP 工具；**无 `claude-memory` CLI**）：被动记忆通过 hooks 自动捕获 observations，查询走 3-layer（`search` 索引 → `timeline` 上下文 → `get_observations` 取过滤后全文，~10x token 节省）。`build_corpus`/`query_corpus`（knowledge-agent）当前 query 超时，ad-hoc 用 mem-search 替代。graphify/context7/exa 同属上下文工具，详细用法见 [supervisor/policies/common.md](../../supervisor/policies/common.md)「上下文工具」。
 - **Roadmap 分析缓存**：`.agent/context/memory.md` 用于 `/vibe-roadmap` 每次分析后的结果缓存（本地文件，不纳入 git）
 - **Project-Specific Extensions**：
   - `.vibe/policies/` — 项目专属 policy overlay（自动附加到 `supervisor/policies/`）

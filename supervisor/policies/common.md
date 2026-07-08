@@ -48,13 +48,55 @@ vibe3 task show
 
 **禁止**：只看 handoff 忽视 comments。如果 comments 中有人类最新指令与 handoff 冲突，以 comments 为准。
 
-## 项目记忆系统（claude-memory）
+## 上下文工具（Context Tools）
 
-跨对话长期记忆，用于保存和检索架构共识、重要决策、最佳实践。
+Agent 在 plan/review/explore 阶段按需主动调用以下工具收集上下文（**非预注入**，依自动化指令）。工具不可用时记录证据限制后继续，不阻塞流程。memory 类工具只作历史证据，不得覆盖最新人类指令/issue/spec/accepted ADR/仓库事实。
 
-- **何时用**：需要回顾架构决策、寻找类似问题的解法、了解模块演进历史
-- **推荐命令**：`smart_search`（智能搜索）、`timeline`（时间线）、`get_observations`（获取详情）
-- **与 handoff 的区别**：claude-memory 是跨对话长期记忆；handoff 是当前 flow 的临时交接记录
+### mem-search（claude-mem 跨会话记忆）
+
+跨对话长期记忆，保存架构共识、决策、最佳实践。**无 `claude-memory` CLI**——使用 claude-mem 的 `mem-search` skill（封装 MCP search 工具）。
+
+- **3-layer progressive disclosure**（~10x token 节省）：
+  1. `search` → 索引（IDs + titles，~50-100 tokens/条）
+  2. `timeline(anchor=<ID>)` → 某观察的上下文
+  3. `get_observations([IDs])` → 仅对过滤后的 ID 取全文
+- **何时用**：回顾架构决策、寻找类似问题解法、了解模块演进历史
+- **与 handoff 区别**：mem-search 是跨对话长期记忆；handoff 是当前 flow 的临时交接记录
+
+### graphify（代码知识图谱）
+
+代码结构图谱（`graphify-out/`，god nodes + 社区 + 跨文件关系）。
+
+- `graphify query "<问题>"` — BFS 取相关模块/社区/god nodes
+- `graphify explain "<NodeName>"` — 单节点 calls/uses/methods（理解组件关系首选）
+- `graphify path "<A>" "<B>"` — 最短路径（需精确节点名，ad-hoc 概念慎用）
+- `graphify-out/GRAPH_REPORT.md` — 架构概览
+- **何时用**：scope 不明、理解跨模块影响、确认改动波及面
+
+### context7（库 API 文档）
+
+- `resolve-library-id` → `query-docs` 取官方用法
+- **何时用**：plan 涉及具体库/框架 API，避免凭记忆写错
+
+### exa（外部搜索）
+
+- 使用 Exa MCP 的 web search capability — 外部最佳实践/先验方案
+- **何时用**：域不熟或需外部先验（可选）
+
+### Claude / Codex 调用映射
+
+| 能力 | Claude Code | Codex |
+|------|-------------|-------|
+| mem-search skill | `/claude-mem:mem-search` | `$claude-mem:mem-search` |
+| claude-mem search | plugin 提供的 `search` / `timeline` / `get_observations` | `mcp__mcp_search__search` / `timeline` / `get_observations` |
+| Context7 | `resolve-library-id` → `query-docs` | `mcp__context7__resolve_library_id` → `mcp__context7__query_docs` |
+| Exa | `web_search_exa` | `mcp__exa_search__web_search_exa` |
+
+调用前以当前 agent 的实际工具列表为准。平台前缀是 adapter 细节，不得把 Claude slash 命令写成跨平台通用入口；工具不可用时记录 limitation，并运行 `vibe-project-check` 的 Phase 9 定位配置层或 session 加载问题。
+
+### knowledge-agent（curated 知识库，deferred）
+
+`build_corpus` + `prime_corpus` + `query_corpus` 构建/查询持久知识库。当前 `query_corpus` 超时 + concept-filter 拧巴，**ad-hoc 用 mem-search 替代**；持久 "专家 brain" 需求出现且超时修复后再用。
 
 ## 工具选择顺序
 

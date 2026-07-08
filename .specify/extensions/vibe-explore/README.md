@@ -5,15 +5,16 @@ feeding the interactive spec-writing phase (#3327).
 
 ## What it does
 
-Registers a mandatory `before_specify` hook that gathers four context sources
+Registers a mandatory `before_specify` hook that gathers five context sources
 as **ephemeral evidence** for spec writing:
 
 | Source              | Tool                                  | Provides                       |
 |---------------------|---------------------------------------|--------------------------------|
-| Code background     | `graphify query` / `graphify path`    | Modules, communities, god nodes|
-| Development history | `claude-memory smart search`          | Prior decisions, pitfalls      |
+| Code background     | `graphify query` / `graphify explain` | Modules, communities, connections |
+| Development history | claude-mem `mem-search` (3-layer)     | Prior decisions, pitfalls      |
 | Decision context    | `docs/decisions/` ADR frontmatter scan| Accepted decisions, scope      |
 | Prior specs         | `.specify/specs/*/spec.md` scan       | Related features, dedup        |
+| External prior art  | Exa MCP web search (optional)         | External best practices        |
 
 Each source degrades gracefully — a missing tool yields a one-line limitation
 note, never a hook failure.
@@ -24,7 +25,7 @@ Constitution convention **Explore Before Spec**: non-trivial features benefit
 from relevant code background and development history before specification.
 The interactive specify agent gathers context via tools (per the automation
 directive — automation does not pre-inject context; agents gather it
-themselves via spec-kit/graphify/claude-mem).
+themselves via graphify/mem-search/exa).
 
 ## Non-goal
 
@@ -36,7 +37,7 @@ themselves via spec-kit/graphify/claude-mem).
 
 - `extension.yml` — manifest + mandatory `before_specify` hook.
 - `commands/explore.md` — the gather command (skill markdown, agent-executed;
-  no bash adapter needed — the agent calls graphify/claude-memory directly).
+  no bash adapter needed — the agent calls graphify/mem-search/exa directly).
 
 ## Relationship to other extensions
 

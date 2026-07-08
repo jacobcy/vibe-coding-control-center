@@ -4,7 +4,7 @@ extension:
   name: "Vibe Explore-Before-Spec"
   version: "0.1.0"
   description: >-
-    Gathers graphify/claude-mem/ADR/spec context before specify as ephemeral
+    Gathers graphify/mem-search/ADR/spec/exa context before specify as ephemeral
     evidence for spec writing. Output is in-session only; not a handoff
     artifact. Project-owned and non-destructive to external spec-kit/superspec
     sources.
@@ -17,7 +17,7 @@ provides:
     - name: "speckit.vibe-explore.explore"
       file: "commands/explore.md"
       description: >-
-        Gather graphify/claude-mem/ADR/spec context before specify (ephemeral
+        Gather graphify/mem-search/ADR/spec/exa context before specify (ephemeral
         evidence, not a handoff artifact)
 hooks:
   before_specify:
@@ -25,6 +25,7 @@ hooks:
     optional: false
     prompt: "Gather context before specifying?"
     description: >-
-      Query graphify, claude-mem, accepted ADRs, and existing specs; emit
-      findings as ephemeral evidence for spec writing (not a handoff artifact).
+      Query graphify, mem-search (3-layer), accepted ADRs, existing specs, and
+      exa; emit findings as ephemeral evidence for spec writing (not a handoff
+      artifact).
 tags: ["spec-kit", "explore", "context", "vibe"]

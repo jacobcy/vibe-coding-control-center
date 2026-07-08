@@ -1,15 +1,18 @@
 ---
 name: vibe-team-review
-description: |
-  Use when the user wants a comprehensive review using the multi-agent team workflow.
-  Applies to PRs, code changes, architecture decisions, and any task requiring team-based analysis.
+description: Use only when the human explicitly invokes vibe-team-review or /vibe-team-review.
+metadata:
+  experimental: "true"
+  invocation: explicit-human-only
 ---
 
 # Vibe Team Review
 
-`vibe-team-review` 是 Claude Code Agent Teams 多 agent 协作审查入口。Phase 0 完成环境和 Team 准备，Phase 1-5 各是一个 Backlog Task。下游 agent 通过 prompt 注入获取前序报告。
+`vibe-team-review` 是 Claude Code Agent Teams 的实验性多 agent 协作审查入口。Phase 0 完成环境和 Team 准备，Phase 1-5 各是一个 Backlog Task。下游 agent 通过 prompt 注入获取前序报告。
 
 ## When to Use
+
+仅当人类在当前请求中明确写出 `vibe-team-review` 或 `/vibe-team-review` 时使用。普通 PR review、综合审查、复杂改动或多 agent 适用性判断都不得自动触发本 skill。这些请求应路由到对应的单 agent review skill。
 
 仅以下条件**全部**满足时使用，任一缺失 → 立即停止，按文件范围回退到单 agent 审查：
 
