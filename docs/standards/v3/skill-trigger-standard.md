@@ -99,7 +99,7 @@ related_docs:
 | `vibe-check` | Runtime / task-flow binding | 用户要解释或修复 `task <-> flow` / worktree runtime 不一致 | roadmap 归类、task registry 审计、Issue 治理 | "binding 不对", "runtime stale", "check runtime", "当前 worktree 状态不对" |
 | `vibe-review-code` | Code review | 用户要对 source changes 做 pre-PR 审查、复核 PR review feedback、检查实现风险与测试覆盖 | docs-only review、standards/changelog 审查 | "review 这段代码", "代码审查", "PR 前 review", "根据 review feedback 修代码" |
 | `vibe-review-docs` | Documentation review | 用户要审查 docs/、入口文件、standards、changelog，或检查概念漂移与文档治理问题 | source-code implementation review | "review docs", "文档审查", "审一下 CLAUDE.md", "检查标准文档" |
-| `vibe-team-review` | Team Collaboration | 多 agent 协作审查：PR、架构决策、复杂代码变动 | 单 agent 可胜任的小型审查或纯文档审查 | "team review", "团队审查", "复杂 PR 评审" |
+| `vibe-team-review` | Team Collaboration | 实验性多 agent 协作审查；仅当人类明确点名 `vibe-team-review` 或 `/vibe-team-review` 时触发 | 任何未明确点名该 skill 的普通 PR review、综合审查、复杂改动或自动适用性判断 | `vibe-team-review`, `/vibe-team-review` |
 | `vibe-redundancy-audit` | Code Quality | 查找冗余业务逻辑、重复模式、迁移残留、过度设计 | 正常的业务代码评审或 bug 修复 | "redundancy audit", "重复代码", "冗余逻辑", "清理旧路径" |
 | `vibe-rules` | Rules Governance | 检查 rules 冲突、重复、清理过时规则 | 编写新技能或进行 flow 治理 | "vibe-rules", "规则冲突", "清理 rules", "rules check" |
 | `vibe-skill-audit` | Repo-local skill governance | 用户要创建、更新、审查、收紧 repo 内 `skills/vibe-*` 文案与边界 | 已安装 skills 的 inventory、同步、清理 | "创建 skill", "审查 skill", "skill 文案", "自动匹配语义", "vibe-skill" |
