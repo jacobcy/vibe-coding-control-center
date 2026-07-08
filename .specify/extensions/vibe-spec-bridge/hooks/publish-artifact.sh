@@ -71,4 +71,12 @@ CMD=(vibe3 handoff "$KIND" "$RESOLVED")
 if [[ -n "$BRANCH" ]]; then
   CMD+=(--branch "$BRANCH")
 fi
-exec "${CMD[@]}"
+# Graceful degradation (#3331): after_specify/after_plan are mandatory hooks,
+# so a write failure (e.g. no flow bound to the branch) MUST NOT block the
+# specify/plan phase. Emit a note and exit 0; the user can re-publish via
+# `vibe3 handoff <kind>` once the flow is bound. (set -e does not fire on a
+# command used as an `if` condition.)
+if ! "${CMD[@]}"; then
+  echo "vibe-spec-bridge: vibe3 handoff $KIND failed (flow not bound or write error); skipping publish (non-blocking)" >&2
+  exit 0
+fi

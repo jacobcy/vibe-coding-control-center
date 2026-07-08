@@ -150,9 +150,14 @@ def test_extension_yml_additive_hooks_do_not_collide_with_superspec() -> None:
     # hooks are additive and MUST be bridge-only.
     additive_only = bridge_hooks - super_hooks
     assert {"after_specify", "after_plan", "after_review"} <= additive_only
-    # Every bridge hook is optional so spec-kit can skip it gracefully.
+    # after_specify/after_plan are mandatory (#3331): spec_ref/plan_ref MUST
+    # land for review verification. after_implement/after_review stay optional
+    # (report/audit are post-completion records). The adapter degrades
+    # gracefully so a mandatory hook never blocks specify/plan.
+    mandatory = {"after_specify", "after_plan"}
     for lifecycle in bridge:
-        assert bridge[lifecycle].get("optional", False) is True, lifecycle
+        expected_optional = lifecycle not in mandatory
+        assert bridge[lifecycle].get("optional", False) is expected_optional, lifecycle
 
 
 # --- B. publish-artifact.sh adapter (T052/T053) -----------------------------
@@ -263,6 +268,45 @@ def test_implicit_artifact_selects_greatest_spec_directory_by_name(
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == ("handoff spec .specify/specs/013-current/spec.md")
+
+
+def _write_failing_vibe3_probe(bin_dir: Path) -> None:
+    """A vibe3 stub that always fails (simulates no flow bound / write error)."""
+    bin_dir.mkdir()
+    probe = bin_dir / "vibe3"
+    probe.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    probe.chmod(probe.stat().st_mode | stat.S_IXUSR)
+
+
+def test_publish_artifact_adapter_degrades_gracefully_static() -> None:
+    """#3331: the adapter source contains the non-blocking degradation pattern."""
+    joined = "\n".join(_adapter_code_lines())
+    assert "skipping publish (non-blocking)" in joined
+    assert "if !" in joined and "exit 0" in joined
+
+
+def test_publish_artifact_adapter_non_blocking_when_handoff_fails(
+    tmp_path: Path,
+) -> None:
+    """#3331: when vibe3 handoff fails, the adapter exits 0 (non-blocking) so
+    the mandatory after_specify/after_plan hook does not stall specify/plan."""
+    spec_dir = tmp_path / ".specify" / "specs" / "013-test"
+    spec_dir.mkdir(parents=True)
+    (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+    bin_dir = tmp_path / "bin"
+    _write_failing_vibe3_probe(bin_dir)
+
+    result = subprocess.run(
+        [str(EXT_DIR / "hooks" / "publish-artifact.sh"), "spec"],
+        cwd=tmp_path,
+        env={**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, "adapter must not block on handoff failure"
+    assert "skipping publish (non-blocking)" in result.stderr
 
 
 # --- C. EXIT_CONTRACT + FR-014 (T054) ---------------------------------------
