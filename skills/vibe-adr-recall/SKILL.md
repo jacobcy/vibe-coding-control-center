@@ -62,6 +62,7 @@ description: Use when creating or reviewing a non-trivial spec-kit implementatio
 5. **追加** reconciliation 证据（不改写 plan 记录）。
 6. 对未解决的 accepted-ADR 违反、缺失 artifact 证据、或站不住脚的 dismissal，产出**正常** review finding + blocking verdict。
 7. **不**激活 FailedGate、**不**打 label、**不**直接改 flow state（spec FR-012）。reviewer 的 verdict/state 与既有 no-op gate 负责执行；本 skill 只产出 finding。
+8. **Review ADR Proposal**（对称 plan FR-013 supersede disposition）：若 review 发现应记录的决策（新约束/模式/supersede），产出结构化提案——`new ADR`（写明将创建的 ADR 主题 + 拟 `decides`）| `supersede <ADR-NNNN>`（`carry`/`replace`/`retire` + reason）。不在 skill 内自动落地（走 RFC/ADR PR，由人类决策），但 review 输出须含此提案段。
 
 ## Candidate relevance rules
 

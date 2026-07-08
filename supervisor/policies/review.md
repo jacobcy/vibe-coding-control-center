@@ -126,7 +126,7 @@ git diff main...HEAD --name-only
 
 ### 0e. ADR Reconciliation（actual-diff 对账）
 
-Scope 审查完成后，必须把实际变更路径与 plan 阶段的 `ADR Consideration` artifact 做对账。这是 low-code ADR recall 在 review 阶段的落地步骤。
+Scope 审查完成后，必须把实际变更路径与 plan 阶段的 `ADR Consideration` artifact 做对账。这是 low-code ADR recall 在 review 阶段的落地步骤。**MUST 运行 `vibe-adr-recall` skill review stage 产出 `Review reconciliation` artifact，不得跳过。**
 
 **对账步骤**：
 
@@ -151,6 +151,47 @@ Scope 审查完成后，必须把实际变更路径与 plan 阶段的 `ADR Consi
 - ADR 违反**不激活 FailedGate、不自动打 label、不改 flow state**。FailedGate 与自动 labeling 不在本 low-code 实现的 scope 内。
 - review 阶段不得重写 plan 历史，只能在 `Review reconciliation` 子段追加。
 - 不得用 `vibe3 inspect base` 作为 ADR 命中证据的替代；inspect 的 exact partitions 用于 scope 核对，ADR scope 命中看 `git diff` 路径与 ADR frontmatter `scope` glob 的匹配。
+
+### 0f. Spec Completion Reconciliation（spec 完成度对账）
+
+若 flow 有 `spec_ref`，review MUST 对账 spec requirements 与 actual diff，核对实现是否覆盖规格。无 `spec_ref` 则 note + skip（issue-only 任务）。
+
+**对账步骤**：
+
+1. `vibe3 flow show` 确认 `spec_ref`；`vibe3 handoff show @spec` 读 spec 正文。
+2. 抽取 spec 的 **Functional Requirements** / **Success Criteria**（可测试条目）。
+3. `vibe3 inspect base --json` 取 actual changed paths。
+4. 逐条 requirement 对账：是否被 actual diff 覆盖（实现该 requirement 的代码在 diff 中）。
+5. 写 `Spec Completion Reconciliation` 子段到 review：
+   - 覆盖的 requirements（简列）
+   - 未覆盖的 requirements + 严重度
+   - Spec completion conclusion：`complete` | `partial <list>` | `missing <list>`
+
+**判定规则**：
+
+- 核心 Functional Requirement 未实现 → **BLOCK**。
+- 非 core requirement 未实现 → 至少 **MAJOR**（遗漏）。
+- spec 含 `[NEEDS CLARIFICATION]` 残留 → **MAJOR**（spec 质量问题，退回 clarify）。
+- 实现了 spec 未要求的额外功能 → **MINOR**（scope creep），不阻塞。
+
+**边界**：spec_ref 缺失时不得编造 spec，按 issue-only 任务审查。spec 对账不替代 ADR 对账（§0e）；两者独立。
+
+### 0g. New ADR Proposal（新 ADR 提案）
+
+review 发现应记录为 ADR 的决策时，MUST 产 `Review ADR Proposal` 结构化输出，对称 plan 的 supersede disposition（vibe-adr-recall FR-013）。
+
+**触发条件**：
+
+- actual diff 暴露了应固化的新约束/模式（未来同类变更都应遵守）
+- existing accepted ADR 的 `decides` 已过时，实际变更违反且合理 → 应 supersede
+- review 发现架构决策需提升为 ADR（避免散落在 spec/plan 里）
+
+**输出格式**（写进 review 的 `Review ADR Proposal` 子段）：
+
+- `new ADR`：写明将创建的 ADR 主题 + 拟 `decides`
+- `supersede <ADR-NNNN>`：`carry` | `replace` | `retire` + reason
+
+**边界**：review 只产提案，不自动创建 ADR（走 RFC/ADR PR，由人类决策）。未提案且实际违反 accepted ADR → 按 §0e BLOCK。
 
 ### 0.5. 分支身份验证
 
