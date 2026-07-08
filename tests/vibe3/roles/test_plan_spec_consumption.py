@@ -1,6 +1,9 @@
-"""Tests for plan prompt spec consumption (spec 012 US4, issue #3313).
+"""Tests for plan prompt task guidance (spec 012 US4, ADR-0007).
 
-Covers FR-019/020/021/022: planner reads recorded spec, ADR recall, memory advisory.
+Covers FR-019/020/021/022 under ADR-0007: plan prompts are NOT pre-injected
+with spec_ref or memory context. The agent gathers context via spec-kit /
+graphify / mem-search tools per supervisor/policies/plan.md. Only issue body
+is injected (the legit automation channel).
 
 Mock strategy:
   - FlowService: local import in _build_plan_task_guidance → patch source module
@@ -11,8 +14,6 @@ Mock strategy:
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from vibe3.roles.plan import _build_plan_task_guidance
 
@@ -64,8 +65,12 @@ def test_absent_spec_ref_is_legal() -> None:
     assert "Spec Context" not in result
 
 
-def test_valid_spec_ref_contributes_content(tmp_path: Path) -> None:
-    """Valid spec_ref → spec content injected into plan prompt."""
+def test_valid_spec_ref_not_injected(tmp_path: Path) -> None:
+    """ADR-0007: valid spec_ref does NOT inject spec content into plan prompt.
+
+    The agent reads the spec via ``vibe3 handoff show @spec`` per
+    supervisor/policies/plan.md; plan guidance carries only issue body.
+    """
     spec_file = tmp_path / ".specify" / "specs" / "012-spec" / "spec.md"
     spec_file.parent.mkdir(parents=True)
     spec_file.write_text("# Spec 012\nRequirement text.")
@@ -87,16 +92,17 @@ def test_valid_spec_ref_contributes_content(tmp_path: Path) -> None:
         )
 
     assert result is not None
-    assert "Spec Context" in result
-    assert "Requirement text" in result
+    assert "Task Issue Context" in result
+    # ADR-0007: spec content must NOT be pre-injected
+    assert "Spec Context" not in result
+    assert "Requirement text" not in result
 
 
-def test_unreadable_spec_ref_is_blocker_not_absent() -> None:
-    """FR-019: spec_ref set but file missing → blocker, not silent absence.
+def test_unreadable_spec_ref_not_plan_blocker() -> None:
+    """ADR-0007: unreadable spec_ref is NOT surfaced as a plan-time blocker.
 
-    Current behavior (RED): silently skips missing file — spec_ref set but
-    no spec section and no indication the ref was unreadable.  This test
-    asserts the DESIRED behavior after T061 implementation.
+    Plan no longer reads spec_ref (agent does via handoff tool). Spec
+    completion is reconciled by the reviewer (review policy §0f).
     """
     fs_mock = MagicMock()
     fs_mock.get_flow_status.return_value = _make_flow(
@@ -116,16 +122,10 @@ def test_unreadable_spec_ref_is_blocker_not_absent() -> None:
             _make_config(), _make_issue(3313), "dev/issue-3313"
         )
 
-    # FR-019 DESIRED behavior: spec_ref set but unreadable IS distinguishable
-    # from absent (where spec_ref=None). The function MUST surface this as
-    # a blocker — either by raising UserError, or by returning a guidance
-    # section that clearly marks the spec as UNREADABLE.
-    #
-    # RED assertion: current code silently skips → no blocker marker
     assert result is not None
     assert "Task Issue Context" in result
-    # After T061: this should become True — blocked spec must be surfaced
-    assert "BLOCKED" in result  # RED — current code does NOT produce this
+    # ADR-0007: plan does not surface spec blocker
+    assert "BLOCKED" not in result
 
 
 def test_absent_spec_does_not_produce_blocker() -> None:
@@ -149,7 +149,6 @@ def test_absent_spec_does_not_produce_blocker() -> None:
     assert result is not None
     assert "Task Issue Context" in result
     assert "BLOCKED" not in result  # absent is legal, not a blocker
-    assert "Evidence Limitation" in result  # FR-021: memory unavailable → reported
 
 
 def test_adr_recall_annotation_present() -> None:
@@ -180,8 +179,13 @@ def test_adr_recall_annotation_present() -> None:
     assert "Task Issue Context" in result
 
 
-def test_memory_is_advisory_never_overrides_truth() -> None:
-    """FR-021/022: memory context is labeled advisory, cannot override truth."""
+def test_memory_not_injected_via_code() -> None:
+    """ADR-0007: long-term memory is NOT pre-injected into plan guidance.
+
+    The agent queries memory via the mem-search skill per
+    supervisor/policies/plan.md. No ``claude-memory`` subprocess call, no
+    Advisory Memory section, no Evidence Limitation marker.
+    """
     fs_mock = MagicMock()
     fs_mock.get_flow_status.return_value = _make_flow(spec_ref=None)
 
@@ -199,11 +203,8 @@ def test_memory_is_advisory_never_overrides_truth() -> None:
         )
 
     assert result is not None
-    # Memory content, if present, MUST be labeled advisory
-    if "Memory" in result and "Advisory" not in result:
-        pytest.fail("Memory context must be labeled [Advisory]")
-    # Evidence limitation must be reported when memory is unavailable
-    assert "Evidence Limitation" in result
+    assert "Advisory Memory" not in result
+    assert "Evidence Limitation" not in result
 
 
 def test_dev_branch_independence_from_task_lifecycle() -> None:
