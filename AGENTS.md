@@ -148,6 +148,10 @@ Regardless of your identity (Claude, OpenCode, Codex, Trae, etc.):
    - **必须使用 `uv run`**，禁止直接使用 `python`/`pip`。
    - 禁止在文档/输出中使用线框图 (box drawing characters)，使用 YAML/Mermaid/ASCII。
 
+6. **测试边界**：
+   - 默认禁止新增通过 `read_text()`、`grep` 或 substring 逐字锁定 Markdown 文案、工具名或说明句的测试；文档改动优先验证 schema、真实命令或端到端行为。
+   - 唯一例外是满足 [Doc-Text Regression Test Governance Standard](docs/standards/doc-text-test-governance.md) 准入条件的关键语义锁定；此类测试必须放在 `tests/vibe3/doc-text/`（或 V2 对应目录），不得混入功能测试文件。
+
 ## 📦 External Dependencies
 
 This project uses community skills:
@@ -162,10 +166,10 @@ Install via respective tools, then create symlinks in `.claude/skills/`. See [DE
 
 ## 上下文工具（plan/review/explore 按需调用，非预注入）
 
-- `/mem-search` — claude-mem 跨会话记忆搜索（3-layer：search→timeline→get_observations；非 `claude-memory` CLI）
+- `$claude-mem:mem-search` — claude-mem 跨会话记忆搜索（3-layer：`mcp__mcp_search__search` → `timeline` → `get_observations`；非 `claude-memory` CLI）
 - `graphify query/explain` — 代码知识图谱（模块/社区/关系）
-- `context7` — 库 API 官方文档（resolve-library-id → query-docs）
-- `exa web_search` — 外部最佳实践搜索
+- `mcp__context7__resolve_library_id` → `mcp__context7__query_docs` — 库 API 官方文档
+- `mcp__exa_search__web_search_exa` — 外部最佳实践搜索
 - 详细用法见 [supervisor/policies/common.md](supervisor/policies/common.md)「上下文工具」
 
 ## 🔗 Kiro Integration

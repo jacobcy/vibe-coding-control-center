@@ -29,8 +29,9 @@ still proceed even when every tool is absent.
 
 ### 2. Development history (mem-search, 3-layer progressive disclosure)
 
-Use the `/mem-search` skill. There is NO `claude-memory` CLI — claude-mem is
-accessed via the mem-search skill (which wraps the MCP search tools). Follow
+Use the claude-mem `mem-search` skill: `/claude-mem:mem-search` in Claude Code
+or `$claude-mem:mem-search` in Codex. There is NO `claude-memory` CLI — the
+skill wraps the MCP search tools. Follow
 the 3-layer workflow to keep token cost low:
 
 1. `search` with the feature description → compact index (IDs + titles,
@@ -58,8 +59,10 @@ mem-search / claude-mem is unavailable.
 ### 5. External prior art (exa, optional)
 
 - When the problem domain is unfamiliar or the feature resembles a known
-  external pattern, use `exa web_search` for how others solved similar
-  problems (best practices, prior art).
+  external pattern, use the Exa MCP web search capability for how others
+  solved similar problems (best practices, prior art). In Codex the tool is
+  `mcp__exa_search__web_search_exa`; use the tool name exposed by the current
+  host rather than assuming a Claude command name.
 - Skip if exa is unavailable, or when sources 1-4 already give enough context.
 
 ## Output (in-session, ephemeral)

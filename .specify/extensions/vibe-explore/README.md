@@ -11,10 +11,10 @@ as **ephemeral evidence** for spec writing:
 | Source              | Tool                                  | Provides                       |
 |---------------------|---------------------------------------|--------------------------------|
 | Code background     | `graphify query` / `graphify explain` | Modules, communities, connections |
-| Development history | `/mem-search` (3-layer)               | Prior decisions, pitfalls      |
+| Development history | claude-mem `mem-search` (3-layer)     | Prior decisions, pitfalls      |
 | Decision context    | `docs/decisions/` ADR frontmatter scan| Accepted decisions, scope      |
 | Prior specs         | `.specify/specs/*/spec.md` scan       | Related features, dedup        |
-| External prior art  | `exa web_search` (optional)           | External best practices        |
+| External prior art  | Exa MCP web search (optional)         | External best practices        |
 
 Each source degrades gracefully — a missing tool yields a one-line limitation
 note, never a hook failure.

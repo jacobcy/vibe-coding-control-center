@@ -72,10 +72,10 @@ issue 满足任一条件即为代码层补偿反模式：
 - 读取当前 flow 的 handoff 现场
 - **消费已登记的 spec**：先看 `vibe3 flow show`。若存在 `spec_ref`，必须通过 `vibe3 handoff show @spec` 读取正文并纳入需求语义；已登记但无法解析的 spec 是 blocker，不得静默退化为只读 issue。若没有 `spec_ref`，允许按 issue 直接规划。
 - **主动收集上下文（agent 工具，非预注入）**：依自动化指令，plan 不被预注入上下文；agent 自行按需调用以下工具收集，工具不可用时记录证据限制后继续。memory 只作历史证据，不得覆盖最新人类指令、issue、spec、accepted ADR 或当前仓库事实。
-  - **长期记忆**（`/mem-search` skill，3-layer）：涉及架构决策/相似历史问题/模块演进时，`search` 取索引 → 过滤相关 ID → `get_observations` 取全文（token 高效，~10x 节省）。注意：无 `claude-memory` CLI，用 `/mem-search` skill。
+  - **长期记忆**（claude-mem `mem-search` skill，3-layer）：涉及架构决策/相似历史问题/模块演进时，`search` 取索引 → 过滤相关 ID → `get_observations` 取全文（token 高效，~10x 节省）。注意：无 `claude-memory` CLI；Claude/Codex 入口按 common policy 的调用映射选择。
   - **代码结构**（graphify）：scope 不明或需理解模块关系时，`graphify query "<问题>"` 取相关模块/社区/god nodes；`graphify explain "<NodeName>"` 取单节点 calls/uses/methods。`graphify path` 需精确节点名，慎用。
-  - **库 API 文档**（context7）：plan 涉及具体库/框架 API 时，`resolve-library-id` → `query-docs` 取官方用法，避免凭记忆写错 API。
-  - **外部实现模式**（exa，可选）：域不熟或需先验方案时，`exa web_search` 搜外部最佳实践。
+  - **库 API 文档**（context7）：plan 涉及具体库/框架 API 时，调用 Context7 的 resolve-library-id → query-docs capability 取官方用法，避免凭记忆写错 API。
+  - **外部实现模式**（exa，可选）：域不熟或需先验方案时，调用 Exa MCP web search capability 搜外部最佳实践。
 - 使用项目工具确认受影响文件和符号
 - 判断是否触及关键路径、公开入口或共享状态
 - 判断本次任务属于哪一类改动

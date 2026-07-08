@@ -593,10 +593,14 @@ npx claude-mem@latest doctor 2>&1 | grep -iE "✗|✓|passed|failed" | head -10
 
 ```bash
 # 标准 §总览 pin：claude-mem 13.10.2 / superpowers 6.1.0 / codex 1.0.2 / claude-hud 0.3.0
-claude plugin list 2>&1 | grep -iE "claude-mem|superpowers|codex|claude-hud|context7" || echo "BROKEN: claude plugin list empty"
+if command -v claude >/dev/null 2>&1; then
+  claude plugin list 2>&1 | grep -iE "claude-mem|superpowers|codex|claude-hud|context7" || echo "BROKEN: claude plugin list empty"
+else
+  echo "SKIP: Claude plugin checks (claude CLI not installed; valid for Codex-only adapter)"
+fi
 ```
 
-**Step 9.4: Codex claude-mem 集成（已知 marketplace 兼容问题）**
+**Step 9.4: Codex context tools 配置层**
 
 ```bash
 # 标准 §claude-mem Codex 兼容：13.10.2 用 marketplace plugin 方式
@@ -605,19 +609,48 @@ codex plugin list 2>&1 | grep "claude-mem@" | head -1 || echo "MISSING: claude-m
 
 # 若 plugin not installed，检查 marketplace 是否误注册为本地路径
 codex plugin marketplace list 2>&1 | grep claude-mem
-# 修复路径见标准 §claude-mem Codex 兼容（Git marketplace 方式）
+
+# Codex MCP 注册状态。server 名称以 config.toml 中的真实名称为准。
+codex mcp get context7 || echo "MISSING: Codex MCP context7"
+codex mcp get exa-search || echo "MISSING: Codex MCP exa-search"
+codex mcp get mcp-search || echo "MISSING: Codex MCP mcp-search (claude-mem)"
 ```
 
-**Step 9.5: MCP servers 与 key**
+这一步只证明配置已注册，不证明当前 agent session 已加载工具。修复 marketplace 的路径见标准 §claude-mem Codex 兼容（Git marketplace 方式）。
+
+Codex MCP 的 key 由 `codex mcp get <server>` 显示的 server 私有配置负责传入。不得用当前 shell 的 `$EXA_API_KEY` / `$CONTEXT7_API_KEY` 是否存在来判断 Codex MCP 是否配置；否则会把 MCP 私有 env 误报为缺失。
+
+**Step 9.5: Codex 当前 agent 工具面与最小调用探针**
+
+Codex 配置层通过后，必须在**当前执行 project-check 的 Codex session** 中检查实际工具面，并执行最小只读调用。不要只看 `codex mcp list/get`。非 Codex adapter 跳过本步骤并进入对应平台检查。
+
+Codex 的预期工具名：
+
+- Context7：`mcp__context7__resolve_library_id`、`mcp__context7__query_docs`
+- Exa：`mcp__exa_search__web_search_exa`、`mcp__exa_search__web_fetch_exa`
+- claude-mem：`mcp__mcp_search__search`、`mcp__mcp_search__timeline`、`mcp__mcp_search__get_observations`
+
+使用当前 host 的工具发现能力（tool search / available tools inventory）确认上述工具存在，然后逐项执行：
+
+1. Context7：调用 `resolve_library_id` 查询一个公开库（例如 `claude-mem`）。
+2. Exa：调用 `web_search_exa`，限制为 1 条公开结果。
+3. claude-mem：调用 `search`，限制为 1–3 条索引结果；不在 readiness probe 中抓取 observation 全文。
+
+按以下状态裁决：
+
+- `READY`：配置存在、预期工具出现在当前工具面、最小调用成功。
+- `RESTART_REQUIRED`：配置存在，但当前工具面缺少对应工具。提示用户重启当前 Claude/Codex session 后重跑 project-check；不得报告整体 ready。
+- `BROKEN`：配置缺失，或工具已加载但最小调用失败。保留原始错误摘要，并按 plugin-setup-standard 对应工具的安装/修复路径处理。
+
+**Step 9.6: Claude MCP/plugin 与 shell key（仅 Claude adapter）**
 
 ```bash
-# exa：标准 §exa search，key 从环境变量读
-test -n "$EXA_API_KEY" && echo "exa: EXA_API_KEY present" || echo "MISSING: EXA_API_KEY"
-# context7：作为 Claude plugin 或 Codex MCP
+# 以下检查只用于 Claude adapter；Codex 不使用当前 shell env 判定 MCP 私有 key。
+test -n "$EXA_API_KEY" && echo "exa: EXA_API_KEY present" || echo "MISSING: EXA_API_KEY (Claude adapter)"
 claude plugin list 2>&1 | grep -q context7 && echo "context7: ok (plugin)" || echo "WARNING: context7 plugin not found"
 ```
 
-**Step 9.6: 版本漂移判定**
+**Step 9.7: 版本漂移判定**
 
 对每项实际版本与标准 pin 比对。漂移时不自动升降级，输出建议并询问用户对齐方向：
 - 实际 > pin 且功能正常 → 提示"保最新 + 更新标准 pin"或"降到 pin"
@@ -627,10 +660,11 @@ claude plugin list 2>&1 | grep -q context7 && echo "context7: ok (plugin)" || ec
 
 按分类分流，**不自行修复上游问题**：
 - **MISSING/BROKEN** → 引导按标准 §对应工具 的官方安装命令修复；claude-mem doctor 失败先跑 `npx claude-mem@latest repair`
+- **RESTART_REQUIRED** → 配置已存在但当前 session 未加载工具；重启对应 agent session 后重新执行 Step 9.5，不重复安装
 - **KNOWN_ISSUE_VIOLATION** → 按标准规避策略告警，询问用户是否应用（如端口对齐需 restart worker，有短暂中断）
 - **VERSION_DRIFT** → 询问对齐方向，确认后才动手；superpowers 等跨 session 工具默认保最新 + 更新 pin
 
-**验证**: 所有工具 `--version` / `status` 正常，claude-mem doctor 全绿，无 KNOWN_ISSUE_VIOLATION；残留漂移明确列出并记录用户决策。
+**验证**: 所有工具 `--version` / `status` 正常；当前 adapter 的 context tools 配置存在且最小调用成功；claude-mem doctor 全绿；无 KNOWN_ISSUE_VIOLATION。`RESTART_REQUIRED` 必须在重启 session 并复查成功后才能转为 `READY`。
 
 ---
 
@@ -672,6 +706,7 @@ claude plugin list 2>&1 | grep -q context7 && echo "context7: ok (plugin)" || ec
 - BACKEND_OR_KEY_MISSING → "安装缺失的后端 CLI 或运行 `vibe keys init`"
 - PROMPT_READINESS_GAP → "检查 flow 绑定、issue 分支名与 prompt 资产完整性"
 - TOOLCHAIN_DRIFT → "Phase 9：实际版本与 plugin-setup-standard pin 不一致，按建议对齐"
+- RESTART_REQUIRED → "Phase 9：工具已配置但当前 agent session 未加载；重启 session 后重跑实际调用探针"
 - KNOWN_ISSUE_VIOLATION → "Phase 9：命中标准已知上游问题且违反规避策略（如 claude-mem 端口漂移）"
 
 ### 项目状态
