@@ -160,8 +160,13 @@ Install via respective tools, then create symlinks in `.claude/skills/`. See [DE
 
 - `vibe3 inspect base/files/symbols` — Git 改动、Review Kernel、单文件 AST 与已验证符号引用证据
 
-- `claude-memory smart search` — 项目记忆搜索（跨对话上下文）
-- 详细用法见 [supervisor/policies/common.md](supervisor/policies/common.md)
+## 上下文工具（plan/review/explore 按需调用，非预注入）
+
+- `/mem-search` — claude-mem 跨会话记忆搜索（3-layer：search→timeline→get_observations；非 `claude-memory` CLI）
+- `graphify query/explain` — 代码知识图谱（模块/社区/关系）
+- `context7` — 库 API 官方文档（resolve-library-id → query-docs）
+- `exa web_search` — 外部最佳实践搜索
+- 详细用法见 [supervisor/policies/common.md](supervisor/policies/common.md)「上下文工具」
 
 ## 🔗 Kiro Integration
 
