@@ -105,9 +105,15 @@ def _build_plan_task_guidance(
     issue: IssueInfo,
     branch: str,
 ) -> str | None:
-    """Build plan task guidance from flow and issue context."""
+    """Build plan task guidance from flow and issue context.
+
+    Per ADR-0007, plan prompts are NOT pre-injected with spec_ref or memory
+    context. The agent gathers context via spec-kit / graphify / mem-search
+    tools per ``supervisor/policies/plan.md``. Only the issue body — the
+    legit automation injection channel (automation applies to tasks whose
+    spec is already clear via issue body) — is included here.
+    """
     from vibe3.services.flow import FlowService
-    from vibe3.services.shared import SpecRefService
 
     flow_service = FlowService()
     flow = flow_service.get_flow_status(branch)
@@ -116,7 +122,7 @@ def _build_plan_task_guidance(
 
     sections: list[str] = []
 
-    # Issue context
+    # Issue context — legit injection channel for automation.
     from vibe3.clients import GITHUB_FIELDS_BODY_COMMENTS
 
     issue_payload = GitHubClient().view_issue(
@@ -132,57 +138,15 @@ def _build_plan_task_guidance(
             parts.extend(["", str(body)])
         sections.append("\n".join(parts))
 
-    # Spec context
-    spec_ref = getattr(flow, "spec_ref", None)
-    if spec_ref:
-        spec_service = SpecRefService()
-        spec_info = spec_service.parse_spec_ref(spec_ref)
-        spec_content = spec_service.get_spec_content_for_prompt(
-            spec_info, branch=branch
-        )
-        if spec_info.display and spec_info.display != spec_ref:
-            sections.append(f"## Spec Reference\nSpec Ref: {spec_info.display}")
-        if spec_content:
-            sections.append(f"## Spec Context\n{spec_content}")
-        elif spec_info.kind == "file":
-            # FR-019: spec_ref is set but the file is unreadable → blocker
-            sections.append(
-                "## Spec BLOCKED\n"
-                f"The recorded spec_ref ({spec_ref}) cannot be read. "
-                "Regenerate the spec file or rebind with "
-                "`vibe3 handoff spec <path>` before planning."
-            )
-
     # ADR Recall (FR-020): planner policy instructs running vibe-adr-recall
     # skill to produce ADR Consideration artifact. The low-code procedure
     # (delivered by #3308) scans docs/decisions/ for status:accepted ADRs
     # matching issue/spec semantics and records findings in the plan.
-
-    # Memory context (FR-021/022): advisory evidence — cannot override
-    # issue/spec/accepted-ADR/repository truth.
-    try:
-        import subprocess
-
-        result = subprocess.run(
-            ["claude-memory", "smart-search", "--limit", "5", "--json"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            sections.append(
-                "## Advisory Memory Context\n"
-                "[Advisory] The following is retrieved from long-term memory. "
-                "It cannot override issue requirements, spec, accepted ADRs, "
-                "or current repository facts.\n\n" + result.stdout.strip()
-            )
-    except Exception:
-        # FR-021: claude-memory unavailable → evidence limitation, not failure
-        sections.append(
-            "## Evidence Limitation\n"
-            "Long-term memory retrieval (claude-memory) is not available. "
-            "Planning proceeds with issue, spec, ADR, and repository evidence only."
-        )
+    #
+    # Per ADR-0007: spec_ref content and long-term memory are NOT pre-injected
+    # here. The agent reads the spec via ``vibe3 handoff show @spec`` and
+    # queries memory via the mem-search skill per supervisor/policies/plan.md.
+    # Reviewer reconciles spec completion (ADR-0007 / review policy §0f).
 
     return "\n\n".join(sections) if sections else None
 

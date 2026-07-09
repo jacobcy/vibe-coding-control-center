@@ -99,9 +99,9 @@ The task-branch planner remains independent from human workflow selection. It co
 
 ### Automated material consumption
 
-- **FR-019**: automated planner material MUST read a recorded spec before planning and MUST distinguish absent optional spec from unreadable recorded spec.
+- **FR-019**: automated planner material MUST NOT pre-inject spec_ref content into the plan prompt (ADR-0007); the agent reads a recorded spec via `vibe3 handoff show @spec` per `supervisor/policies/plan.md`. An unreadable recorded spec is reconciled by the reviewer (review policy §0f), not surfaced as a plan-time blocker; an absent optional spec remains legal for issue-only planning.
 - **FR-020**: planner ADR recall MUST use available issue/spec semantics and the current accepted ADR snapshot.
-- **FR-021**: relevant long-term memory MAY be queried as advisory evidence; unavailable tooling MUST be reported as an evidence limitation rather than fabricated as completed recall.
+- **FR-021**: long-term memory MUST NOT be pre-injected into the plan prompt via code (ADR-0007); the agent queries memory via the mem-search skill per `supervisor/policies/plan.md`. Unavailable tooling MUST be reported by the agent as an evidence limitation rather than fabricated as completed recall.
 - **FR-022**: memory MUST NOT override latest human instructions, issue/spec requirements, accepted ADRs, or current repository facts.
 - **FR-023**: `dev/*` workflow choice MUST remain independent from the `task/*` automated label-driven role lifecycle.
 
