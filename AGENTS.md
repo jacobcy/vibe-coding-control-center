@@ -185,5 +185,6 @@ When using Kiro (AI IDE with spec workflow), follow rules in [supervisor/policie
 - 治理真源：[`.specify/memory/constitution.md`](.specify/memory/constitution.md)
   （治理 spec-kit 使用；权限低于 SOUL.md / CLAUDE.md / `.claude/rules/*`）
 - 规格目录：`.specify/specs/NNN-<slug>/`
-- 可用 skills：`$speckit-*`（如 `$speckit-plan`、`$speckit-specify`、`$speckit-implement`）
+- 可用 skills：`/speckit-*`（如 `/speckit-plan`、`/speckit-specify`、`/speckit-implement`），或 `specify workflow run speckit` 串联六阶段
+- **双轨模型**：spec-kit（spec-driven 人机协作）与 vibe3 flow（issue-driven 自动化）并行，经 `after_*` hooks 桥接，不互相驱动。选用决策见 [docs/standards/spec-kit-workflow-standard.md](docs/standards/spec-kit-workflow-standard.md)
 <!-- END spec-kit context -->

@@ -20,6 +20,8 @@ Agent 工作流适用于：
 - 测试编写
 - 文档生成
 
+> **与 spec-kit 的关系**：vibe3 flow（本规范）是 issue-driven 自动化轨；spec-kit 是 spec-driven 人机协作轨。两轨经 `vibe-spec-bridge` 的 `after_*` hooks 单向桥接（spec-kit 产物 → vibe3 handoff refs），**不互相驱动**。选用决策与 superspec 可用性见 [spec-kit-workflow-standard.md](spec-kit-workflow-standard.md)。
+
 ---
 
 ## 一、前置条件
