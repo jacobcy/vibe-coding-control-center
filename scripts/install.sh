@@ -346,7 +346,7 @@ mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/config" "$INSTALL_D
 
 # 3. Sync core components (Copying to ensure global persistence)
 log_info "Syncing core modules..."
-for dir in bin lib lib3 config scripts alias src skills supervisor; do
+for dir in bin lib lib3 config scripts alias src skills supervisor .agent; do
     [[ -d "$SOURCE_ROOT/$dir" ]] || continue
     mkdir -p "$INSTALL_DIR/$dir"
     # Copy directory contents portably so GNU/BSD cp do not create nested dir/dir trees.
@@ -379,7 +379,7 @@ _clean_stale_in_dir() {
     fi
 }
 
-for dir in bin lib lib3 config scripts src skills supervisor; do
+for dir in bin lib lib3 config scripts src skills supervisor .agent; do
     if [[ -d "$SOURCE_ROOT/$dir" && -d "$INSTALL_DIR/$dir" ]]; then
         _clean_stale_in_dir "$SOURCE_ROOT/$dir" "$INSTALL_DIR/$dir"
     fi

@@ -42,8 +42,7 @@ _copy_claude_asset_if_missing() {
         local copied_any=false
         local item
         for item in "$source_path"/*(N); do
-            local item_name
-            item_name="$(basename "$item")"
+            local item_name="$(basename "$item")"
             if [[ ! -e "$target_path/$item_name" ]]; then
                 cp -R "$item" "$target_path/$item_name"
                 copied_any=true
@@ -74,6 +73,63 @@ _seed_claude_assets() {
             mkdir -p "$repo_root/.claude/rules"
             ;;
     esac
+}
+
+_link_global_vibe_skills() {
+    local repo_root="$1"
+    local skills_dir="$HOME/.vibe/skills"
+    local -a target_dirs=(
+        ".claude/skills"
+        ".codex/skills"
+        ".opencode/skills"
+        ".agent/skills"
+    )
+
+    if [[ ! -d "$skills_dir" ]]; then
+        _log_warning "Global skills directory not found: $skills_dir"
+        echo "   Run 'scripts/install.sh' first to setup global environment."
+        return 0
+    fi
+
+    local skill
+    local linked=0
+    for skill in "$skills_dir"/vibe-*(N); do
+        [[ -d "$skill" ]] || continue
+        local skill_name="$(basename "$skill")"
+        local target_dir
+        for target_dir in "${target_dirs[@]}"; do
+            mkdir -p "$repo_root/$target_dir"
+            ln -sfn "$skill" "$repo_root/$target_dir/$skill_name"
+        done
+        linked=$((linked + 1))
+    done
+
+    if [[ "$linked" -eq 0 ]]; then
+        _log_warning "No vibe-* skills found in $skills_dir"
+    else
+        _log_success "Linked $linked vibe skills to supported agents"
+    fi
+}
+
+_link_global_vibe_workflows() {
+    local repo_root="$1"
+    local workflows_dir="$HOME/.vibe/.agent/workflows"
+
+    [[ -d "$workflows_dir" ]] || return 0
+
+    mkdir -p "$repo_root/.agent/workflows" "$repo_root/.claude/commands"
+
+    local workflow
+    local linked=0
+    # shellcheck disable=SC1036,SC1058,SC1072,SC1073  # zsh nullglob qualifier (N) on .md glob; not bash extglob
+    for workflow in "$workflows_dir"/vibe:*.md(N); do
+        local workflow_name="$(basename "$workflow")"
+        ln -sfn "$workflow" "$repo_root/.agent/workflows/$workflow_name"
+        ln -sfn "$workflow" "$repo_root/.claude/commands/$workflow_name"
+        linked=$((linked + 1))
+    done
+
+    [[ "$linked" -gt 0 ]] && _log_success "Linked $linked vibe workflows"
 }
 
 _generate_settings_yaml() {
@@ -304,6 +360,7 @@ vibe_init() {
     mkdir -p "$REPO_ROOT/.claude/skills"
     mkdir -p "$REPO_ROOT/.claude/commands"
     mkdir -p "$REPO_ROOT/.codex/skills"
+    mkdir -p "$REPO_ROOT/.opencode/skills"
 
     # Create .agent/ if profile requires
     if [[ "$ENABLE_AGENT" == true ]]; then
@@ -374,39 +431,11 @@ vibe_init() {
         _log_success "GitHub labels created"
     fi
 
-    # 6. Setup .claude/skills symlinks (profile-dependent)
+    # 6. Setup supported agent runtime links (profile-dependent)
     if [[ "$ENABLE_GLOBAL_SKILLS" == true ]]; then
-        _log_info "Setting up .claude/skills symlinks..."
-
-        local VIBE_SKILLS_DIR="$HOME/.vibe/skills"
-
-        if [[ -d "$VIBE_SKILLS_DIR" ]]; then
-            # Use (N) glob qualifier to suppress "no matches" error
-            for skill in "$VIBE_SKILLS_DIR"/vibe-*(N); do
-                if [[ -d "$skill" ]]; then
-                    local skill_name
-                    skill_name="$(basename "$skill")"
-                    local target_link="$REPO_ROOT/.claude/skills/$skill_name"
-
-                    if [[ ! -e "$target_link" ]]; then
-                        ln -sfn "$skill" "$target_link"
-                        _log_success "Linked skill: $skill_name"
-                    else
-                        _log_info "Skill already linked: $skill_name"
-                    fi
-                fi
-            done
-
-            # Check if any skills were processed
-            local skills_count
-            skills_count=$(find "$VIBE_SKILLS_DIR" -maxdepth 1 -name "vibe-*" -type d | wc -l)
-            if [[ "$skills_count" -eq 0 ]]; then
-                _log_warning "No vibe-* skills found in $VIBE_SKILLS_DIR"
-            fi
-        else
-            _log_warning "Global skills directory not found: $VIBE_SKILLS_DIR"
-            echo "   Run 'scripts/install.sh' first to setup global environment."
-        fi
+        _log_info "Setting up supported agent skills and workflows..."
+        _link_global_vibe_skills "$REPO_ROOT"
+        _link_global_vibe_workflows "$REPO_ROOT"
     fi
 
     # 7. Verify project support
