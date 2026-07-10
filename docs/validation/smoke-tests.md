@@ -92,8 +92,8 @@ vibe init --profile github-flow --yes --skip-labels
 - [ ] `.vibe/config.yaml` has `features.github_labels: true`
 - [ ] `.vibe/config.yaml` has `paths.policies_root` pointing to `~/.vibe/assets/policies`
 - [ ] `.agent/` directory created
-- [ ] `.agent/skills/` directory exists
 - [ ] `.agent/workflows/` directory exists
+- [ ] `.codex/skills/` directory exists
 - [ ] `skills/` directory NOT created (github-flow doesn't need it)
 
 **Cleanup**:
@@ -115,8 +115,8 @@ git status  # Ensure clean working tree
 - [ ] `.vibe/config.yaml` exists and contains `profile: vibe-center`
 - [ ] `.agent/` directory exists
 - [ ] `.agent/policies/` directory exists
-- [ ] `.agent/skills/` directory exists
 - [ ] `.agent/workflows/` directory exists
+- [ ] `.codex/skills/` directory exists
 - [ ] `skills/` directory exists
 - [ ] `.vibe/config.yaml` has `paths.policies_root: .agent/policies`
 - [ ] `.vibe/config.yaml` has `paths.prompts_root: config/prompts`

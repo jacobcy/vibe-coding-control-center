@@ -19,13 +19,21 @@ global:
         install: claude plugin install superpowers@claude-plugins-official
         # Claude Code 优先走官方 plugin 生态，不用 npx skills 模拟
 
+  # Codex 全局期望
+  codex:
+    expected:
+      superpowers-plugin:
+        description: Codex plugin 形态的 Superpowers 能力集
+        install: codex plugin marketplace add https://github.com/obra/superpowers.git && codex plugin add superpowers@superpowers-dev
+        # Codex 主路径走 plugin，不用 npx skills 分发 Superpowers
+
   # 其他 Agents 全局期望
   agents:
     expected:
       superpowers:
         description: 开发方法论工具集，包含 brainstorming, systematic-debugging, writing-plans 等 14+ skills
-        install: npx skills add obra/superpowers -g --agent antigravity codex kiro-cli -y
-        # 其他 Agents (Antigravity, Codex, Kiro-cli) 主要使用 npx skills 分发的 Superpowers
+        install: npx skills add obra/superpowers -g --agent antigravity kiro-cli -y
+        # 非 plugin agent 才使用 npx skills 分发 Superpowers
 
 # 项目级期望 - 当前项目专属
 project:
@@ -41,7 +49,7 @@ project:
     expected:
       vibe-star:
         description: 本项目原生 vibe-* 系列 skills
-        install: scripts/init.sh (自动 symlink 到 .agent/skills/)
+        install: scripts/init.sh (自动 symlink 到 agent-specific skills dirs)
 
   # 独立扩展 - 自己管理的工具
   managed:

@@ -62,6 +62,27 @@ _symlink_files() {
   done
 }
 
+_install_codex_superpowers_plugin() {
+  command -v codex >/dev/null 2>&1 || return 0
+
+  if codex plugin list 2>/dev/null | grep -q '^superpowers@superpowers-dev[[:space:]]\+installed, enabled'; then
+    echo "✅ Codex superpowers plugin already installed"
+    return 0
+  fi
+
+  echo "📦 Installing Codex superpowers plugin..."
+  codex plugin marketplace add https://github.com/obra/superpowers.git >/dev/null 2>&1 || true
+  if codex plugin add superpowers@superpowers-dev >/dev/null 2>&1; then
+    echo "✅ Codex superpowers plugin installed"
+  else
+    echo -e "\033[1;33m⚠️  Warning: Codex superpowers plugin install skipped. Run: codex plugin marketplace add https://github.com/obra/superpowers.git && codex plugin add superpowers@superpowers-dev\033[0m"
+  fi
+}
+
+_join_agents_without_plugin_backed() {
+  jq -r '[.[] | select(. != "codex" and . != "claude-code")] | join(" ")'
+}
+
 echo -e "\n\033[1;36m🔧 Setting up Vibe Center development environment...\033[0m"
 echo "ℹ️  此脚本可重复运行；重复执行会复用已存在的初始化结果。"
 
@@ -78,30 +99,37 @@ fi
 
 # ── 1. Install approved third-party skills from ~/.vibe/skills.json ──────────
 # IMPORTANT: Skills installation should NOT be blocked by openspec/pre-commit issues
+_install_codex_superpowers_plugin
 if [ -f "$VIBE_SKILLS_CONFIG" ] && command -v jq &> /dev/null; then
   echo "📦 Installing approved third-party skills from $VIBE_SKILLS_CONFIG..."
 
-  global_agents=$(jq -r '.global.agents // [] | join(" ")' "$VIBE_SKILLS_CONFIG")
-  jq -c '.global.packages[]?' "$VIBE_SKILLS_CONFIG" | while read -r pkg; do
-    source=$(echo "$pkg" | jq -r '.source')
-    skills=$(echo "$pkg" | jq -r '.skills | join(" ")')
-    echo "  → $source (global): $skills"
-    # shellcheck disable=SC2086
-    npx skills add "$source" -g --agent $global_agents --skill $skills -y
-  done
+  global_agents=$(jq '.global.agents // []' "$VIBE_SKILLS_CONFIG" | _join_agents_without_plugin_backed)
+  if [ -n "$global_agents" ]; then
+    jq -c '.global.packages[]?' "$VIBE_SKILLS_CONFIG" | while read -r pkg; do
+      source=$(echo "$pkg" | jq -r '.source')
+      skills=$(echo "$pkg" | jq -r '.skills | join(" ")')
+      echo "  → $source (global): $skills"
+      # shellcheck disable=SC2086
+      npx skills add "$source" -g --agent $global_agents --skill $skills -y
+    done
+  else
+    echo "  → no npx global agents configured"
+  fi
 
-  project_agents=$(jq -r '.project.agents // [] | join(" ")' "$VIBE_SKILLS_CONFIG")
-  jq -c '.project.packages[]?' "$VIBE_SKILLS_CONFIG" | while read -r pkg; do
-    source=$(echo "$pkg" | jq -r '.source')
-    skills=$(echo "$pkg" | jq -r '.skills | join(" ")')
-    echo "  → $source (project): $skills"
-    # shellcheck disable=SC2086
-    npx skills add "$source" --agent $project_agents --skill $skills -y
-  done
+  project_agents=$(jq '.project.agents // []' "$VIBE_SKILLS_CONFIG" | _join_agents_without_plugin_backed)
+  if [ -n "$project_agents" ]; then
+    jq -c '.project.packages[]?' "$VIBE_SKILLS_CONFIG" | while read -r pkg; do
+      source=$(echo "$pkg" | jq -r '.source')
+      skills=$(echo "$pkg" | jq -r '.skills | join(" ")')
+      echo "  → $source (project): $skills"
+      # shellcheck disable=SC2086
+      npx skills add "$source" --agent $project_agents --skill $skills -y
+    done
+  else
+    echo "  → no npx project agents configured"
+  fi
 else
-  # Fallback: install superpowers for current supported non-Claude agents
-  echo "📦 Installing Superpowers (fallback)..."
-  npx skills add obra/superpowers -g --agent codex gemini-cli opencode github-copilot qoder codebuddy trae-cn -y
+  echo "📦 Skipping npx skills fallback; configure $VIBE_SKILLS_CONFIG for non-plugin agents"
 fi
 echo "✅ Skills installation complete"
 
@@ -110,7 +138,7 @@ echo "✅ Skills installation complete"
 echo "🔗 Creating symlinks for local skills..."
 
 # Link skills/vibe-* (project-owned skills)
-_symlink_files "skills/vibe-*/" ".agent/skills" "identity" "dir"
+mkdir -p ".agent/skills"
 _symlink_files "skills/vibe-*/" ".claude/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".codex/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".gemini/skills" "identity" "dir"

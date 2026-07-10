@@ -39,13 +39,13 @@ AI 驱动的 skills 体系梳理、差距分析与安装建议工具。
 
 ### 1. Superpowers
 
-- **Claude Code**：优先走官方 plugin 生态
-- **其他 Agents**：优先走 `npx skills add obra/superpowers ...`
+- **Claude Code / Codex**：优先走 plugin 生态
+- **其他 Agents**：按需走 `npx skills add obra/superpowers ...`
 - **本项目角色**：`scripts/init.sh` 负责把项目内可见层和本地 symlink 层准备好，但不替代全局安装
 
 一句话：
-- Claude 用 plugin
-- 其他 agent 用 `npx skills`
+- Claude / Codex 用 plugin
+- 非 plugin agent 才用 `npx skills`
 
 ### 2. OpenSpec
 
@@ -142,11 +142,10 @@ global:
 
 | 目录 | 用途 | 内容 |
 |------|------|------|
-| `~/.agents/skills/` | 全局 Superpowers / 其他第三方 skills | 非 Claude Agents 共享 |
+| `~/.agents/skills/` | 全局 Superpowers / 其他第三方 skills | 非 plugin Agents 共享 |
 | `~/.claude/plugins/` | Claude 官方 plugin 生态 | Claude Code 使用 |
 | `~/.claude/skills/` | Claude 本地扩展目录 | 可承载 gstack 等增强层 |
-| `.agents/skills/` | 项目级第三方 | 应避免重复全局已有的 |
-| `.agent/skills/` | Legacy 项目级入口 | symlink 指向项目自有 vibe-* |
+| `.agent/skills/` / `.agents/skills/` | `npx skills` 项目级第三方 | 应避免重复 plugin 已覆盖的 |
 | `.codex/skills/` | Codex 项目级入口 | symlink 指向项目自有 vibe-* |
 | `skills/` | Native vibe-* | 本项目原生 skills |
 
@@ -155,13 +154,13 @@ global:
 ```text
 .claude/skills/vibe-check -> ../../skills/vibe-check
 .codex/skills/vibe-check  -> ../../skills/vibe-check
-.agent/skills/vibe-check  -> ../../skills/vibe-check  # Legacy
 ```
 
 ### 使用策略
 
 - **Claude Code**: 优先使用官方 plugin 形态的 Superpowers；本地增强能力可放在 `~/.claude/skills/`
-- **其他 Agents**: 主要使用 `~/.agents/skills/` 下的 Superpowers / 第三方 skills
+- **Codex**: 第三方主能力走 `codex plugin`；项目自有 `vibe-*` 由 `.codex/skills/` 暴露
+- **其他 Agents**: 非 plugin agent 才使用 `~/.agents/skills/` 下的 Superpowers / 第三方 skills
 - **vibe-\***: 本项目原生，通过 symlink 分发
 - **OpenSpec**: 自己管理，项目内初始化
 - **Gstack**: 用户按需安装，不是默认必需项
@@ -179,7 +178,7 @@ global:
 4. **生成建议报告**：保存到 `.agent/reports/skills-analysis-*.md`
 5. **按体系给修复建议**：
    - Claude plugin 缺失
-   - 其他 Agent 的 `npx skills` 缺失
+   - Codex/Claude plugin 缺失或非 plugin Agent 的 `npx skills` 缺失
    - 项目级 `scripts/init.sh` 同步缺失
    - 用户可选增强（如 gstack）
 6. **等待人工确认**：不自动执行，需用户确认后手动处理

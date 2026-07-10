@@ -93,11 +93,11 @@ test -f .claude/settings.json && echo ".claude/settings.json exists" || echo ".c
 test -f .codex/config.toml && echo ".codex/config.toml exists" || echo ".codex/config.toml not present (optional)"
 ```
 
-**Step 1.3: 检查 .agent/ 目录结构**
+**Step 1.3: 检查 agent 目录结构**
 
 ```bash
-test -d .agent/skills && echo "skills exists" || echo "skills missing"
 test -d .agent/workflows && echo "workflows exists" || echo "workflows missing"
+test -d .codex/skills && echo "codex skills exists" || echo "codex skills missing"
 ```
 
 ---

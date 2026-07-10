@@ -303,6 +303,7 @@ vibe_init() {
     # Always create basic structure
     mkdir -p "$REPO_ROOT/.claude/skills"
     mkdir -p "$REPO_ROOT/.claude/commands"
+    mkdir -p "$REPO_ROOT/.codex/skills"
 
     # Create .agent/ if profile requires
     if [[ "$ENABLE_AGENT" == true ]]; then

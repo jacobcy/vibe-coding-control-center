@@ -28,7 +28,7 @@ description: Use when the user wants to save session context. This is a human-fa
 - **vibe-continue**: Session handoff 恢复入口
 - **vibe3 handoff**: Handoff 基础设施（存储、链、查询）
 - **vibe3 flow/task**: Flow 与 task 状态真源
-- **claude-memory**: 长期项目共识存储（仅形成稳定共识时使用）
+- **mcp-search / claude-mem**: 长期项目共识存储（仅形成稳定共识时使用）
 
 **vibe-save 不等于自动状态同步**：
 - `vibe-save` 只写入 handoff，不自动回写 flow/task 状态
@@ -106,7 +106,7 @@ vibe3 handoff append "[vibe-save] session save: <summary>" --actor vibe-save --k
 
 ### Step 4: Long-Term Memory (Optional)
 
-只有在本次会话产出了稳定的项目约束、长期适用的定义或反复复用的规则时，才使用 `claude-memory` MCP 工具记录。
+只有在本次会话产出了稳定的项目约束、长期适用的定义或反复复用的规则时，才使用 `mcp-search` / claude-mem 记录。
 
 如果只是完成当前任务、记录 blockers 或保存下一步，不写记忆，更不默认创建新知识库。
 
@@ -116,7 +116,7 @@ vibe3 handoff append "[vibe-save] session save: <summary>" --actor vibe-save --k
 
 - Handoff 是否已写入（`vibe3 handoff show` 可验证）
 - 是否同步了共享 task 状态
-- 是否使用了 `claude-memory` 记录稳定共识
+- 是否使用了 `mcp-search` / claude-mem 记录稳定共识
 - 当前最关键的下一步是什么
 
 ## Recommended Handoff Format

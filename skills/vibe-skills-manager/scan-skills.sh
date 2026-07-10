@@ -96,30 +96,6 @@ cat >> "$REPORT_FILE" << EOF
       ],
       "count": $(ls -1 ".agents/skills" 2>/dev/null | wc -l | tr -d ' ')
     },
-    "agent_skills": {
-      "path": ".agent/skills/",
-      "skills": [
-EOF
-
-# 扫描 .agent/skills
-if [ -d ".agent/skills" ]; then
-    FIRST=true
-    for skill in ".agent/skills"/*; do
-        [ -e "$skill" ] || continue
-        name=$(basename "$skill")
-        is_symlink="false"
-        target=""
-        [ -L "$skill" ] && { is_symlink="true"; target=$(readlink "$skill"); }
-        [ "$FIRST" = true ] && FIRST=false || echo "," >> "$REPORT_FILE"
-        echo -n "        {\"name\": \"$name\", \"symlink\": $is_symlink, \"target\": \"$target\"}" >> "$REPORT_FILE"
-    done
-fi
-
-cat >> "$REPORT_FILE" << EOF
-
-      ],
-      "count": $(ls -1 ".agent/skills" 2>/dev/null | wc -l | tr -d ' ')
-    },
     "claude_local": {
       "path": ".claude/skills/",
       "skills": [

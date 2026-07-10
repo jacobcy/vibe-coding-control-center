@@ -22,9 +22,9 @@ SHELL
     'cd "'"$REPO_ROOT"'/docs" && HOME="'"$TMP_HOME"'" PATH="'"$TMP_BIN"':/usr/bin:/bin" ../bin/vibe skills check'
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "项目级:" ]]
-  [[ "$output" =~ "已链接:" ]]
-  [[ "$output" =~ "本地 vibe-* skills" ]]
+  [[ "$output" =~ "项目级 Skills 同步" ]]
+  [[ "$output" =~ ".codex/skills" ]]
+  [[ "$output" =~ "Codex:" ]]
 }
 
 @test "global agent symlinks target HOME/.agents/skills for trae and kiro" {
@@ -41,6 +41,12 @@ SHELL
 }
 
 @test "global superpowers sync returns failure when npx skills add fails" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/config/v3"
+  cat > "$fixture/config/v3/skills.json" <<'JSON'
+{"global":{"agents":["antigravity"],"packages":[]},"project":{"agents":["codex","claude-code"],"packages":[]}}
+JSON
   cat > "$TMP_BIN/npx" <<'SHELL'
 #!/usr/bin/env bash
 echo "network failure" >&2
@@ -49,7 +55,7 @@ SHELL
   chmod +x "$TMP_BIN/npx"
 
   run env HOME="$TMP_HOME" PATH="$TMP_BIN:/usr/bin:/bin" VIBE_ROOT="$REPO_ROOT" bash -lc '
-    HOME="'"$TMP_HOME"'" PATH="'"$TMP_BIN"':/usr/bin:/bin" VIBE_ROOT="'"$REPO_ROOT"'" \
+    HOME="'"$TMP_HOME"'" PATH="'"$TMP_BIN"':/usr/bin:/bin" VIBE_ROOT="'"$fixture"'" \
       zsh -c '"'"'
         source "'"$REPO_ROOT"'/lib/config.sh"
         source "'"$REPO_ROOT"'/lib/skills.sh"

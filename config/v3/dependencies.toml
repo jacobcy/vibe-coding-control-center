@@ -52,7 +52,7 @@ optional = [
   { name = "linear@claude-plugins-official", scope = "user", description = "Linear 集成" },
   { name = "codex@openai-codex", scope = "user", description = "OpenAI Codex 集成" },
   { name = "commit-commands@claude-plugins-official", scope = "project", description = "Claude 提交辅助命令" },
-  { name = "claude-mem@thedotmack", scope = "user", description = "Claude 记忆增强" },
+  { name = "claude-mem@claude-mem-local", scope = "user", description = "Claude 记忆增强" },
   { name = "discord@claude-plugins-official", scope = "user", description = "Discord 集成" },
   { name = "prompt-improver@severity1-marketplace", scope = "user", description = "Prompt 优化辅助" },
   { name = "telegram@claude-plugins-official", scope = "user", description = "Telegram 集成" },
@@ -74,6 +74,6 @@ optional = [
   { name = "CONTEXT7_API_KEY", env_var = "CONTEXT7_API_KEY", description = "Context7 文档检索", get_from = "https://context7.com", used_by = ["plugin:context7@claude-plugins-official"], resolution = ["env"], activation = "any_used" },
   { name = "LINEAR_API_KEY", env_var = "LINEAR_API_KEY", description = "Linear API", get_from = "https://linear.app/settings/api", used_by = ["plugin:linear@claude-plugins-official"], resolution = ["env"], activation = "any_used" },
   { name = "DEEPSEEK_API_KEY", env_var = "DEEPSEEK_API_KEY", description = "DeepSeek API", get_from = "https://api.deepseek.com", used_by = [], resolution = ["env"], activation = "explicit_only" },
-  { name = "GEMINI_API_KEY", env_var = "GEMINI_API_KEY", description = "Gemini API", get_from = "https://ai.google.dev", note = "Gemini 登录可替代", used_by = ["tool:gemini", "plugin:claude-mem@thedotmack"], resolution = ["gemini_auth", "env"], activation = "any_used" },
+  { name = "GEMINI_API_KEY", env_var = "GEMINI_API_KEY", description = "Gemini API", get_from = "https://ai.google.dev", note = "Gemini 登录可替代", used_by = ["tool:gemini", "plugin:claude-mem@claude-mem-local"], resolution = ["gemini_auth", "env"], activation = "any_used" },
   { name = "VIBE_MANAGER_GITHUB_TOKEN", env_var = "VIBE_MANAGER_GITHUB_TOKEN", description = "Manager Bot GitHub Token", get_from = "GitHub Bot 账号的 Personal Access Token", note = "用于区分人类和 Manager Bot 的 GitHub 操作", used_by = [], resolution = ["env"], activation = "explicit_only" },
 ]
