@@ -39,7 +39,7 @@ SH
   chmod +x "$bin_dir/npx" "$bin_dir/codex" "$bin_dir/openspec" "$bin_dir/pre-commit"
 
   run env HOME="$home_dir" NPX_LOG="$npx_log" CODEX_LOG="$codex_log" PATH="$bin_dir:$PATH" \
-    bash -c 'cd "'"$fixture"'" && bash "'"$VIBE_ROOT"'/scripts/init.sh"'
+    zsh -c 'cd "'"$fixture"'" && zsh "'"$VIBE_ROOT"'/scripts/init.sh"'
 
   [ "$status" -eq 0 ]
   grep -F 'plugin marketplace add https://github.com/obra/superpowers.git' "$codex_log"

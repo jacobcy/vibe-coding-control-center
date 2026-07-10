@@ -42,10 +42,11 @@ _symlink_files() {
   local target_dir="$2"
   local name_transform="${3:-identity}"  # Optional: function to transform filename
   local file_type="${4:-file}"            # Optional: 'file' or 'dir'
+  local item
 
   mkdir -p "$target_dir"
 
-  for item in $source_pattern; do
+  while IFS= read -r item; do
     if [ "$file_type" = "dir" ]; then
       [ -d "$item" ] || continue
       item="${item%/}"
@@ -59,7 +60,7 @@ _symlink_files() {
     fi
 
     ln -sfn "../../$item" "$target_dir/$name"
-  done
+  done < <(eval "printf '%s\n' $source_pattern")
 }
 
 _install_codex_superpowers_plugin() {
