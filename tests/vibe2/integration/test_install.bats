@@ -47,8 +47,10 @@ SH
   [ ! -s "$npx_log" ]
   [ -L "$fixture/.claude/skills/vibe-demo" ]
   [ -L "$fixture/.codex/skills/vibe-demo" ]
+  [ -L "$fixture/.agent/skills/vibe-demo" ]
   [ "$(readlink "$fixture/.claude/skills/vibe-demo")" = "../../skills/vibe-demo" ]
   [ "$(readlink "$fixture/.codex/skills/vibe-demo")" = "../../skills/vibe-demo" ]
+  [ "$(readlink "$fixture/.agent/skills/vibe-demo")" = "../../skills/vibe-demo" ]
 }
 
 @test "init installs tracked project extension through local dev source" {

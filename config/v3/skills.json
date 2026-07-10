@@ -10,7 +10,9 @@
     "_comment": "Project-visible local skills are linked by scripts/init.sh",
     "agents": [
       "codex",
-      "claude-code"
+      "claude-code",
+      "opencode",
+      "agy"
     ],
     "packages": []
   }

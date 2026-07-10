@@ -5,9 +5,17 @@
 agents:
   - claude-code
   - codex
-  - gemini
   - opencode
-  - copilot
+  - agy
+
+# 当前支持的第三方能力仓库。
+# 确定 GitHub 仓库后，按 agent 选择对应 plugin 安装器。
+repositories:
+  claude-mem: https://github.com/thedotmack/claude-mem
+  superpowers: https://github.com/obra/superpowers
+  ponytail: https://github.com/DietrichGebert/ponytail
+  caveman: https://github.com/JuliusBrussee/caveman
+  speckit: https://github.com/github/spec-kit
 
 # 全局期望 - 所有项目共享
 global:
@@ -17,7 +25,18 @@ global:
       superpowers-plugin:
         description: Claude Code 官方 plugin 形态的 Superpowers 能力集
         install: claude plugin install superpowers@claude-plugins-official
-        # Claude Code 优先走官方 plugin 生态，不用 npx skills 模拟
+      ponytail-plugin:
+        description: Ponytail 极简工程纪律插件
+        install: claude plugin marketplace add DietrichGebert/ponytail && claude plugin install ponytail@ponytail
+      caveman-plugin:
+        description: Caveman 输出压缩插件
+        install: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman
+      claude-mem-plugin:
+        description: claude-mem 跨会话记忆插件
+        install: claude plugin marketplace add thedotmack/claude-mem && claude plugin install claude-mem
+      speckit:
+        description: spec-kit / superspec 项目技能
+        install: specify integration install claude --force && specify extension add superspec
 
   # Codex 全局期望
   codex:
@@ -25,15 +44,47 @@ global:
       superpowers-plugin:
         description: Codex plugin 形态的 Superpowers 能力集
         install: codex plugin marketplace add https://github.com/obra/superpowers.git && codex plugin add superpowers@superpowers-dev
-        # Codex 主路径走 plugin，不用 npx skills 分发 Superpowers
+      ponytail-plugin:
+        description: Ponytail Codex plugin
+        install: codex plugin marketplace add https://github.com/DietrichGebert/ponytail.git && codex plugin add ponytail@ponytail
+      caveman-plugin:
+        description: Caveman Codex plugin
+        install: codex plugin marketplace add JuliusBrussee/caveman && codex plugin add caveman@caveman
+      claude-mem-plugin:
+        description: claude-mem Codex marketplace plugin
+        install: codex plugin marketplace add thedotmack/claude-mem && codex plugin add claude-mem@claude-mem-local
+      speckit:
+        description: spec-kit / superspec Codex skills
+        install: specify integration install codex --force && specify extension add superspec
 
-  # 其他 Agents 全局期望
-  agents:
+  # OpenCode 全局期望
+  opencode:
     expected:
-      superpowers:
-        description: 开发方法论工具集，包含 brainstorming, systematic-debugging, writing-plans 等 14+ skills
-        install: npx skills add obra/superpowers -g --agent antigravity kiro-cli -y
-        # 非 plugin agent 才使用 npx skills 分发 Superpowers
+      superpowers-plugin:
+        description: OpenCode git-backed Superpowers plugin
+        install: opencode plugin "superpowers@git+https://github.com/obra/superpowers.git" --global
+      ponytail-plugin:
+        description: OpenCode Ponytail plugin
+        install: opencode plugin opencode-ponytail --global
+      caveman-plugin:
+        description: Caveman OpenCode installer
+        install: npx -y github:JuliusBrussee/caveman -- --only opencode
+      claude-mem:
+        description: claude-mem OpenCode integration
+        install: npx claude-mem install --ide opencode
+
+  # Agy 全局期望
+  agy:
+    expected:
+      ponytail-plugin:
+        description: Ponytail Agy plugin
+        install: agy plugin install https://github.com/DietrichGebert/ponytail
+      superpowers-plugin:
+        description: Superpowers Agy plugin
+        install: agy plugin install https://github.com/obra/superpowers
+      caveman-plugin:
+        description: Caveman Agy plugin
+        install: agy plugin install https://github.com/JuliusBrussee/caveman
 
 # 项目级期望 - 当前项目专属
 project:
@@ -55,7 +106,7 @@ project:
   managed:
     openspec:
       description: OpenSpec 工具链，包含 openspec-new-change, openspec-apply-change 等 10+ 命令
-      install: openspec init --tools antigravity,claude,codex,trae
+      install: openspec init --tools claude,codex,opencode
       # OpenSpec 自己管理，不通过 npx skills 或 claude plugin
 
   # 用户可选增强

@@ -457,8 +457,8 @@ case "$ADAPTER" in
   opencode)
     command -v opencode >/dev/null 2>&1 || echo "MISSING: opencode CLI not found"
     ;;
-  gemini)
-    command -v gemini >/dev/null 2>&1 || echo "MISSING: gemini CLI not found"
+  agy)
+    command -v agy >/dev/null 2>&1 || echo "MISSING: agy CLI not found"
     ;;
   *)
     # 自定义 adapter profile（如 vibe-center）：从 backend 配置推断实际 CLI
@@ -467,6 +467,8 @@ case "$ADAPTER" in
     case "$BACKEND" in
       claude) command -v claude >/dev/null 2>&1 || echo "MISSING: claude CLI (backend=$BACKEND)" ;;
       codex) command -v codex >/dev/null 2>&1 || echo "MISSING: codex CLI (backend=$BACKEND)" ;;
+      opencode) command -v opencode >/dev/null 2>&1 || echo "MISSING: opencode CLI (backend=$BACKEND)" ;;
+      agy) command -v agy >/dev/null 2>&1 || echo "MISSING: agy CLI (backend=$BACKEND)" ;;
       *) echo "NOTE: custom adapter='$ADAPTER' backend='$BACKEND'，手动确认对应 CLI" ;;
     esac
     ;;

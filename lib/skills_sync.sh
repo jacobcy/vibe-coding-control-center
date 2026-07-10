@@ -71,11 +71,7 @@ _vibe_skills_global_agents() {
     local manifest="$(_vibe_skills_manifest_file)"
     if [[ -f "$manifest" ]] && command -v jq >/dev/null 2>&1; then
         jq -r '.global.agents[]?' "$manifest"
-	    else
-	        echo "antigravity"
-	        echo "kiro-cli"
-	        echo "copilot"
-	    fi
+    fi
 }
 
 _vibe_skills_project_agents() {
@@ -83,30 +79,23 @@ _vibe_skills_project_agents() {
     if [[ -f "$manifest" ]] && command -v jq >/dev/null 2>&1; then
         jq -r '.project.agents[]?' "$manifest"
     else
-	        echo "claude-code"
-	        echo "antigravity"
-	        echo "codex"
-        echo "kiro-cli"
+        echo "claude-code"
+        echo "codex"
+        echo "opencode"
+        echo "agy"
     fi
 }
 
 _vibe_skills_superpowers() {
-    local yaml_file="$(_vibe_skills_expected_file)"
-    if [[ -f "$yaml_file" ]]; then
-        grep -E '^\s+-\s+\S+' "$yaml_file" | head -n 5 | sed 's/^[[:space:]]*-[[:space:]]*//'
-    else
-        echo "claude-code"
-        echo "antigravity"
-        echo "codex"
-        echo "kiro-cli"
-    fi
+    echo "brainstorming"
+    echo "systematic-debugging"
+    echo "writing-plans"
+    echo "executing-plans"
+    echo "verification-before-completion"
 }
 
 _vibe_skills_agent_dir() {
     case "$1" in
-        antigravity) echo "$HOME/.gemini/antigravity/skills" ;;
-        trae) echo "$HOME/.trae/skills" ;;
-        kiro-cli) echo "$HOME/.kiro/skills" ;;
         codex) echo "$HOME/.agents/skills" ;;
         *) echo "$HOME/.agents/skills/$1" ;;
     esac
@@ -116,9 +105,8 @@ _vibe_skills_project_targets() {
     local agent
     for agent in "$@"; do
         case "$agent" in
-            antigravity) echo "$VIBE_ROOT/.agent/skills" ;;
-            trae) echo "$VIBE_ROOT/.trae/skills" ;;
             claude-code) echo "$VIBE_ROOT/.claude/skills" ;;
+            agy) echo "$VIBE_ROOT/.agent/skills" ;;
             *) echo "$VIBE_ROOT/.$agent/skills" ;;
         esac
     done
@@ -189,7 +177,7 @@ _vibe_skills_sync_global_superpowers() {
     superpowers_source="obra/superpowers@${superpowers_ref}"
     log_step "同步全局 Superpowers skills (${(j: :)agents})"
     cmd=(npx --yes --package "skills@${skills_cli_version}" skills add "$superpowers_source" -g --agent)
-    for agent in "${agents[@]}"; do [[ "$agent" == "kiro" ]] || cmd+=("$agent"); done
+    for agent in "${agents[@]}"; do cmd+=("$agent"); done
     for skill in "${skills[@]}"; do cmd+=(--skill "$skill"); done
     cmd+=(-y)
     output="$("${cmd[@]}" 2>&1)" || {
@@ -304,8 +292,7 @@ _vibe_skills_check_status() {
     echo ""
     echo "修复建议:"
     echo "  - Claude / 项目级 skills 缺失：${CYAN}zsh scripts/init.sh${NC}"
-    echo "  - 其他 Agent 全局第三方 skills：仅在你实际使用这些 agent 时再装，属于可选增强"
-    echo "    ${CYAN}npx skills add obra/superpowers -g --agent antigravity kiro -y${NC}"
+    echo "  - 第三方能力优先使用各 agent plugin；npx skills 仅作为明确需要时的 legacy fallback"
     echo "  - 逻辑审计 / 推荐：${CYAN}/vibe-skills-manager${NC}"
     echo ""
     echo "结论:"

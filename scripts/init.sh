@@ -138,14 +138,10 @@ echo "✅ Skills installation complete"
 echo "🔗 Creating symlinks for local skills..."
 
 # Link skills/vibe-* (project-owned skills)
-mkdir -p ".agent/skills"
+_symlink_files "skills/vibe-*/" ".agent/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".claude/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".codex/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".gemini/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".copilot/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".opencode/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".qoder/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".codebuddy/skills" "identity" "dir"
 
 #  Symlink workflows
 echo "🔗 Creating symlinks for workflows..."
@@ -158,7 +154,7 @@ echo "📦 Initializing OpenSpec (optional)..."
 if [[ -d "openspec/specs" || -f "openspec/config.yaml" ]]; then
   echo "✅ OpenSpec already initialized"
 elif command -v openspec &> /dev/null; then
-  if openspec init --tools claude,codex,opencode,qoder,codebuddy,trae; then
+  if openspec init --tools claude,codex,opencode; then
     echo "✅ OpenSpec initialized"
   else
     echo -e "\033[1;33m⚠️  Warning: openspec init failed. Continuing (non-blocking).\033[0m"

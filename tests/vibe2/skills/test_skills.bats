@@ -3,8 +3,7 @@
 setup() {
   export REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
   export TMP_HOME="$BATS_TEST_TMPDIR/home"
-  mkdir -p "$TMP_HOME/.claude/plugins" "$TMP_HOME/.agents/skills" "$TMP_HOME/.trae/skills" "$TMP_HOME/.kiro/skills"
-  mkdir -p "$TMP_HOME/.gemini/antigravity/skills"
+  mkdir -p "$TMP_HOME/.claude/plugins" "$TMP_HOME/.agents/skills"
   printf '%s\n' '{"plugins":["superpowers@claude-plugins-official"]}' > "$TMP_HOME/.claude/plugins/installed_plugins.json"
   mkdir -p "$TMP_HOME/.agents/skills/brainstorming"
 
@@ -27,13 +26,13 @@ SHELL
   [[ "$output" =~ "Codex:" ]]
 }
 
-@test "global agent symlinks target HOME/.agents/skills for trae and kiro" {
+@test "global agent symlinks target HOME/.agents/skills for opencode and agy" {
   run env HOME="$TMP_HOME" VIBE_ROOT="$REPO_ROOT" zsh -c '
     source "'"$REPO_ROOT"'/lib/config.sh"
     source "'"$REPO_ROOT"'/lib/skills.sh"
-    _vibe_skills_sync_agents_symlinks antigravity trae kiro
-    print -r -- "$(readlink "$HOME/.trae/skills/brainstorming")"
-    print -r -- "$(readlink "$HOME/.kiro/skills/brainstorming")"
+    _vibe_skills_sync_agents_symlinks opencode agy
+    print -r -- "$(readlink "$HOME/.agents/skills/opencode/brainstorming")"
+    print -r -- "$(readlink "$HOME/.agents/skills/agy/brainstorming")"
   '
 
   [ "$status" -eq 0 ]
@@ -45,7 +44,7 @@ SHELL
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/config/v3"
   cat > "$fixture/config/v3/skills.json" <<'JSON'
-{"global":{"agents":["antigravity"],"packages":[]},"project":{"agents":["codex","claude-code"],"packages":[]}}
+{"global":{"agents":["legacy-agent"],"packages":[]},"project":{"agents":["codex","claude-code","opencode","agy"],"packages":[]}}
 JSON
   cat > "$TMP_BIN/npx" <<'SHELL'
 #!/usr/bin/env bash

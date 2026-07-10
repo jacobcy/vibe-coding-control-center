@@ -37,20 +37,20 @@ AI 驱动的 skills 体系梳理、差距分析与安装建议工具。
 
 ## 当前 skill 体系
 
-### 1. Superpowers
+### 1. 支持范围
 
-- **Claude Code / Codex**：优先走 plugin 生态
-- **其他 Agents**：按需走 `npx skills add obra/superpowers ...`
-- **本项目角色**：`scripts/init.sh` 负责把项目内可见层和本地 symlink 层准备好，但不替代全局安装
+- 当前稳定目标 agent：Claude Code、Codex、OpenCode、Agy
+- 当前维护的第三方能力：claude-mem、superpowers、ponytail、caveman、speckit
+- 不再把 Antigravity、Kiro、Gemini、Copilot 等作为默认 skills 安装建议
 
 一句话：
-- Claude / Codex 用 plugin
-- 非 plugin agent 才用 `npx skills`
+- 确定 GitHub 仓库后，按 agent 选择对应 plugin 安装器
+- `npx skills` 只作为明确需要时的 legacy fallback
 
 ### 2. OpenSpec
 
 - 属于项目内使用的独立工具链
-- 通过 `openspec init --tools ...` 初始化
+- 通过 `openspec init --tools claude,codex,opencode` 初始化
 - `scripts/init.sh` 负责当前项目 / worktree 的 OpenSpec 初始化
 - 有自己独立的命令与 workflow，不并入 `npx skills` 的“第三方通用技能包”语义
 
@@ -110,15 +110,23 @@ global:
   claude:
     expected:
       - superpowers-plugin  # Claude 官方 plugin 形态
-  agents:
+  codex:
     expected:
-      - superpowers  # 其他 Agents 的 npx skills 形态
+      - superpowers-plugin  # Codex plugin 形态
+  opencode:
+    expected:
+      - superpowers-plugin  # OpenCode plugin 形态
+  agy:
+    expected:
+      - ponytail-plugin  # Agy plugin 形态
 
 # 项目级期望
 project:
   agents:
     - codex
     - claude-code
+    - opencode
+    - agy
   packages: []  # 项目自有 vibe-* 由 scripts/init.sh 建立 symlink
 ```
 
