@@ -12,4 +12,11 @@ def test_codex_manifest_uses_plugin_backed_skills() -> None:
 
     assert manifest["global"]["agents"] == []
     assert manifest["global"]["packages"] == []
-    assert set(manifest["project"]["agents"]) == {"codex", "claude-code"}
+    # project.agents is the canonical agent universe (see skills-expected.yaml);
+    # codex/claude-code are plugin-backed and filtered out at install time (init.sh).
+    assert set(manifest["project"]["agents"]) == {
+        "codex",
+        "claude-code",
+        "opencode",
+        "agy",
+    }
