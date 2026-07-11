@@ -114,8 +114,12 @@ def record_dispatch_failure_if_unexpected(
                 error_code = "E_DISPATCH_CODE_ERROR"
 
         # Build error message with classification context
+        # Skip role in message when role is "dispatch" to avoid "dispatch dispatch"
+        role_part = "" if role == "dispatch" else f" {role}"
+        issue_part = f" for #{issue_number}" if issue_number else ""
         error_message = (
-            f"{dispatch_source} {role} dispatch failed [exception]: {exception}"
+            f"{dispatch_source}{role_part} dispatch failed{issue_part}"
+            f" [exception]: {exception}"
         )
 
         try:
@@ -171,8 +175,9 @@ def record_dispatch_failure_if_unexpected(
 
     # Include dispatch_source marker and reason_code for disambiguation
     reason_detail = result.reason or "(no detail)"
+    role_part = "" if role == "dispatch" else f" {role}"
     error_message = (
-        f"{dispatch_source} {role} dispatch failed [{reason_code}]: {reason_detail}"
+        f"{dispatch_source}{role_part} dispatch failed [{reason_code}]: {reason_detail}"
     )
     try:
         record_error(

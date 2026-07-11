@@ -76,7 +76,7 @@ def test_qualify_blocked_records_error_on_exception(
     # RuntimeError is not a permanent code error → stays E_EXEC_UNKNOWN
     assert call_args["error_code"] == "E_EXEC_UNKNOWN"
     assert call_args["issue_number"] == 123
-    assert "preflight dispatch dispatch failed" in call_args["error_message"]
+    assert "preflight dispatch failed" in call_args["error_message"]
 
 
 @pytest.mark.regression("issue-3250")
@@ -123,7 +123,7 @@ def test_qualify_active_records_error_on_exception(
     # RuntimeError is not a permanent code error → stays E_EXEC_UNKNOWN
     assert call_args["error_code"] == "E_EXEC_UNKNOWN"
     assert call_args["issue_number"] == 456
-    assert "preflight dispatch dispatch failed" in call_args["error_message"]
+    assert "preflight dispatch failed" in call_args["error_message"]
 
 
 @pytest.mark.regression("issue-3250")
@@ -212,4 +212,4 @@ def test_dispatch_preflight_classified_exception(exception, expected_code):
     assert call_args["error_code"] == expected_code
     assert call_args["issue_number"] == 555
     # dispatch_source embedded in message string, not a separate kwarg
-    assert "preflight dispatch dispatch failed" in call_args["error_message"]
+    assert "preflight dispatch failed" in call_args["error_message"]
