@@ -186,12 +186,6 @@ class FlowRecoveryService:
             # the scene. Manual path guides the user to rebind/regenerate; auto path
             # keeps the flow blocked for repair (no resume, no rebuild) — spec 012
             # US2, SC-002.
-            if not auto:
-                raise UserError(
-                    f"Artifact repair blocker: {consistency.reason}. "
-                    "通过 `vibe3 handoff <spec|plan|report|audit> <path>` "
-                    "重新绑定或重新生成制品。"
-                )
             return RecoveryResult(
                 action=RecoveryAction.ARTIFACT_BLOCKED,
                 success=False,
