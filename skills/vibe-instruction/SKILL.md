@@ -270,33 +270,39 @@ vibe3 ask "问题内容"  # 询问关于项目的问题
 
 ---
 
-## Execution Flow（标准开发工作流）
+## Execution Flow（开发工作流）
 
-完整的 vibe3 工作流由 `/vibe-continue` 定义。以下是核心步骤：
+本项目采用双轨模型（权威：[spec-kit-workflow-standard.md](../../docs/standards/spec-kit-workflow-standard.md)）：
+
+| 轨 | 适用 | 入口 |
+|---|---|---|
+| spec-kit 轨（人机协作首选） | 非平凡变更、新 feature、需 spec 设计 | `/speckit-*` skills |
+| vibe3 flow 轨（自动化后端） | issue body 已明确、琐碎修复、文档改动 | `/vibe-continue` |
+
+> `vibe3 plan/run/review` 是 issue-driven 自动化后端，**通常不作为人机协作首选入口**；spec/explore 阶段保持人机协作走 spec-kit 轨。openspec 不是本项目推荐工作流，统一用 spec-kit。
 
 ### 1. 启动任务
 
 ```bash
-/vibe-new <issue-number>        # 创建 flow/branch/worktree，完成后指引到 /vibe-continue
-/vibe-continue                  # 恢复已有 branch，查看工作流方法
+/vibe-new <issue-number>        # 创建 flow/branch/worktree，自动扫描 spec 状态并推荐阶段
+/vibe-continue                  # 恢复已有 branch，按 spec status 分流到正确轨
 ```
 
-### 2. 执行工作流（详见 /vibe-continue）
+### 2. 检查 spec 状态 + 推荐阶段
 
 ```bash
-vibe3 plan --branch <branch>                    # 1. 生成计划
-vibe3 handoff show @plan --branch <branch>      # 2. 检查计划
-vibe3 run --branch <branch>                     # 3. 执行实现
-vibe3 handoff show @report --branch <branch>    # 4. 检查执行结果
-vibe3 review --branch <branch>                  # 5. 代码审查
-vibe3 handoff show @audit --branch <branch>     # 6. 检查审查结果
-vibe3 flow show --branch <branch>               # 7. 查看整体进度
-vibe3 run --publish --branch <branch>           # 8. 提交并创建 PR
+/speckit-superspec-status       # 扫描 .specify/specs/，输出每 spec 阶段 + Suggested next step
+vibe3 flow show                 # 确认 spec_ref / plan_ref / report_ref / audit_ref
 ```
 
-**注意**：`--branch` 可接受分支名或 issue 编号。
+依 suggested next step 选择轨（详见 `/vibe-new` Step 7.5 / `/vibe-continue` Step 1.5）。
 
-### 3. 提交与收口
+### 3. 推进执行
+
+- **spec-kit 轨**：`/speckit-<phase>`（brainstorm → specify → plan → tasks → implement → review）
+- **vibe3 flow 轨**：`/vibe-continue`（plan → run → review → publish）
+
+### 4. 提交与收口
 
 ```bash
 /vibe-commit                     # 整理变更并推送到 PR
