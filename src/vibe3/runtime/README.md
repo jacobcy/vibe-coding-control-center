@@ -22,7 +22,7 @@ Orchestra 支持两种运行时模式：
 | protocols.py | 78 | ServiceBase、CheckServiceProtocol 协议定义 |
 | taxonomy.py | 83 | MODULE_CATEGORY_MAP、ModuleCategory 分类 |
 | pool_exhaustion.py | 43 | 连接池耗尽检测 |
-| orchestra_instance.py | 19 | Orchestra 实例信息读写 |
+| orchestra_instance.py | 19 | Orchestra 实例信息读写（re-export 自 vibe3.utils） |
 | __init__.py | 135 | 模块初始化、公共导出 |
 
 **总计**: 9 文件，1327 行代码（截至 2026-07）
@@ -150,7 +150,7 @@ runtime/
 | CheckServiceProtocol | 协议 | domain/, services/orchestra/ |
 | **Heartbeat** | | |
 | HeartbeatServer | 事件服务器 | server/, domain/ |
-| FailedGateProtocol | 协议 | domain/ |
+| FailedGateProtocol | 协议 | domain/protocols/（由 domain 定义，runtime 引用） |
 | get_current_tick_id | 工具函数 | domain/, services/ |
 | **Circuit Breaker** | | |
 | CircuitBreaker | 熔断器 | services/orchestra/ |
@@ -158,17 +158,17 @@ runtime/
 | ErrorCategory | 错误分类 | services/orchestra/ |
 | classify_failure | 分类函数 | services/orchestra/ |
 | **Cleanup** | | |
-| execute_expired_resource_cleanup | 清理函数 | domain/ |
+| execute_expired_resource_cleanup | 清理函数 | runtime/heartbeat.py（内部调用） |
 | **Periodic Check** | | |
-| execute_periodic_check | 检查函数 | domain/ |
+| execute_periodic_check | 检查函数 | runtime/heartbeat.py（内部调用） |
 | **Instance Management** | | |
-| OrchestraInstanceInfo | 数据模型 | server/, domain/ |
-| read_instance_info | 读取函数 | server/, domain/ |
+| OrchestraInstanceInfo | 数据模型 | server/ |
+| read_instance_info | 读取函数 | server/ |
 | validate_instance | 验证函数 | server/ |
 | write_instance_info | 写入函数 | server/ |
 | **Taxonomy** | | |
-| MODULE_CATEGORY_MAP | 分类映射 | domain/, services/ |
-| ModuleCategory | 类别枚举 | domain/, services/ |
+| MODULE_CATEGORY_MAP | 分类映射 | runtime/taxonomy.py（内部使用） |
+| ModuleCategory | 类别枚举 | runtime/taxonomy.py（内部使用） |
 
 ## execution 层接口
 

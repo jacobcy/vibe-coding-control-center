@@ -125,11 +125,11 @@ agents/
 | build_review_prompt_body | 构建函数 | commands/ |
 | make_review_context_builder | 工厂函数 | commands/ |
 | **Section Inspectors** | | |
-| describe_plan_sections | 检查函数 | commands/, roles/ |
-| describe_run_plan_sections | 检查函数 | commands/, roles/ |
-| describe_review_sections | 检查函数 | commands/, roles/ |
+| describe_plan_sections | 检查函数 | roles/ |
+| describe_run_plan_sections | 检查函数 | roles/ |
+| describe_review_sections | 检查函数 | roles/ |
 | **Types** | | |
-| RunPromptMode | 类型字面量 | agents/run_prompt |
+| RunPromptMode | 类型字面量 | agents/run_prompt, roles/run_command.py |
 
 ## execution 层接口
 

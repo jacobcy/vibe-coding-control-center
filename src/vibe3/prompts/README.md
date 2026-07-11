@@ -109,7 +109,7 @@ prompts/
 | PromptRecipe | 数据模型 | commands/ |
 | PromptRenderResult | 渲染结果 | agents/, commands/ |
 | PromptVariableSource | 变量来源 | commands/ |
-| PromptRenderProvenance | 来源追踪 | execution/, domain/ |
+| PromptRenderProvenance | 来源追踪 | prompts/provenance.py（内部使用，避免循环导入） |
 | PromptVariableProvenance | 变量来源追踪 | commands/ |
 | PromptSectionSpec | 段落规格 | commands/ |
 | PromptMaterialSpec | 材料规格 | commands/ |
@@ -148,11 +148,11 @@ prompts/
 | resolve_common_rules_path | 解析规则路径 | agents/, roles/ |
 | discover_project_scope_overlays | 发现覆盖层 | agents/, roles/ |
 | **Provenance** | | |
-| collect_dry_run_provenance | 收集来源 | execution/, domain/, commands/ |
+| collect_dry_run_provenance | 收集来源 | execution/, commands/ |
 | **Governance Material** | | |
-| load_governance_material_catalog | 加载材料目录 | execution/, domain/ |
-| resolve_governance_material | 解析材料 | execution/, domain/ |
-| build_governance_execution_name | 构建执行名称 | execution/ |
+| load_governance_material_catalog | 加载材料目录 | roles/ |
+| resolve_governance_material | 解析材料 | execution/, roles/ |
+| build_governance_execution_name | 构建执行名称 | execution/, roles/ |
 
 ## execution 层接口
 
