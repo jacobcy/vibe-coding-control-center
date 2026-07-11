@@ -86,14 +86,6 @@ _vibe_skills_project_agents() {
     fi
 }
 
-_vibe_skills_superpowers() {
-    echo "brainstorming"
-    echo "systematic-debugging"
-    echo "writing-plans"
-    echo "executing-plans"
-    echo "verification-before-completion"
-}
-
 _vibe_skills_agent_dir() {
     case "$1" in
         codex) echo "$HOME/.agents/skills" ;;
@@ -148,46 +140,11 @@ _vibe_skills_sync_codex_plugin() {
 }
 
 _vibe_skills_sync_agents_symlinks() {
-    local agent agent_dir skill_dir skill_name
-    mkdir -p "$HOME/.agents/skills"
-    for agent in "$@"; do
-        [[ "$agent" == "codex" ]] && continue
-        agent_dir="$(_vibe_skills_agent_dir "$agent")"
-        mkdir -p "$agent_dir"
-        for skill_dir in "$HOME/.agents/skills"/*(/N); do
-            skill_name="${skill_dir:t}"
-            ln -sfn "$HOME/.agents/skills/$skill_name" "$agent_dir/$skill_name"
-        done
-    done
+    log_success "跳过 ~/.agents/skills 镜像；第三方 skills 由各 agent plugin 管理"
 }
 
 _vibe_skills_sync_global_superpowers() {
-    local -a agents skills cmd
-    local agent skill output
-    local skills_cli_version superpowers_ref superpowers_source
-    agents=(${(f)"$(_vibe_skills_global_agents | grep -Ev '^(codex|claude-code)$' || true)"})
-    skills=(${(f)"$(_vibe_skills_superpowers)"})
-    if (( ${#agents[@]} == 0 )); then
-        log_success "无 npx Superpowers agent 需要同步（Codex/Claude 使用 plugin）"
-        return 0
-    fi
-    (( ${#skills[@]} )) || { vibe_die "No superpowers skills found in registry"; return 1; }
-    skills_cli_version="${VIBE_SKILLS_CLI_VERSION:-1.4.4}"
-    superpowers_ref="${VIBE_SUPERPOWERS_REF:-e4a2375cb705ca5800f0833528ce36a3faf9017a}"
-    superpowers_source="obra/superpowers@${superpowers_ref}"
-    log_step "同步全局 Superpowers skills (${(j: :)agents})"
-    cmd=(npx --yes --package "skills@${skills_cli_version}" skills add "$superpowers_source" -g --agent)
-    for agent in "${agents[@]}"; do cmd+=("$agent"); done
-    for skill in "${skills[@]}"; do cmd+=(--skill "$skill"); done
-    cmd+=(-y)
-    output="$("${cmd[@]}" 2>&1)" || {
-        echo "$output" >&2
-        return 1
-    }
-    echo "$output" | grep -E "(Installed|✓|already)" || true
-    log_success "全局 Superpowers 已同步"
-    _vibe_skills_sync_agents_symlinks "${agents[@]}"
-    log_success "各 Agent skills 已同步"
+    log_success "跳过 npx Superpowers sync；Claude / Codex / OpenCode / AGY 使用各自 plugin 安装"
 }
 
 _vibe_skills_sync_local_skills() {
@@ -253,21 +210,21 @@ _vibe_skills_check_status() {
         echo "  CLI: 未安装 codex"
     fi
     echo ""
-    echo "${CYAN}全局共享 Skills (~/.agents/skills/，可选增强):${NC}"
+    echo "${CYAN}全局共享 Skills (~/.agents/skills/，legacy，建议清空):${NC}"
     global_count="$(_vibe_skills_count_entries "$HOME/.agents/skills")"
     echo "  已安装: $global_count 个"
     echo ""
-    echo "${CYAN}各 Agent 全局 Skills 镜像（非阻塞）:${NC}"
+    echo "${CYAN}各 Agent 全局 Skills 镜像（legacy，已停用）:${NC}"
     agents=(${(f)"$(_vibe_skills_global_agents)"})
     for agent in "${agents[@]}"; do
         agent_dir="$(_vibe_skills_agent_dir "$agent")"
         if [[ "$agent" == "claude-code" ]]; then
             continue
         elif [[ "$agent" == "codex" ]]; then
-            echo "  $agent: $global_count skills (共享 ~/.agents/skills，可选)"
+            echo "  $agent: 不使用 ~/.agents/skills；使用 Codex plugin"
         elif [[ -d "$agent_dir" ]]; then
             count="$(_vibe_skills_count_entries "$agent_dir")"
-            echo "  $agent: $count/$global_count (可选)"
+            echo "  $agent: legacy mirror present ($count entries)"
         else
             echo "  $agent: 未启用（目录不存在，跳过）"
         fi
@@ -292,7 +249,7 @@ _vibe_skills_check_status() {
     echo ""
     echo "修复建议:"
     echo "  - Claude / 项目级 skills 缺失：${CYAN}zsh scripts/init.sh${NC}"
-    echo "  - 第三方能力优先使用各 agent plugin；npx skills 仅作为明确需要时的 legacy fallback"
+    echo "  - 第三方能力使用各 agent plugin；不要用 npx skills 写入 ~/.agents/skills"
     echo "  - 逻辑审计 / 推荐：${CYAN}/vibe-skills-manager${NC}"
     echo ""
     echo "结论:"
@@ -328,15 +285,7 @@ _vibe_skills_run_audit() {
     fi
     echo ""
     echo "${CYAN}[2] 全局 Skills 覆盖${NC}"
-    agents=(${(f)"$(_vibe_skills_global_agents | grep -Ev '^(codex|claude-code)$' || true)"})
-    for agent in "${agents[@]}"; do
-        linked="$global_count"
-        [[ "$agent" == "codex" ]] || linked="$(_vibe_skills_count_entries "$(_vibe_skills_agent_dir "$agent")")"
-        [[ "$linked" -ge 10 ]] && echo "    OK $agent: $linked skills" || {
-            echo "    !  $agent: $linked skills (预期 >=10)"
-            issues=$((issues + 1))
-        }
-    done
+    echo "    SKIP: ~/.agents/skills legacy mirror 已停用；第三方能力走各 agent plugin"
     echo ""
     echo "${CYAN}[3] 本地 vibe-* Symlink${NC}"
     for agent in "${project_agents[@]}"; do
