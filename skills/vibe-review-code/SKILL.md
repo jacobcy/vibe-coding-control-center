@@ -113,6 +113,8 @@ gh pr view <number> --comments
 **上下文工具（graphify / mem-search，按需）**：
 
 > 详见 supervisor/policies/common.md「上下文工具」+ review.md §4。工具不可用时记录限制后继续。
+>
+> **调查顺序**：graphify explain（跨模块影响）→ mem-search（历史 verdict）。scope 不明时先 `graphify query`。
 
 - **graphify explain**：涉及跨模块变更时，`graphify explain "<ChangedNode>"` 取 calls/uses/methods 连接辅助判断波及面。scope 不明时 `graphify query "<问题>"` 找相关社区。
 - **mem-search（3-layer，可选）**：相似 issue/变更的历史 review verdict、已知坑时，`search` 取索引 → 过滤相关 ID → `get_observations` 取全文。memory 非真源，不覆盖当前 diff/ADR/inspect 证据。

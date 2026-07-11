@@ -204,6 +204,8 @@ uv run python src/vibe3/cli.py snapshot diff --quiet
 ### 4. 上下文工具（graphify / mem-search / context7 / exa）
 
 > 详见 supervisor/policies/common.md「上下文工具」。工具不可用时记录限制后继续，不阻塞代码分析。
+>
+> **调查顺序**：graphify explain（结构影响）→ mem-search（历史 verdict）→ context7（API 验证）→ exa（外部模式）。
 
 - **graphify explain** — 代码结构影响：`graphify explain "<ChangedNode>"` 取 calls/uses/methods，判断改动波及面。scope 不明时 `graphify query "<问题>"`。
 - **mem-search（3-layer）** — 历史 verdict/已知坑：`search` → `get_observations` 查相似 issue 的历史 review verdict 和常见缺陷。memory 不覆盖 diff/inspect 证据。

@@ -198,6 +198,8 @@ uv run python src/vibe3/cli.py snapshot diff --quiet
 ### 3. 上下文工具（graphify / exa / mem-search）
 
 > 详见 supervisor/policies/common.md「上下文工具」。工具不可用时记录限制后继续。
+>
+> **调查顺序**：graphify explain（攻击面）→ exa（CVE/安全最佳实践）→ mem-search（历史缺陷）。
 
 - **graphify explain** — 攻击面影响：`graphify explain "<Node>"` 取 calls/uses，判断安全敏感改动波及哪些消费者。
 - **exa** — 安全最佳实践/CVE：`web_search_exa` 搜索相关 CVE、安全模式、OWASP 指南、供应链风险。

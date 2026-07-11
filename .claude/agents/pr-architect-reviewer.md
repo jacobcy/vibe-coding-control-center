@@ -173,6 +173,8 @@ src/vibe3/
 ### 4. 上下文工具（graphify / mem-search / exa / context7）
 
 > 详见 supervisor/policies/common.md「上下文工具」。工具不可用时记录限制后继续，不阻塞架构审查。
+>
+> **调查顺序**：graphify explain（变更波及面）→ mem-search（历史架构决策）→ exa（外部替代方案）→ context7（API 契约）。scope 不明时先 `graphify query`。
 
 - **graphify explain** — 变更波及面：`graphify explain "<NodeName>"` 取被改模块的 calls/uses/methods 连接，判断是否间接影响核心层。scope 不明时 `graphify query "<问题>"`。
 - **mem-search（3-layer）** — 历史架构决策/ADR：`search` 取索引 → `get_observations` 取全文，查同类组件的历史架构评审结论、替代方案讨论。memory 不覆盖当前 diff/ADR 证据。
