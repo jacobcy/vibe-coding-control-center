@@ -1,10 +1,6 @@
 version: 1
 architecture_packages: [runtime, orchestra]
 entries:
-  - path: src/vibe3/runtime/orchestra_instance.py
-    responsibilities: [process_lifecycle]
-    reason: Owns orchestra process lifecycle and instance identity
-    review_floor: repeated
   - path: src/vibe3/runtime/heartbeat.py
     responsibilities: [heartbeat_timer, event_ingestion]
     reason: Drives reconciliation timing and event ingestion
@@ -37,10 +33,6 @@ entries:
     responsibilities: [job_queue_lifecycle]
     reason: Owns queue mutation operations
     review_floor: repeated
-  - path: src/vibe3/orchestra/queue_entry.py
-    responsibilities: [job_queue_lifecycle]
-    reason: Defines queue entry lifecycle state
-    review_floor: repeated
   - path: src/vibe3/orchestra/queue_persistence_service.py
     responsibilities: [job_queue_lifecycle]
     reason: Persists orchestra queue state
@@ -57,10 +49,6 @@ entries:
     responsibilities: [dispatch_coordination]
     reason: Constructs the active dispatch coordinator
     review_floor: repeated
-  - path: src/vibe3/orchestra/flow_dispatch.py
-    responsibilities: [dispatch_coordination]
-    reason: Dispatches work for eligible flows
-    review_floor: repeated
   - path: src/vibe3/orchestra/failed_gate.py
     responsibilities: [dispatch_coordination]
     reason: Applies failed-gate dispatch behavior
@@ -72,10 +60,6 @@ entries:
   - path: src/vibe3/orchestra/remote_check.py
     responsibilities: [dispatch_coordination]
     reason: Collects remote evidence used by dispatch
-    review_floor: repeated
-  - path: src/vibe3/orchestra/protocols.py
-    responsibilities: [protocols]
-    reason: Defines orchestra kernel protocols
     review_floor: repeated
   - path: src/vibe3/orchestra/domain_types.py
     responsibilities: [domain_types]

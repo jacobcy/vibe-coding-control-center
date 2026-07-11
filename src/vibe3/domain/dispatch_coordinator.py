@@ -248,7 +248,7 @@ class GlobalDispatchCoordinator:
         clean_old_state_labels(issue, role, self._config)
 
         branch, _ = self._flow_context(issue.number)
-        from vibe3.domain.events.base import DomainEvent
+        from vibe3.models import DomainEvent
 
         publish(
             cast(

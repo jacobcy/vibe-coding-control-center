@@ -6,7 +6,7 @@ def test_orchestra_imports_use_new_paths():
     from vibe3.domain.dispatch_coordinator import GlobalDispatchCoordinator
     from vibe3.domain.failed_gate import FailedGate
     from vibe3.domain.flow_manager import FlowManager
-    from vibe3.orchestra.protocols import FlowManagerProtocol
+    from vibe3.domain.protocols.flow_protocols import FlowManagerProtocol
 
     # Verify classes are imported correctly
     assert FailedGate is not None

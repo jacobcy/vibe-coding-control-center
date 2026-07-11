@@ -259,14 +259,6 @@ def test_flow_lifecycle_re_exports():
     assert PRMerged is not None
 
 
-def test_policy_re_export():
-    """Test that PolicyChanged is re-exported correctly."""
-    from vibe3.domain.events.policy import PolicyChanged
-
-    # Import successful if we get here
-    assert PolicyChanged is not None
-
-
 def test_flow_blocked_publish_integration():
     """Test publishing FlowBlocked event via EventPublisher."""
     received_events = []

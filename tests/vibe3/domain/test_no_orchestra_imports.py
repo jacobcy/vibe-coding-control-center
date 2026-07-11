@@ -14,7 +14,7 @@ def get_imports_from_file(filepath: Path) -> list[str]:
     """Extract all imports from a Python file.
 
     Returns:
-        List of import strings (e.g., "vibe3.orchestra.flow_dispatch")
+        List of import strings (e.g., "vibe3.orchestra.global_dispatch_coordinator")
     """
     try:
         content = filepath.read_text()
@@ -42,7 +42,6 @@ def is_orchestra_import(import_str: str, file_path: Path | None = None) -> bool:
     - orchestra.failed_gate (TYPE_CHECKING only)
 
     Disallowed:
-    - orchestra.flow_dispatch
     - orchestra.global_dispatch_coordinator
     - orchestra.issue_loader
     - orchestra.queue_operations

@@ -27,7 +27,6 @@ if TYPE_CHECKING:
         expand_template,
         load_rules,
     )
-    from vibe3.domain.events.base import DomainEvent
     from vibe3.domain.events.flow_lifecycle import (
         ControlPlaneEventPublished,
         ExecutorDispatchIntent,
@@ -45,10 +44,6 @@ if TYPE_CHECKING:
     from vibe3.domain.events.governance import (
         GovernanceScanCompleted,
         GovernanceScanStarted,
-    )
-    from vibe3.domain.events.policy import PolicyChanged
-    from vibe3.domain.events.supervisor_apply import (
-        SupervisorIssueIdentified,
     )
     from vibe3.domain.failed_gate import FailedGate, GateResult, GateStatus
     from vibe3.domain.flow_manager import FlowManager
@@ -71,10 +66,11 @@ if TYPE_CHECKING:
     )
     from vibe3.domain.qualify_gate import QualifyGateService
     from vibe3.domain.role_resolver import find_role_for_state
+    from vibe3.models import DomainEvent, PolicyChanged, SupervisorIssueIdentified
 
 _LAZY_IMPORTS: dict[str, str] = {
     # Events - base
-    "DomainEvent": "vibe3.domain.events.base",
+    "DomainEvent": "vibe3.models",
     # Events - flow lifecycle
     "ControlPlaneEventPublished": "vibe3.domain.events.flow_lifecycle",
     "IssueFailed": "vibe3.domain.events.flow_lifecycle",
@@ -92,9 +88,9 @@ _LAZY_IMPORTS: dict[str, str] = {
     "GovernanceScanStarted": "vibe3.domain.events.governance",
     "GovernanceScanCompleted": "vibe3.domain.events.governance",
     # Events - policy
-    "PolicyChanged": "vibe3.domain.events.policy",
+    "PolicyChanged": "vibe3.models",
     # Events - supervisor apply
-    "SupervisorIssueIdentified": "vibe3.domain.events.supervisor_apply",
+    "SupervisorIssueIdentified": "vibe3.models",
     # Orchestration
     "FlowManager": "vibe3.domain.flow_manager",
     "GlobalDispatchCoordinator": "vibe3.domain.dispatch_coordinator",

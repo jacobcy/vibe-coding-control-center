@@ -5,7 +5,7 @@ Events for governance service lifecycle and periodic scans.
 
 from dataclasses import dataclass
 
-from .base import DomainEvent
+from vibe3.models import DomainEvent
 
 
 @dataclass(frozen=True)

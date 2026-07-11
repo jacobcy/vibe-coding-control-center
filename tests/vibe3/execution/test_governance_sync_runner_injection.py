@@ -67,7 +67,7 @@ class TestGovernanceSyncRunnerWithInjection:
                 lambda *, target_repo=None: MagicMock(),
             )
             m.setattr(
-                "vibe3.orchestra.flow_dispatch.FlowManager",
+                "vibe3.domain.flow_manager.FlowManager",
                 lambda config: MagicMock(),
             )
             m.setattr(
@@ -122,7 +122,7 @@ class TestGovernanceSyncRunnerWithInjection:
                 lambda *, target_repo=None: MagicMock(),
             )
             m.setattr(
-                "vibe3.orchestra.flow_dispatch.FlowManager",
+                "vibe3.domain.flow_manager.FlowManager",
                 lambda config: MagicMock(),
             )
             m.setattr(
@@ -179,7 +179,7 @@ class TestGovernanceSyncRunnerWithInjection:
                 lambda *, target_repo=None: MagicMock(),
             )
             m.setattr(
-                "vibe3.orchestra.flow_dispatch.FlowManager",
+                "vibe3.domain.flow_manager.FlowManager",
                 lambda config: MagicMock(),
             )
             m.setattr(
@@ -314,7 +314,7 @@ class TestGovernanceAsyncRunnerWithInjection:
                 lambda store, backend: mock_registry,
             )
             m.setattr(
-                "vibe3.orchestra.flow_dispatch.FlowManager",
+                "vibe3.domain.flow_manager.FlowManager",
                 lambda config: MagicMock(),
             )
             m.setattr(
