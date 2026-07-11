@@ -166,6 +166,8 @@ Install via respective tools, then create symlinks in `.claude/skills/`. See [DE
 
 ## 上下文工具（plan/review/explore 按需调用，非预注入）
 
+> **优先原则**：涉及第三方库/公开 API 用法时，**必须优先**通过 Context7 获取官方文档（`resolve-library-id` → `query-docs`）、Exa 搜索外部最佳实践（`web_search_exa`），避免凭训练记忆写不准确的 API。graphify 和 mem-search 用于项目内部代码结构与历史，不用于外部库。
+
 - `$claude-mem:mem-search` — claude-mem 跨会话记忆搜索（3-layer：`mcp__mcp_search__search` → `timeline` → `get_observations`；非 `claude-memory` CLI）
 - `graphify query/explain` — 代码知识图谱（模块/社区/关系）
 - `mcp__context7__resolve_library_id` → `mcp__context7__query_docs` — 库 API 官方文档
