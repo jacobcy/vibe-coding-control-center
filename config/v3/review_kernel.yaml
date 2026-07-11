@@ -69,10 +69,6 @@ entries:
     responsibilities: [dispatch_coordination]
     reason: Collects remote evidence used by dispatch
     review_floor: repeated
-  - path: src/vibe3/orchestra/protocols.py
-    responsibilities: [protocols]
-    reason: Defines orchestra kernel protocols
-    review_floor: repeated
   - path: src/vibe3/orchestra/domain_types.py
     responsibilities: [domain_types]
     reason: Defines types crossing orchestra kernel boundaries

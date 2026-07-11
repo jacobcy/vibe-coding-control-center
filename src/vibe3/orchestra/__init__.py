@@ -55,13 +55,13 @@ _LAZY_IMPORTS: dict[str, str] = {
     "is_auto_task_branch": "vibe3.orchestra.issue_loader",
     "run_remote_label_check": "vibe3.orchestra.remote_check",
     "RemoteCheckResult": "vibe3.orchestra.remote_check",
-    # Protocols (self-module re-exports only)
-    "CheckServiceProtocol": "vibe3.orchestra.protocols",
-    "FlowServiceProtocol": "vibe3.orchestra.protocols",
-    "CapacityServiceProtocol": "vibe3.orchestra.protocols",
-    "IssueCollectionServiceProtocol": "vibe3.orchestra.protocols",
-    "FlowManagerProtocol": "vibe3.orchestra.protocols",
-    "LabelDispatchCallable": "vibe3.orchestra.protocols",
+    # Protocols (canonical home: orchestra.domain_types)
+    "CheckServiceProtocol": "vibe3.orchestra.domain_types",
+    "FlowServiceProtocol": "vibe3.orchestra.domain_types",
+    "CapacityServiceProtocol": "vibe3.orchestra.domain_types",
+    "IssueCollectionServiceProtocol": "vibe3.orchestra.domain_types",
+    "FlowManagerProtocol": "vibe3.orchestra.domain_types",
+    "LabelDispatchCallable": "vibe3.orchestra.domain_types",
     # Domain types (from orchestra.domain_types)
     "ServiceBase": "vibe3.orchestra.domain_types",
     "GateResult": "vibe3.orchestra.domain_types",
