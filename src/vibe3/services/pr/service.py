@@ -320,8 +320,14 @@ class PRService:
                 f"after fixing the branch/upstream state"
             ) from exc
 
+        # Compute committed change summary from inspect-base facts
+        from vibe3.analysis.review_observation import build_committed_summary
+
+        head_sha = self.git_client.resolve_revision("HEAD")
+        change_summary = build_committed_summary(self.git_client, base_branch, head_sha)
+
         metadata = get_metadata_from_flow(self.store, head_branch)
-        enhanced_body = build_pr_body(body, metadata)
+        enhanced_body = build_pr_body(body, metadata, change_summary=change_summary)
         request = CreatePRRequest(
             title=title,
             body=enhanced_body,
