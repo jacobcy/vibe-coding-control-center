@@ -85,15 +85,15 @@ git log main..origin/main --oneline | wc -l
 从输入解析中已确认的信息**不再询问**：
 - worktree 已在输入中指定 → 不问
 - workflow 已在输入中指定 → 不问
-- 两者都未指定 → 依次询问：
-  - 用当前仓库还是新建 worktree
-  - 后续打算走哪条实现 workflow
+- workflow 未指定 → 不强问，根据任务性质推荐（见下方），由 Step 7.5 的 spec 状态扫描辅助决策
 
-可推荐但不强绑：
-- `superpowers:writing-plans`
-- `superpowers:executing-plans`
-- `openspec:ff`
-- repo-native `vibe3 plan/run/review`
+**workflow 推荐顺序**（参考 [spec-kit-workflow-standard.md](../../docs/standards/spec-kit-workflow-standard.md) 双轨模型）：
+
+1. **spec-kit 轨（人机协作首选）**：非平凡变更（新 feature、需 spec 设计）走六阶段
+   `brainstorm → specify → plan → tasks → implement → review`，对应 `/speckit-*` skills
+2. **vibe3 flow 轨（issue-driven 自动化后端）**：issue body 已明确、琐碎修复、文档改动 → `vibe3 plan/run/review`
+
+> **注意**：`vibe3 plan/run/review` 是自动化执行后端，**通常不作为人机协作首选入口**；spec/explore 阶段保持人机协作走 spec-kit 轨。openspec 不是本项目推荐工作流，统一用 spec-kit。
 
 ## 5. 确认依赖关系
 
@@ -182,16 +182,48 @@ vibe3 flow show
 - Worktree 路径（如有）
 - 下一步建议
 
-## 8. 指向 vibe-continue 工作流
+## 7.5 自动检查 spec 状态 + 推荐阶段
 
-bootstrap 完成后，**必须**告知用户下一步是 `/vibe-continue`：
+bootstrap 后、指向下一阶段前，扫描 spec-kit 状态给出阶段推荐。
 
-> Flow 已 ready。如选择 vibe3 工作流，请执行 `/vibe-continue` 查看标准工作流方法并开始执行。
+**扫描命令**：
 
-标准 vibe3 工作流由 `/vibe-continue` 定义，包含：
-- `vibe3 plan` → `vibe3 run` → `vibe3 review` → `vibe3 run --publish`
-- 每步之间可用 `vibe3 handoff show @<artifact>` 检查结果
-- 详见 `/vibe-continue` 的"标准工作流方法"章节
+```bash
+# spec-kit specs 产物清单（+ 存在 / - 缺失）
+for d in .specify/specs/*/; do
+  [ -d "$d" ] || continue
+  printf "%s: " "$(basename "$d")"
+  for f in spec.md plan.md tasks.md; do
+    [ -f "$d$f" ] && printf "+%s " "${f%.md}" || printf "-%s " "${f%.md}"
+  done
+  echo
+done
+
+# vibe3 flow 的 spec_ref / plan_ref / report_ref / audit_ref
+vibe3 flow show
+```
+
+**推荐规则**：
+
+| spec 产物状态 | 推荐下一步 |
+|---|---|
+| 无 `.specify/specs/` 或无匹配 spec | 非平凡变更 → `/speckit-superspec-brainstorm` 或 `/speckit-specify`；琐碎 → `/vibe-continue` |
+| 仅 `spec.md` | `/speckit-plan` |
+| `spec.md` + `plan.md` | `/speckit-tasks` |
+| `+ tasks.md`，未 implement | `/speckit-superspec-execute` |
+| 已 implement，未 review | `/speckit-superspec-review` |
+| flow 已有 `spec_ref`/`plan_ref` 但无匹配 spec 目录 | 走 vibe3 flow 轨 `/vibe-continue` |
+
+向用户展示扫描结果 + 推荐，由用户确认进入哪条轨。不自动推进。
+
+## 8. 指向下一阶段（双轨分流）
+
+bootstrap 完成 + Step 7.5 spec 状态扫描后，根据推荐分流：
+
+- **spec-kit 轨**（存在匹配 spec，或非平凡变更需 spec 设计）：`/speckit-<phase>` 或 `specify workflow run speckit`
+- **vibe3 flow 轨**（issue body 已明确、琐碎修复）：`/vibe-continue`（`vibe3 plan → run → review → publish`）
+
+> 不再默认把 vibe3 plan/run/review 作为"标准"工作流。两条轨皆为 first-class，视任务性质选择。详见 [spec-kit-workflow-standard.md](../../docs/standards/spec-kit-workflow-standard.md)。
 
 ## 停止条件
 
