@@ -200,46 +200,22 @@ TaskList  # 查看活跃 Monitor
 
 ## Step 1.5: 自动扫描 spec-kit 状态 + 推荐阶段
 
-恢复上下文后，立即扫描 spec-kit 状态分流到正确轨（参考 [spec-kit-workflow-standard.md](../../docs/standards/spec-kit-workflow-standard.md) 双轨模型）。
+恢复上下文后，调用现有 skill 查 spec-kit 进度，分流到正确轨（参考 [spec-kit-workflow-standard.md](../../docs/standards/spec-kit-workflow-standard.md) 双轨模型）。
 
-**扫描命令**：
+1. **调用 `/speckit-superspec-status`**（勿手写 bash 重造）：
+   - 扫描 `.specify/specs/`，读 `progress.yml`（无则按 `spec.md`/`plan.md`/`tasks.md` 推断 phase）
+   - 输出每 spec 阶段（Phase X/6）+ 任务完成比 + **`Suggested next step`**（如 `/speckit.superspec.execute 001`）
+2. **跑 `vibe3 flow show [--branch <b>]`** 确认 `spec_ref`/`plan_ref`/`report_ref`/`audit_ref`，关联 issue 到具体 spec 编号
 
-```bash
-# spec-kit specs 产物清单（+ 存在 / - 缺失）
-for d in .specify/specs/*/; do
-  [ -d "$d" ] || continue
-  printf "%s: " "$(basename "$d")"
-  for f in spec.md plan.md tasks.md; do
-    [ -f "$d$f" ] && printf "+%s " "${f%.md}" || printf "-%s " "${f%.md}"
-  done
-  echo
-done
+**轨选择**：
 
-# vibe3 flow refs（spec_ref / plan_ref / report_ref / audit_ref）
-vibe3 flow show [--branch <b>]
-```
-
-**推荐规则**：
-
-| spec 产物状态 | 推荐轨 | 下一步 |
+| 情况 | 推荐轨 | 下一步 |
 |---|---|---|
-| 无匹配 spec，issue 已明确 | vibe3 flow | `/vibe-continue` Step 2 标准流程 |
-| 仅 `spec.md` | spec-kit | `/speckit-plan` |
-| `+ plan.md` | spec-kit | `/speckit-tasks` |
-| `+ tasks.md`，未 implement | spec-kit | `/speckit-superspec-execute` |
-| 已 implement，未 review | spec-kit | `/speckit-superspec-review` |
+| suggested next step 存在，非平凡变更 | spec-kit | 按 suggestion（`/speckit-*`） |
+| 无 `.specify/` 或无匹配 spec，issue 已明确 | vibe3 flow | Step 2 标准流程 |
 | flow 有 `spec_ref`/`plan_ref` 但无 spec 目录 | vibe3 flow | 按 plan_ref/run_ref 推进 |
 
-向用户报告：
-
-```
-spec-kit 状态：
-- 012-spec-handoff-bridge: +spec +plan +tasks → 推荐 /speckit-superspec-execute
-vibe3 flow refs: spec_ref=... plan_ref=...
-推荐轨：spec-kit（或 vibe3 flow）
-```
-
-由用户确认进入哪条轨。不自动推进。
+向用户报告 status 输出 + 推荐，由用户确认进入哪条轨。不自动推进。
 
 ## Step 2: 判断流程 + 执行下一步
 

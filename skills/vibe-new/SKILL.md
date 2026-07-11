@@ -184,37 +184,23 @@ vibe3 flow show
 
 ## 7.5 自动检查 spec 状态 + 推荐阶段
 
-bootstrap 后、指向下一阶段前，扫描 spec-kit 状态给出阶段推荐。
+bootstrap 后、指向下一阶段前，调用现有 skill 查 spec-kit 进度：
 
-**扫描命令**：
+1. **调用 `/speckit-superspec-status`**（勿手写 bash 重造）：
+   - 扫描 `.specify/specs/`，读每个 spec 的 `progress.yml`（无则按 `spec.md`/`plan.md`/`tasks.md` 存在性推断 phase）
+   - 输出每 spec 的阶段（brainstorm/specify/plan/tasks/execute/review，Phase X/6）+ 任务完成比
+   - **直接给出 `Suggested next step`**（如 `/speckit.superspec.execute 001`）
+2. **跑 `vibe3 flow show`** 确认当前 flow 的 `spec_ref` / `plan_ref` / `report_ref` / `audit_ref`，用来把 issue 关联到具体 spec 编号
 
-```bash
-# spec-kit specs 产物清单（+ 存在 / - 缺失）
-for d in .specify/specs/*/; do
-  [ -d "$d" ] || continue
-  printf "%s: " "$(basename "$d")"
-  for f in spec.md plan.md tasks.md; do
-    [ -f "$d$f" ] && printf "+%s " "${f%.md}" || printf "-%s " "${f%.md}"
-  done
-  echo
-done
+**轨选择**（依 suggested next step + 任务性质）：
 
-# vibe3 flow 的 spec_ref / plan_ref / report_ref / audit_ref
-vibe3 flow show
-```
-
-**推荐规则**：
-
-| spec 产物状态 | 推荐下一步 |
+| 情况 | 推荐 |
 |---|---|
-| 无 `.specify/specs/` 或无匹配 spec | 非平凡变更 → `/speckit-superspec-brainstorm` 或 `/speckit-specify`；琐碎 → `/vibe-continue` |
-| 仅 `spec.md` | `/speckit-plan` |
-| `spec.md` + `plan.md` | `/speckit-tasks` |
-| `+ tasks.md`，未 implement | `/speckit-superspec-execute` |
-| 已 implement，未 review | `/speckit-superspec-review` |
-| flow 已有 `spec_ref`/`plan_ref` 但无匹配 spec 目录 | 走 vibe3 flow 轨 `/vibe-continue` |
+| `/speckit-superspec-status` 给出 suggested next step，且为非平凡变更 | 按 suggestion 进入 spec-kit 轨 |
+| 无 `.specify/` 或无匹配 spec，且变更为非平凡 | `/speckit-superspec-brainstorm` 或 `/speckit-specify` 起步 |
+| issue body 已明确、琐碎修复、文档改动 | 跳过 spec-kit，走 vibe3 flow 轨 `/vibe-continue` |
 
-向用户展示扫描结果 + 推荐，由用户确认进入哪条轨。不自动推进。
+向用户展示 status 输出 + 推荐，由用户确认进入哪条轨。不自动推进。
 
 ## 8. 指向下一阶段（双轨分流）
 
