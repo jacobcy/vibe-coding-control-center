@@ -296,6 +296,12 @@ class FlowRecoveryService:
                 logger.bind(
                     domain="recovery", branch=branch, fix=consistency.fix_action
                 ).info("Applied cheap consistency fix before manual resume")
+        elif consistency.code == FlowConsistencyCode.MISSING_ARTIFACT:
+            raise UserError(
+                f"Artifact repair blocker: {consistency.reason}. "
+                "通过 `vibe3 handoff <spec|plan|report|audit> <path>` "
+                "重新绑定或重新生成制品。"
+            )
         elif consistency.needs_rebuild:
             raise UserError(
                 f"{consistency.reason}. "

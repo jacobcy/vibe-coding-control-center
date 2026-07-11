@@ -194,11 +194,10 @@ class TestRecover:
             return_value=("docs/plans/missing.md", False),
         ):
             with pytest.raises(UserError, match="Artifact repair blocker"):
-                svc.recover(
+                svc.recover_manual(
                     branch="task/issue-1",
                     issue_number=1,
                     reason="manual resume",
-                    auto=False,
                 )
 
     def test_missing_artifact_auto_keeps_blocked_without_rebuild(self):
@@ -217,13 +216,12 @@ class TestRecover:
                 return_value=("docs/plans/missing.md", False),
             ),
             patch.object(svc, "_do_rebuild") as mock_rebuild,
-            patch.object(svc, "_do_resume") as mock_resume,
+            patch.object(svc, "_auto_resume_attempt") as mock_resume,
         ):
-            result = svc.recover(
+            result = svc.recover_auto(
                 branch="task/issue-1",
                 issue_number=1,
                 reason="auto recovery",
-                auto=True,
             )
         mock_rebuild.assert_not_called()
         mock_resume.assert_not_called()
