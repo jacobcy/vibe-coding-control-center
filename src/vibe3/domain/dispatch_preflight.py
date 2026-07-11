@@ -10,7 +10,7 @@ from loguru import logger
 
 from vibe3.models import IssueInfo, IssueState
 from vibe3.observability import append_orchestra_event, get_degraded_manager
-from vibe3.services.orchestra import record_error
+from vibe3.services.orchestra import record_dispatch_failure_if_unexpected
 
 
 class QualifyGateLike(Protocol):
@@ -88,14 +88,13 @@ class DispatchPreflightService:
                 f"Blocked qualify gate failed for #{issue.number}: {exc}"
             )
             try:
-                record_error(
-                    error_code="E_DISPATCH_FAILURE",
-                    error_message=(
-                        f"dispatch_preflight blocked qualify gate failed for "
-                        f"#{issue.number}: {exc}"
-                    ),
-                    issue_number=issue.number,
-                )
+                if isinstance(exc, Exception):
+                    record_dispatch_failure_if_unexpected(
+                        role="dispatch",
+                        issue_number=issue.number,
+                        exception=exc,
+                        dispatch_source="preflight",
+                    )
             except Exception as record_exc:
                 logger.bind(
                     domain="orchestra", action="dispatch_preflight_record_error"
@@ -146,14 +145,13 @@ class DispatchPreflightService:
                 f"Qualify gate failed for #{issue.number}: {exc}"
             )
             try:
-                record_error(
-                    error_code="E_DISPATCH_FAILURE",
-                    error_message=(
-                        f"dispatch_preflight active qualify gate failed for "
-                        f"#{issue.number}: {exc}"
-                    ),
-                    issue_number=issue.number,
-                )
+                if isinstance(exc, Exception):
+                    record_dispatch_failure_if_unexpected(
+                        role="dispatch",
+                        issue_number=issue.number,
+                        exception=exc,
+                        dispatch_source="preflight",
+                    )
             except Exception as record_exc:
                 logger.bind(
                     domain="orchestra", action="dispatch_preflight_record_error"
