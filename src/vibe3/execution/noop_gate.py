@@ -10,7 +10,7 @@ from loguru import logger
 from vibe3.agents import ExecutionRole
 from vibe3.clients import SQLiteClient
 from vibe3.config import get_role_output_contract
-from vibe3.execution.publish_completion import PublishCompletionService
+from vibe3.execution.publish_completion import PublishPRRefCompensationService
 from vibe3.models import VerdictRecord, VerdictValue
 from vibe3.services.flow import TransitionRecorder
 from vibe3.services.shared import get_role_block_function
@@ -57,7 +57,8 @@ def apply_unified_noop_gate(
     flow_service: "FlowQueryProtocol | None" = None,
     publish_mode: bool = False,
     before_open_pr_numbers: frozenset[int] | None = None,
-    publish_completion: PublishCompletionService | None = None,
+    before_pr_ref: str | None = None,
+    publish_completion: PublishPRRefCompensationService | None = None,
 ) -> None:
     """Apply the single hard no-op gate after agent completion.
 
@@ -297,7 +298,7 @@ def apply_unified_noop_gate(
                     from vibe3.clients import GitHubClient
                     from vibe3.services.shared import LabelService
 
-                    publish_completion = PublishCompletionService(
+                    publish_completion = PublishPRRefCompensationService(
                         GitHubClient(),
                         LabelService(repo=repo),
                         TransitionRecorder(store),
@@ -307,6 +308,7 @@ def apply_unified_noop_gate(
                     branch=branch,
                     before_state_labels=effective_before_labels,
                     before_open_pr_numbers=before_open_pr_numbers,
+                    before_pr_ref=before_pr_ref,
                     actor=actor,
                 )
                 if publish_result.completed:

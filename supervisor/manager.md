@@ -901,6 +901,7 @@ Decision sketch:
       - 写 issue comment：说明为什么无法裁决，以及需要外部确认的点
       - `exit()`
 - 已有 `pr_ref`（merge-ready 后 executor 提交了 PR）：
+  - **注意**：`pr_ref` 存在不代表发布已完成，必须检查 PR 状态、CI、review 等
   - **审核 PR**：读取 pr_ref，检查 PR 标题、描述、变更范围是否与 plan/spec 一致
   - **检查 CI 状态**：
     ```bash
@@ -921,10 +922,18 @@ Decision sketch:
       ```bash
       gh issue comment <改进issue编号> --body "<补充说明>"
       ```
-    - comment：PR reviewed and approved, automation complete
-    - 写 handoff append：确认 PR 审核通过，进入 done
-    - 进入 `state/done`
-    - `exit()`
+    - comment：PR reviewed and approved, waiting for merge
+    - 写 handoff append：确认 PR 审核通过，等待 merge 或后续 follow-up
+    - **检查 PR 是否已合并**：
+      ```bash
+      gh pr view <pr-number> --json state,mergedAt
+      ```
+    - 若 PR 已 MERGED：
+      - 进入 `state/done`
+      - `exit()`
+    - 若 PR 仍 OPEN：
+      - 进入 `state/handoff`（等待 executor 做 follow-up publish）
+      - `exit()`
   - 若 PR 有问题（内容不符、遗漏变更、描述不准确）：
     - 写 handoff append：明确 PR 需要修改的问题
     - 进入 `state/in-progress`（executor 会读 handoff 修复 PR）
@@ -944,11 +953,26 @@ Decision sketch:
       ```
     - `exit()`
   - 若 PR 仍 OPEN 且属于当前 issue，且 CI / review 现场可读：
+    - **先补写 pr_ref**：
+      ```bash
+      vibe3 handoff append “Found existing PR #<pr-number>” --actor manager --kind note
+      ```
     - 按”已有 `pr_ref`”同等标准审查 PR
     - 若通过：
       - **检查改进 issue 补充说明**：查看本轮是否创建了系统改进 issue
       - 若有改进 issue，检查是否需要补充说明
-      - 写 handoff append，进入 `state/done`，`exit()`
+      - **检查 PR 是否已合并**：
+        ```bash
+        gh pr view <pr-number> --json state,mergedAt
+        ```
+      - 若 PR 已 MERGED：
+        - 写 handoff append：PR 已合并，进入 done
+        - 进入 `state/done`
+        - `exit()`
+      - 若 PR 仍 OPEN：
+        - 写 handoff append：PR 审核通过，等待 merge 或 follow-up
+        - 进入 `state/handoff`
+        - `exit()`
     - 若需修复：写 handoff append，进入 `state/in-progress`，`exit()`
   - 若 PR 存在但归属不清、branch 不匹配、证据冲突：
     - 进入 `state/blocked`

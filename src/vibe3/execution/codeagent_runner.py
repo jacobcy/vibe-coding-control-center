@@ -69,6 +69,7 @@ class SyncExecutionContext:
     commit_count_before: int | None = None
     before_issue_is_closed: bool = False
     before_open_pr_numbers: frozenset[int] | None = None
+    before_pr_ref: str | None = None
 
 
 class CodeagentExecutionService:
@@ -284,6 +285,16 @@ class CodeagentExecutionService:
             except Exception as exc:
                 log.warning(f"Cannot read issue state for no-op gate: {exc}")
 
+        # Capture before_pr_ref from flow_state for publish compensation
+        before_pr_ref: str | None = None
+        if branch and store:
+            try:
+                flow_state = store.get_flow_state(branch)
+                if flow_state:
+                    before_pr_ref = flow_state.get("pr_ref")
+            except Exception as exc:
+                log.warning(f"Cannot read pr_ref from flow_state: {exc}")
+
         execution_cwd = self._resolve_command_cwd(command.cwd)
 
         # Record commit count before execution (for planner commit detection)
@@ -309,6 +320,7 @@ class CodeagentExecutionService:
             commit_count_before=commit_count_before,
             before_issue_is_closed=before_issue_is_closed,
             before_open_pr_numbers=before_open_pr_numbers,
+            before_pr_ref=before_pr_ref,
         )
 
     def _finalize_sync_execution(
@@ -390,6 +402,7 @@ class CodeagentExecutionService:
                     flow_service=FlowService(),
                     publish_mode=command.publish_mode,
                     before_open_pr_numbers=ctx.before_open_pr_numbers,
+                    before_pr_ref=ctx.before_pr_ref,
                 )
 
             # Supervisor success: remove state/handoff label to prevent re-dispatch.

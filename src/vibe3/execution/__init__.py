@@ -62,7 +62,7 @@ if TYPE_CHECKING:
     from vibe3.execution.prompt_meta import PromptMeta, build_prompt_meta
     from vibe3.execution.publish_completion import (
         PublishCompletionResult,
-        PublishCompletionService,
+        PublishPRRefCompensationService,
     )
     from vibe3.execution.role_interfaces import GovernanceFunctions
     from vibe3.execution.role_request_factory import (
@@ -111,7 +111,7 @@ _LAZY_IMPORTS = {
     "build_prompt_meta": "vibe3.execution.prompt_meta",
     "PromptMeta": "vibe3.execution.prompt_meta",
     "PublishCompletionResult": "vibe3.execution.publish_completion",
-    "PublishCompletionService": "vibe3.execution.publish_completion",
+    "PublishPRRefCompensationService": "vibe3.execution.publish_completion",
     # Role request factory
     "build_role_async_request": "vibe3.execution.role_request_factory",
     "build_role_sync_request": "vibe3.execution.role_request_factory",
@@ -182,7 +182,7 @@ __all__ = [
     "build_prompt_meta",
     "PromptMeta",
     "PublishCompletionResult",
-    "PublishCompletionService",
+    "PublishPRRefCompensationService",
     # Role request factory
     "build_role_async_request",
     "build_role_sync_request",
