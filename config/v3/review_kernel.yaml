@@ -37,10 +37,6 @@ entries:
     responsibilities: [job_queue_lifecycle]
     reason: Owns queue mutation operations
     review_floor: repeated
-  - path: src/vibe3/orchestra/queue_entry.py
-    responsibilities: [job_queue_lifecycle]
-    reason: Defines queue entry lifecycle state
-    review_floor: repeated
   - path: src/vibe3/orchestra/queue_persistence_service.py
     responsibilities: [job_queue_lifecycle]
     reason: Persists orchestra queue state
