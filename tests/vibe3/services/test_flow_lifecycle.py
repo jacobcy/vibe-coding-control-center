@@ -113,9 +113,9 @@ def test_reactivate_flow_preserves_initiator():
 
 def test_flow_manager_uses_service_for_reactivation():
     """FlowManager should delegate reactivation to the shared bootstrap path."""
+    from vibe3.domain import FlowManager
     from vibe3.models.orchestra_config import OrchestraConfig
     from vibe3.models.orchestration import IssueInfo
-    from vibe3.orchestra.flow_dispatch import FlowManager
 
     config = OrchestraConfig(repo="test/repo")
     manager = FlowManager(config)

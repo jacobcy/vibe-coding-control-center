@@ -1,10 +1,6 @@
 version: 1
 architecture_packages: [runtime, orchestra]
 entries:
-  - path: src/vibe3/runtime/orchestra_instance.py
-    responsibilities: [process_lifecycle]
-    reason: Owns orchestra process lifecycle and instance identity
-    review_floor: repeated
   - path: src/vibe3/runtime/heartbeat.py
     responsibilities: [heartbeat_timer, event_ingestion]
     reason: Drives reconciliation timing and event ingestion
@@ -52,10 +48,6 @@ entries:
   - path: src/vibe3/orchestra/dispatch_coordinator_factory.py
     responsibilities: [dispatch_coordination]
     reason: Constructs the active dispatch coordinator
-    review_floor: repeated
-  - path: src/vibe3/orchestra/flow_dispatch.py
-    responsibilities: [dispatch_coordination]
-    reason: Dispatches work for eligible flows
     review_floor: repeated
   - path: src/vibe3/orchestra/failed_gate.py
     responsibilities: [dispatch_coordination]

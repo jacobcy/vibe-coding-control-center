@@ -20,15 +20,15 @@ if TYPE_CHECKING:
         HeartbeatServer,
         get_current_tick_id,
     )
-    from vibe3.runtime.orchestra_instance import (
+    from vibe3.runtime.periodic_check_executor import execute_periodic_check
+    from vibe3.runtime.protocols import CheckServiceProtocol, ServiceBase
+    from vibe3.runtime.taxonomy import MODULE_CATEGORY_MAP, ModuleCategory
+    from vibe3.utils import (
         OrchestraInstanceInfo,
         read_instance_info,
         validate_instance,
         write_instance_info,
     )
-    from vibe3.runtime.periodic_check_executor import execute_periodic_check
-    from vibe3.runtime.protocols import CheckServiceProtocol, ServiceBase
-    from vibe3.runtime.taxonomy import MODULE_CATEGORY_MAP, ModuleCategory
 
 
 def __getattr__(name: str) -> object:
@@ -38,19 +38,19 @@ def __getattr__(name: str) -> object:
     """
     # Orchestra instance management
     if name == "OrchestraInstanceInfo":
-        from vibe3.runtime.orchestra_instance import OrchestraInstanceInfo
+        from vibe3.utils import OrchestraInstanceInfo
 
         return OrchestraInstanceInfo
     if name == "read_instance_info":
-        from vibe3.runtime.orchestra_instance import read_instance_info
+        from vibe3.utils import read_instance_info
 
         return read_instance_info
     if name == "validate_instance":
-        from vibe3.runtime.orchestra_instance import validate_instance
+        from vibe3.utils import validate_instance
 
         return validate_instance
     if name == "write_instance_info":
-        from vibe3.runtime.orchestra_instance import write_instance_info
+        from vibe3.utils import write_instance_info
 
         return write_instance_info
 
