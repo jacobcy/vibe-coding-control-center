@@ -198,19 +198,44 @@ TaskList  # 查看活跃 Monitor
 
 提取当前状态，决定下一步。
 
+## Step 1.5: 自动扫描 spec-kit 状态 + 推荐阶段
+
+恢复上下文后，调用现有 skill 查 spec-kit 进度，分流到正确轨（参考 [spec-kit-workflow-standard.md](../../docs/standards/spec-kit-workflow-standard.md) 双轨模型）。
+
+1. **调用 `/speckit-superspec-status`**（勿手写 bash 重造）：
+   - 扫描 `.specify/specs/`，读 `progress.yml`（无则按 `spec.md`/`plan.md`/`tasks.md` 推断 phase）
+   - 输出每 spec 阶段（Phase X/6）+ 任务完成比 + **`Suggested next step`**（如 `/speckit.superspec.execute 001`）
+2. **跑 `vibe3 flow show [--branch <b>]`** 确认 `spec_ref`/`plan_ref`/`report_ref`/`audit_ref`，关联 issue 到具体 spec 编号
+
+**轨选择**：
+
+| 情况 | 推荐轨 | 下一步 |
+|---|---|---|
+| suggested next step 存在，非平凡变更 | spec-kit | 按 suggestion（`/speckit-*`） |
+| 无 `.specify/` 或无匹配 spec，issue 已明确 | vibe3 flow | Step 2 标准流程 |
+| flow 有 `spec_ref`/`plan_ref` 但无 spec 目录 | vibe3 flow | 按 plan_ref/run_ref 推进 |
+
+向用户报告 status 输出 + 推荐，由用户确认进入哪条轨。不自动推进。
+
 ## Step 2: 判断流程 + 执行下一步
 
-### 流程判断
+### 流程判断（双轨分流）
 
 先判断任务类型：
 
 ```
 当前是 RFC 探索模式？
   ├─ Yes → 执行 RFC 探索流程（Step E1-E5，参见上方 RFC 探索模式章节）
-  └─ No  → 执行标准实现流程（plan → run → review → publish，如下）
+  └─ No  → 双轨分流（依 Step 1.5 扫描结果）：
+       ├─ spec-kit 轨（存在匹配 spec，或非平凡变更需 spec 设计）
+       │    → 按 spec 产物推进：/speckit-plan | /speckit-tasks | /speckit-superspec-execute | /speckit-superspec-review
+       └─ vibe3 flow 轨（issue body 已明确，无 spec）
+            → 标准实现流程：plan → run → review → publish（如下）
 ```
 
-### 标准实现流程
+> **注意**：`vibe3 plan/run/review` 是 issue-driven 自动化后端，**通常不作为人机协作首选**；spec/explore 阶段保持人机协作走 spec-kit 轨。openspec 不是本项目推荐工作流，统一用 spec-kit。
+
+### vibe3 flow 标准实现流程
 
 根据 flow 状态决定：
 
@@ -428,21 +453,28 @@ vibe3 run --publish --branch <b>         # 创建 PR
 - `--branch` 接受分支名或 issue 编号
 - 异步命令用 Monitor 监控，不要轮询
 
-## 与其他 workflow 的等效关系
+## 与其他 workflow 的阶段对应
 
-| vibe-continue | superpowers | openspec |
-|---------------|-------------|----------|
-| `vibe3 plan` | `writing-plans` | `openspec:continue` |
-| `vibe3 run` | `executing-plans` | `openspec:apply` |
-| `vibe3 review` | `requesting-code-review` | `openspec:verify` |
-| `vibe3 run --publish` | `finishing-a-development-branch` | `openspec:archive` |
+本项目双轨模型（[spec-kit-workflow-standard.md](../../docs/standards/spec-kit-workflow-standard.md)）：spec-kit 轨为人机协作首选，vibe3 flow 轨为 issue-driven 自动化后端。
+
+| 阶段 | spec-kit 轨（首选） | vibe3 flow 轨 |
+|------|---------------------|---------------|
+| brainstorm / explore | `/speckit-superspec-brainstorm` | — |
+| specify | `/speckit-specify` | — |
+| plan | `/speckit-plan` | `vibe3 plan` |
+| tasks | `/speckit-tasks` | — |
+| implement | `/speckit-superspec-execute` | `vibe3 run` |
+| review | `/speckit-superspec-review` | `vibe3 review` |
+| publish | （经 `vibe-spec-bridge` after_* hooks 桥接 handoff） | `vibe3 run --publish` |
 
 | RFC 探索模式 | 等效能力 |
 |--------------|----------|
-| E1 Explore | `openspec-explore` 探索模式 |
+| E1 Explore | spec-kit `before_specify` hook（graphify/mem-search/exa/ADR） |
 | E2 Analyze (Grill Me) | 苏格拉底式质询 / 魔鬼代言人 |
 | E3 Converge | 方案对比与收敛 |
 | E4 Record | Issue comment / ADR 记录 |
+
+> openspec 不是本项目推荐工作流，spec/explore/plan/tasks/implement/review 统一走 spec-kit（`/speckit-*` skills）。`superpowers:*` 作为 cross-cutting 技能仍可使用，但项目工作流入口是 spec-kit + vibe3 双轨。
 
 ## 限制
 
