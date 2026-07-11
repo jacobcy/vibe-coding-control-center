@@ -19,9 +19,6 @@ Authority separation (#3289):
 - ``manual_resume``           — human-authorized clear of blocked_reason +
                                 explicit/inferred target. Fail closed on open
                                 deps unless ``force=True``.
-
-No method on the auto path can clear a human blocked_reason or infer a target
-from local refs.
 """
 
 from __future__ import annotations
@@ -30,8 +27,8 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+import vibe3.exceptions as vibe_exceptions
 from vibe3.clients import GitHubClient
-from vibe3.exceptions import UserError
 from vibe3.models import FlowStateProjection, IssueState
 from vibe3.services.flow.blocked_state_io import BlockedStateIO
 from vibe3.services.flow.blocked_state_types import (
@@ -160,26 +157,32 @@ class BlockedStateService:
             get_degraded_manager().enter_degraded_mode(
                 DegradedModeReason.GITHUB_API_ERROR
             )
-            raise UserError(
+            raise vibe_exceptions.UserError(
                 f"Cannot resume #{issue_number}: GitHub truth unreadable ({exc})"
             ) from exc
 
         # 2. Check dependencies (fail closed unless force)
         open_deps = self._collect_open_deps(truth.blocked_by)
         if open_deps and not force:
-            raise UserError(
+            raise vibe_exceptions.UserError(
                 f"Cannot resume #{issue_number}: open dependencies remain "
                 f"({open_deps}). Resolve them first, or pass --force to override."
             )
 
         # 3. Current label must be BLOCKED for a resume transition to make sense
-        current_state = self._io.read_issue_state(issue_number)
-        if current_state is not None and current_state != IssueState.BLOCKED:
+        try:
+            current_state = self._io.read_issue_state_strict(issue_number)
+        except Exception as exc:
+            raise vibe_exceptions.UserError(
+                f"Cannot resume #{issue_number}: state labels unreadable ({exc})"
+            ) from exc
+        if current_state != IssueState.BLOCKED:
+            current_label = current_state.to_label() if current_state else "missing"
             return ResumeResult(
                 success=False,
                 target_state=None,
                 detail=(
-                    f"Issue #{issue_number} is {current_state.to_label()}, "
+                    f"Issue #{issue_number} is {current_label}, "
                     "not blocked; nothing to resume"
                 ),
             )
@@ -309,6 +312,8 @@ class BlockedStateService:
             body, updated_at = snapshot
             if body is None:
                 raise RuntimeError(f"Issue #{issue_number} body is None")
+            if not updated_at:
+                raise RuntimeError(f"Issue #{issue_number} updatedAt is missing")
             truth = parse_projection(body)
             get_degraded_manager().exit_degraded_mode()
         except Exception as exc:
@@ -382,9 +387,14 @@ class BlockedStateService:
 
         # 1. Optimistic lock: reject if truth changed after evaluation
         current_snapshot = self._safe_get_snapshot(decision.issue_number)
+        if current_snapshot is None:
+            return ResumeResult(
+                success=False,
+                target_state=None,
+                detail="Cannot verify issue truth snapshot; auto resume skipped",
+            )
         if (
             decision.truth_snapshot is not None
-            and current_snapshot is not None
             and current_snapshot != decision.truth_snapshot
         ):
             logger.bind(
@@ -400,14 +410,21 @@ class BlockedStateService:
             )
 
         # 2. Current label must be BLOCKED
-        current_state = self._io.read_issue_state(decision.issue_number)
-        if current_state is not None and current_state != IssueState.BLOCKED:
+        try:
+            current_state = self._io.read_issue_state_strict(decision.issue_number)
+        except Exception as exc:
+            return ResumeResult(
+                success=False,
+                target_state=None,
+                detail=f"Cannot verify issue state labels; auto resume skipped ({exc})",
+            )
+        if current_state != IssueState.BLOCKED:
+            current_label = current_state.to_label() if current_state else "missing"
             return ResumeResult(
                 success=False,
                 target_state=None,
                 detail=(
-                    f"Issue #{decision.issue_number} is "
-                    f"{current_state.to_label()}, not blocked; "
+                    f"Issue #{decision.issue_number} is {current_label}, not blocked; "
                     "auto resume is a no-op"
                 ),
             )

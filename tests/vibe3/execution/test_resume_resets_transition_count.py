@@ -51,6 +51,10 @@ def test_resume_preserves_history_and_records_recovery(tmp_path):
 
     # Mock label service
     label_service = MagicMock()
+    label_service.issue_port.get_issue_labels.return_value = [
+        "state/blocked",
+        "priority/8",
+    ]
     label_service.get_state.return_value = IssueState.BLOCKED
     label_service.replace_issue_state.return_value = "normalized"
 
@@ -120,6 +124,7 @@ def test_resume_retains_block_when_transition_budget_is_exhausted(tmp_path):
 
     # Mock label service
     label_service = MagicMock()
+    label_service.issue_port.get_issue_labels.return_value = ["state/blocked"]
     label_service.get_state.return_value = IssueState.BLOCKED
 
     # Resume via authorized manual_resume — budget exhausted, must fail closed

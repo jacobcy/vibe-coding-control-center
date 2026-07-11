@@ -226,7 +226,7 @@ class FlowRecoveryService:
             result = service.apply_auto_resume(decision)
             return RecoveryResult(
                 action=scene_action,
-                success=True,
+                success=result.success,
                 detail=f"Scene repaired; {result.detail}",
             )
         return RecoveryResult(

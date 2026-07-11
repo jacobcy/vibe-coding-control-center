@@ -1,23 +1,12 @@
-"""Tests for BlockedStateService authority separation (#3289).
-
-Covers the split API:
-- ``sync_block_state``       — align cache/label to truth (no resume)
-- ``evaluate_auto_eligibility`` — read-only eligibility + snapshot
-- ``apply_auto_resume``      — consume snapshot-bound decision
-- ``manual_resume``          — authorized clear + explicit/inferred target
-
-Includes the mandatory truth table (#3289 acceptance criteria), the #3184
-regression (durable human reason survives auto paths), and the race test
-(stale decision rejected when truth changed between evaluate and apply).
-"""
+"""Tests for BlockedStateService authority separation (#3289)."""
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+import vibe3.exceptions as vibe_exceptions
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.exceptions import UserError
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow.blocked_state_service import BlockedStateService
 from vibe3.services.flow.blocked_state_types import (
@@ -35,7 +24,7 @@ class StubGitHubClient:
         self,
         issue_body: str = "",
         labels: list[str] | None = None,
-        updated_at: str = "2026-07-02T00:00:00Z",
+        updated_at: str | None = "2026-07-02T00:00:00Z",
     ) -> None:
         self._issue_body = issue_body
         self._labels = labels or []
@@ -151,9 +140,11 @@ def _patch_deps_resolved(resolved_map: dict[int, bool]) -> MagicMock:
     return _factory
 
 
-# ============================================================================
-# set_block + sync_block_state (alignment, no resume)
-# ============================================================================
+def _unreadable_label_service() -> MagicMock:
+    service = MagicMock()
+    service.issue_port.get_issue_labels.return_value = None
+    service.replace_issue_state.side_effect = AssertionError("unexpected label write")
+    return service
 
 
 def test_set_block_writes_all_three_sources(tmp_path: Path) -> None:
@@ -247,11 +238,6 @@ def test_sync_block_state_preserves_human_reason(tmp_path: Path) -> None:
     assert "Human gate" in github.get_issue_body(123)
 
 
-# ============================================================================
-# evaluate_auto_eligibility (read-only, snapshot-bound)
-# ============================================================================
-
-
 def test_evaluate_not_eligible_when_human_reason_present(tmp_path: Path) -> None:
     """Truth table row 1+2: reason present -> NOT_ELIGIBLE regardless of deps."""
     store = SQLiteClient(db_path=str(tmp_path / "test.db"))
@@ -296,6 +282,18 @@ def test_evaluate_not_eligible_when_truth_unreadable(tmp_path: Path) -> None:
     assert decision.reason_code == AutoResumeReasonCode.TRUTH_UNREADABLE
 
 
+def test_evaluate_not_eligible_when_snapshot_version_missing(tmp_path: Path) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("test-branch", flow_slug="test")
+    github = StubGitHubClient(issue_body=_blocked_body(deps=[]), updated_at=None)
+
+    service = _make_service(store, github)
+    decision = service.evaluate_auto_eligibility(123, "test-branch")
+
+    assert decision.verdict == AutoResumeVerdict.NOT_ELIGIBLE
+    assert decision.reason_code == AutoResumeReasonCode.TRUTH_UNREADABLE
+
+
 def test_evaluate_eligible_when_reason_absent_and_all_deps_closed(
     tmp_path: Path,
 ) -> None:
@@ -317,11 +315,6 @@ def test_evaluate_eligible_when_reason_absent_and_all_deps_closed(
     assert decision.verdict == AutoResumeVerdict.ELIGIBLE
     assert decision.truth_snapshot == "2026-07-02T12:00:00Z"
     assert sorted(decision.closed_deps) == [456, 789]
-
-
-# ============================================================================
-# apply_auto_resume (existing flow -> handoff, pre-flow -> ready)
-# ============================================================================
 
 
 def test_apply_auto_resume_existing_flow_targets_handoff(tmp_path: Path) -> None:
@@ -370,13 +363,59 @@ def test_apply_auto_resume_rejects_stale_decision(tmp_path: Path) -> None:
     decision = service.evaluate_auto_eligibility(123, "test-branch")
     assert decision.truth_snapshot == "ts-original"
 
-    # Simulate truth changing between evaluate and apply
     github._updated_at = "ts-changed"
 
     result = service.apply_auto_resume(decision)
     assert not result.success
-    # Zero mutation: label unchanged, body unchanged
     assert label_service.current_state == IssueState.BLOCKED
+
+
+def test_apply_auto_resume_rejects_unreadable_snapshot(tmp_path: Path) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("test-branch", flow_slug="test")
+    github = StubGitHubClient(issue_body=_blocked_body(deps=[]), updated_at="ts-1")
+    label_service = StubLabelService()
+    label_service.current_state = IssueState.BLOCKED
+
+    service = _make_service(store, github, label_service)
+    decision = service.evaluate_auto_eligibility(123, "test-branch")
+    github.get_issue_snapshot = MagicMock(side_effect=Exception("GitHub down"))
+
+    result = service.apply_auto_resume(decision)
+
+    assert not result.success
+    assert label_service.current_state == IssueState.BLOCKED
+
+
+def test_apply_auto_resume_rejects_unreadable_labels(tmp_path: Path) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("test-branch", flow_slug="test")
+    github = StubGitHubClient(issue_body=_blocked_body(deps=[]), updated_at="ts-1")
+    label_service = _unreadable_label_service()
+
+    service = _make_service(store, github, label_service)
+    decision = service.evaluate_auto_eligibility(123, "test-branch")
+    before = github.get_issue_body(123)
+
+    result = service.apply_auto_resume(decision)
+
+    assert not result.success
+    assert github.get_issue_body(123) == before
+
+
+def test_apply_auto_resume_rejects_missing_blocked_label(tmp_path: Path) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("test-branch", flow_slug="test")
+    github = StubGitHubClient(issue_body=_blocked_body(deps=[]), updated_at="ts-1")
+
+    service = _make_service(store, github)
+    decision = service.evaluate_auto_eligibility(123, "test-branch")
+    before = github.get_issue_body(123)
+    result = service.apply_auto_resume(decision)
+
+    assert not result.success
+    assert "missing" in result.detail
+    assert github.get_issue_body(123) == before
 
 
 def test_apply_auto_resume_rejects_non_eligible_decision(tmp_path: Path) -> None:
@@ -392,11 +431,6 @@ def test_apply_auto_resume_rejects_non_eligible_decision(tmp_path: Path) -> None
     )
     result = service.apply_auto_resume(bad_decision)
     assert not result.success
-
-
-# ============================================================================
-# manual_resume (authorized clear + explicit/inferred target)
-# ============================================================================
 
 
 def test_manual_resume_clears_reason_and_advances(tmp_path: Path) -> None:
@@ -433,7 +467,7 @@ def test_manual_resume_fail_closed_on_open_dep(tmp_path: Path) -> None:
         "vibe3.services.shared.dependency_resolution.DependencyResolutionService.is_dependency_resolved",
         side_effect=_patch_deps_resolved({456: False}),
     ):
-        with pytest.raises(UserError, match="open dependencies"):
+        with pytest.raises(vibe_exceptions.UserError, match="open dependencies"):
             service.manual_resume(
                 issue_number=123,
                 branch="test-branch",
@@ -475,7 +509,7 @@ def test_manual_resume_fail_closed_on_unreadable_truth(tmp_path: Path) -> None:
     github.get_issue_body.side_effect = Exception("GitHub down")
 
     service = _make_service(store, github)
-    with pytest.raises(UserError, match="unreadable"):
+    with pytest.raises(vibe_exceptions.UserError, match="unreadable"):
         service.manual_resume(
             issue_number=123,
             branch="test-branch",
@@ -484,9 +518,40 @@ def test_manual_resume_fail_closed_on_unreadable_truth(tmp_path: Path) -> None:
         )
 
 
-# ============================================================================
-# #3184 Regression: durable human reason survives all auto paths
-# ============================================================================
+def test_manual_resume_fail_closed_on_unreadable_labels(tmp_path: Path) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("test-branch", flow_slug="test")
+    github = StubGitHubClient(issue_body=_blocked_body(reason="Human gate"))
+    label_service = _unreadable_label_service()
+
+    service = _make_service(store, github, label_service)
+    with pytest.raises(vibe_exceptions.UserError, match="labels unreadable"):
+        service.manual_resume(
+            issue_number=123,
+            branch="test-branch",
+            actor="human:resume",
+            reason="try",
+        )
+
+    assert "Human gate" in (github.get_issue_body(123) or "")
+
+
+def test_manual_resume_fail_closed_on_missing_blocked_label(tmp_path: Path) -> None:
+    store = SQLiteClient(db_path=str(tmp_path / "test.db"))
+    store.update_flow_state("test-branch", flow_slug="test")
+    github = StubGitHubClient(issue_body=_blocked_body(reason="Human gate"))
+
+    service = _make_service(store, github)
+    result = service.manual_resume(
+        issue_number=123,
+        branch="test-branch",
+        actor="human:resume",
+        reason="try",
+    )
+
+    assert not result.success
+    assert "missing" in result.detail
+    assert "Human gate" in (github.get_issue_body(123) or "")
 
 
 def test_3184_durable_reason_survives_auto_evaluate(tmp_path: Path) -> None:
@@ -532,11 +597,6 @@ def test_3184_auto_path_has_no_callable_api_to_clear_reason(tmp_path: Path) -> N
     result = service.apply_auto_resume(decision)
     assert not result.success
     assert "Human gate" in github.get_issue_body(123)
-
-
-# ============================================================================
-# Query / consistency operations (unchanged behavior)
-# ============================================================================
 
 
 def test_validate_consistency_detects_mismatch(tmp_path: Path) -> None:

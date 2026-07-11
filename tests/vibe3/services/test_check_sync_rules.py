@@ -12,8 +12,13 @@ from vibe3.clients import (
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models import IssueState
+from vibe3.services.check.rule_checks import (
+    CheckContext,
+    rule_flow_consistency_recovery,
+)
 from vibe3.services.check.service import CheckService
 from vibe3.services.flow.blocked_state_io import BlockedStateIO
+from vibe3.services.flow.recovery import RecoveryAction, RecoveryResult
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
@@ -216,3 +221,37 @@ def test_inactive_flow_statuses_includes_pr_backed_terminal_states() -> None:
     assert "failed" in CheckService.INACTIVE_FLOW_STATUSES
     assert "active" not in CheckService.INACTIVE_FLOW_STATUSES
     assert "blocked" not in CheckService.INACTIVE_FLOW_STATUSES
+
+
+def test_flow_consistency_recovery_reports_auto_resume_failure() -> None:
+    ctx = CheckContext(
+        branch="task/issue-123",
+        flow_data={},
+        flow_status="active",
+        is_active_flow=True,
+        task_issue=123,
+        task_issue_closed=False,
+        orchestration_state=IssueState.BLOCKED,
+        issue_payload=None,
+        issue_labels=[],
+        issue_labels_loaded=True,
+        branch_missing=False,
+    )
+    svc = MagicMock()
+    svc.INACTIVE_FLOW_STATUSES = CheckService.INACTIVE_FLOW_STATUSES
+    svc._sync_rules = SyncRulesConfig()
+    consistency = MagicMock(reason="Missing worktree")
+    svc.recovery_svc.classify.return_value = (RecoveryAction.REBUILD, consistency)
+    svc.recovery_svc.recover_auto.return_value = RecoveryResult(
+        action=RecoveryAction.REBUILD,
+        success=False,
+        detail="Cannot verify issue truth snapshot; auto resume skipped",
+    )
+
+    result = rule_flow_consistency_recovery(ctx, svc)
+
+    assert result is None
+    assert ctx.issues == [
+        "Missing worktree. Auto-recovery refused: "
+        "Cannot verify issue truth snapshot; auto resume skipped"
+    ]

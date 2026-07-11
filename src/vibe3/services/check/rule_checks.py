@@ -378,6 +378,11 @@ def rule_flow_consistency_recovery(ctx: CheckContext, svc: Any) -> CheckResult |
                 "`vibe3 handoff <spec|plan|report|audit> <path>`."
             )
             return None
+        if not result.success:
+            ctx.issues.append(
+                f"{consistency_error}. Auto-recovery refused: {result.detail}"
+            )
+            return None
         logger.info(
             "Auto-recovered inconsistent flow",
             branch=ctx.branch,
