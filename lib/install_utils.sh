@@ -30,7 +30,9 @@ _check_runtime_assets() {
         "supervisor/policies/run.md"
         "supervisor/policies/plan.md"
         "supervisor/policies/review.md"
+        ".agent/workflows/vibe:new.md"
         "skills/vibe-commit/SKILL.md"
+        "skills.json"
     )
     local missing=0
     for rel in "${check_files[@]}"; do

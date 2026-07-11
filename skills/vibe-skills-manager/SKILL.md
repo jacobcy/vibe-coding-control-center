@@ -37,20 +37,20 @@ AI 驱动的 skills 体系梳理、差距分析与安装建议工具。
 
 ## 当前 skill 体系
 
-### 1. Superpowers
+### 1. 支持范围
 
-- **Claude Code**：优先走官方 plugin 生态
-- **其他 Agents**：优先走 `npx skills add obra/superpowers ...`
-- **本项目角色**：`scripts/init.sh` 负责把项目内可见层和本地 symlink 层准备好，但不替代全局安装
+- 当前稳定目标 agent：Claude Code、Codex、OpenCode、Agy
+- 当前维护的第三方能力：claude-mem、superpowers、ponytail、caveman、speckit
+- 不再把 Antigravity、Kiro、Gemini、Copilot 等作为默认 skills 安装建议
 
 一句话：
-- Claude 用 plugin
-- 其他 agent 用 `npx skills`
+- 确定 GitHub 仓库后，按 agent 选择对应 plugin 安装器
+- `npx skills` 只作为明确需要时的 legacy fallback
 
 ### 2. OpenSpec
 
 - 属于项目内使用的独立工具链
-- 通过 `openspec init --tools ...` 初始化
+- 通过 `openspec init --tools claude,codex,opencode` 初始化
 - `scripts/init.sh` 负责当前项目 / worktree 的 OpenSpec 初始化
 - 有自己独立的命令与 workflow，不并入 `npx skills` 的“第三方通用技能包”语义
 
@@ -110,15 +110,23 @@ global:
   claude:
     expected:
       - superpowers-plugin  # Claude 官方 plugin 形态
-  agents:
+  codex:
     expected:
-      - superpowers  # 其他 Agents 的 npx skills 形态
+      - superpowers-plugin  # Codex plugin 形态
+  opencode:
+    expected:
+      - superpowers-plugin  # OpenCode plugin 形态
+  agy:
+    expected:
+      - ponytail-plugin  # Agy plugin 形态
 
 # 项目级期望
 project:
   agents:
     - codex
     - claude-code
+    - opencode
+    - agy
   packages: []  # 项目自有 vibe-* 由 scripts/init.sh 建立 symlink
 ```
 
@@ -142,11 +150,10 @@ global:
 
 | 目录 | 用途 | 内容 |
 |------|------|------|
-| `~/.agents/skills/` | 全局 Superpowers / 其他第三方 skills | 非 Claude Agents 共享 |
+| `~/.agents/skills/` | 全局 Superpowers / 其他第三方 skills | 非 plugin Agents 共享 |
 | `~/.claude/plugins/` | Claude 官方 plugin 生态 | Claude Code 使用 |
 | `~/.claude/skills/` | Claude 本地扩展目录 | 可承载 gstack 等增强层 |
-| `.agents/skills/` | 项目级第三方 | 应避免重复全局已有的 |
-| `.agent/skills/` | Legacy 项目级入口 | symlink 指向项目自有 vibe-* |
+| `.agent/skills/` / `.agents/skills/` | `npx skills` 项目级第三方 | 应避免重复 plugin 已覆盖的 |
 | `.codex/skills/` | Codex 项目级入口 | symlink 指向项目自有 vibe-* |
 | `skills/` | Native vibe-* | 本项目原生 skills |
 
@@ -155,13 +162,13 @@ global:
 ```text
 .claude/skills/vibe-check -> ../../skills/vibe-check
 .codex/skills/vibe-check  -> ../../skills/vibe-check
-.agent/skills/vibe-check  -> ../../skills/vibe-check  # Legacy
 ```
 
 ### 使用策略
 
 - **Claude Code**: 优先使用官方 plugin 形态的 Superpowers；本地增强能力可放在 `~/.claude/skills/`
-- **其他 Agents**: 主要使用 `~/.agents/skills/` 下的 Superpowers / 第三方 skills
+- **Codex**: 第三方主能力走 `codex plugin`；项目自有 `vibe-*` 由 `.codex/skills/` 暴露
+- **其他 Agents**: 非 plugin agent 才使用 `~/.agents/skills/` 下的 Superpowers / 第三方 skills
 - **vibe-\***: 本项目原生，通过 symlink 分发
 - **OpenSpec**: 自己管理，项目内初始化
 - **Gstack**: 用户按需安装，不是默认必需项
@@ -179,7 +186,7 @@ global:
 4. **生成建议报告**：保存到 `.agent/reports/skills-analysis-*.md`
 5. **按体系给修复建议**：
    - Claude plugin 缺失
-   - 其他 Agent 的 `npx skills` 缺失
+   - Codex/Claude plugin 缺失或非 plugin Agent 的 `npx skills` 缺失
    - 项目级 `scripts/init.sh` 同步缺失
    - 用户可选增强（如 gstack）
 6. **等待人工确认**：不自动执行，需用户确认后手动处理

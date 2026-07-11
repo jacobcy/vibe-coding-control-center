@@ -42,7 +42,7 @@ _usage() {
     echo "Usage: ${CYAN}vibe update${NC} [options]"
     echo ""
     echo "Synchronizes Vibe distribution from current repo to ${CYAN}~/.vibe${NC}:"
-    echo "  • Syncs: bin, lib, lib3, config, scripts, src, skills, supervisor"
+    echo "  • Syncs: bin, lib, lib3, config, scripts, src, skills, supervisor, .agent"
     echo "  • Cleans: stale files not in source"
     echo "  • Preserves: settings.yaml"
     echo "  • keys.env is now synced and auto-loaded"
@@ -138,6 +138,8 @@ _update_run() {
             exit 1
         }
     done
+
+    _sync_skills_manifest "$SOURCE_ROOT" "$INSTALL_DIR"
 
     # Sync Python project files
     for file in pyproject.toml uv.lock; do
@@ -330,4 +332,28 @@ _sync_component() {
         log_error "Failed to sync: $component_name"
         return 1
     fi
+}
+
+_sync_skills_manifest() {
+    local source_root="$1"
+    local install_dir="$2"
+    local manifest=""
+
+    if [[ -f "$source_root/config/v3/skills.json" ]]; then
+        manifest="$source_root/config/v3/skills.json"
+    elif [[ -f "$source_root/config/skills.json" ]]; then
+        manifest="$source_root/config/skills.json"
+    else
+        return 0
+    fi
+
+    if [[ "$dry_run" == "true" ]]; then
+        log_info "[DRY-RUN] Would copy: skills.json"
+        return 0
+    fi
+
+    cp "$manifest" "$install_dir/skills.json"
+    chmod 644 "$install_dir/skills.json"
+    [[ "$verbose" == "true" ]] && log_success "Copied: skills.json"
+    return 0
 }

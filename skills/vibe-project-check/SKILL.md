@@ -83,7 +83,6 @@ fi
 
 # 检查关键字段
 grep -q "^profile:" .vibe/config.yaml && echo "profile found" || echo "profile missing"
-grep -q "^adapter:" .vibe/config.yaml && echo "adapter found" || echo "adapter missing"
 ```
 
 **Step 1.2: 检查项目内 agent 配置覆盖（如存在）**
@@ -93,11 +92,11 @@ test -f .claude/settings.json && echo ".claude/settings.json exists" || echo ".c
 test -f .codex/config.toml && echo ".codex/config.toml exists" || echo ".codex/config.toml not present (optional)"
 ```
 
-**Step 1.3: 检查 .agent/ 目录结构**
+**Step 1.3: 检查 agent 目录结构**
 
 ```bash
-test -d .agent/skills && echo "skills exists" || echo "skills missing"
 test -d .agent/workflows && echo "workflows exists" || echo "workflows missing"
+test -d .codex/skills && echo "codex skills exists" || echo "codex skills missing"
 ```
 
 ---
@@ -443,11 +442,13 @@ gh auth status
 **Step 7.4: 检查后端 CLI（根据配置）**
 
 ```bash
-# 读取 adapter 配置
-ADAPTER=$(grep -E "^adapter:" .vibe/config.yaml 2>/dev/null | awk '{print $2}')
+# 读取 profile / backend 配置。vibe init 不再要求 adapter 字段。
+PROFILE=$(grep -E "^profile:" .vibe/config.yaml 2>/dev/null | awk '{print $2}')
+BACKEND=$(grep -hE '^VIBE_(DEFAULT_)?BACKEND=' config/keys.env ~/.vibe/config/keys.env 2>/dev/null | head -1 | cut -d= -f2)
+TARGET_BACKEND="${BACKEND:-$PROFILE}"
 
 # 检查对应后端 CLI 是否存在
-case "$ADAPTER" in
+case "$TARGET_BACKEND" in
   claude|"")
     command -v claude >/dev/null 2>&1 || echo "MISSING: claude CLI not found"
     ;;
@@ -457,18 +458,14 @@ case "$ADAPTER" in
   opencode)
     command -v opencode >/dev/null 2>&1 || echo "MISSING: opencode CLI not found"
     ;;
-  gemini)
-    command -v gemini >/dev/null 2>&1 || echo "MISSING: gemini CLI not found"
+  agy)
+    command -v agy >/dev/null 2>&1 || echo "MISSING: agy CLI not found"
+    ;;
+  github-flow|minimal|vibe-center)
+    echo "NOTE: profile='$PROFILE' backend未显式配置；手动确认实际执行 agent CLI"
     ;;
   *)
-    # 自定义 adapter profile（如 vibe-center）：从 backend 配置推断实际 CLI
-    # 读 config/keys.env 或 ~/.vibe/config/keys.env 的 VIBE_BACKEND_* 字段
-    BACKEND=$(grep -hE '^VIBE_(DEFAULT_)?BACKEND=' config/keys.env ~/.vibe/config/keys.env 2>/dev/null | head -1 | cut -d= -f2)
-    case "$BACKEND" in
-      claude) command -v claude >/dev/null 2>&1 || echo "MISSING: claude CLI (backend=$BACKEND)" ;;
-      codex) command -v codex >/dev/null 2>&1 || echo "MISSING: codex CLI (backend=$BACKEND)" ;;
-      *) echo "NOTE: custom adapter='$ADAPTER' backend='$BACKEND'，手动确认对应 CLI" ;;
-    esac
+    echo "NOTE: profile='$PROFILE' backend='$BACKEND'，手动确认对应 CLI"
     ;;
 esac
 ```

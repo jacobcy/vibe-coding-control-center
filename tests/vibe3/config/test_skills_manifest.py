@@ -6,22 +6,17 @@ import json
 from pathlib import Path
 
 
-def test_codex_manifest_installs_caveman_skill_family() -> None:
-    """Codex setup should reproduce the Caveman skills available in Claude."""
+def test_codex_manifest_uses_plugin_backed_skills() -> None:
+    """Codex primary skills should not be installed through npx skills."""
     manifest = json.loads(Path("config/v3/skills.json").read_text(encoding="utf-8"))
 
-    packages = {
-        package["source"]: set(package["skills"])
-        for package in manifest["global"]["packages"]
-    }
-
-    assert "codex" in manifest["global"]["agents"]
-    assert packages["JuliusBrussee/caveman"] == {
-        "cavecrew",
-        "caveman",
-        "caveman-commit",
-        "caveman-compress",
-        "caveman-help",
-        "caveman-review",
-        "caveman-stats",
+    assert manifest["global"]["agents"] == []
+    assert manifest["global"]["packages"] == []
+    # project.agents is the canonical agent universe (see skills-expected.yaml);
+    # codex/claude-code are plugin-backed and filtered out at install time (init.sh).
+    assert set(manifest["project"]["agents"]) == {
+        "codex",
+        "claude-code",
+        "opencode",
+        "agy",
     }

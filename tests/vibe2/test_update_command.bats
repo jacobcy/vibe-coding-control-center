@@ -10,7 +10,7 @@ setup() {
     EXTERNAL_REPO=$(mktemp -d)
 
     # Mock minimal Vibe repo structure
-    mkdir -p "$TEST_REPO"/{bin,lib,lib3,config,config/shell,scripts,src,skills}
+    mkdir -p "$TEST_REPO"/{bin,lib,lib3,config,config/shell,config/v3,scripts,src,skills,.agent/workflows}
     mkdir -p "$TEST_HOME/.vibe"/{bin,lib,config}
     mkdir -p "$EXTERNAL_REPO/.git"
 
@@ -26,6 +26,9 @@ setup() {
     echo "# test bin" > "$TEST_REPO/bin/test_script.sh"
     chmod +x "$TEST_REPO/bin/test_script.sh"
     echo "# test lib" > "$TEST_REPO/lib/test_lib.sh"
+    echo "# workflow" > "$TEST_REPO/.agent/workflows/vibe:new.md"
+    echo '{"project":{"agents":["codex","claude-code","opencode","agy"],"packages":[]}}' \
+        > "$TEST_REPO/config/v3/skills.json"
 
     # Create mock keys.env in target to test preservation
     echo "API_KEY=test123" > "$TEST_HOME/.vibe/config/keys.env"
@@ -54,6 +57,18 @@ teardown() {
     # Check files were synced
     [ -f "$TEST_HOME/.vibe/bin/test_script.sh" ]
     [ -f "$TEST_HOME/.vibe/lib/test_lib.sh" ]
+    [ -f "$TEST_HOME/.vibe/.agent/workflows/vibe:new.md" ]
+}
+
+@test "vibe update refreshes top-level skills manifest" {
+    echo '{"project":{"agents":["old"],"packages":[]}}' > "$TEST_HOME/.vibe/skills.json"
+
+    run env HOME="$TEST_HOME" zsh -lc 'cd "'"$VIBE_TEST_ROOT"'" && ./bin/vibe update run'
+    [ "$status" -eq 0 ]
+
+    [ -f "$TEST_HOME/.vibe/skills.json" ]
+    grep -q '"opencode"' "$TEST_HOME/.vibe/skills.json"
+    ! grep -q '"old"' "$TEST_HOME/.vibe/skills.json"
 }
 
 @test "vibe update syncs config/keys.env from source to target" {

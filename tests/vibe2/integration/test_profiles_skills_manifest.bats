@@ -31,6 +31,21 @@ setup() {
   [ "$output" = "$HOME/.vibe/skills.json" ]
 }
 
+@test "global profiles use canonical runtime asset paths" {
+  run zsh -c "
+    export GREEN='' RED='' YELLOW='' CYAN='' BOLD='' NC=''
+    source '$REPO_ROOT/lib/profiles.sh'
+    get_profile_config github-flow
+    printf '%s\n' \"\$(get_profile_path policies_root)\"
+    printf '%s\n' \"\$(get_profile_path prompts_root)\"
+  "
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"$HOME/.vibe/supervisor/policies"* ]]
+  [[ "$output" == *"$HOME/.vibe/config/prompts"* ]]
+  [[ "$output" != *"assets"* ]]
+}
+
 @test "vibe-center profile skills_manifest path is repo-local config/v3/skills.json" {
   run zsh -c "
     export GREEN='' RED='' YELLOW='' CYAN='' BOLD='' NC=''

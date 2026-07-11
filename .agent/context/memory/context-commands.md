@@ -19,7 +19,7 @@
 
 ### /continue
 - **用途**: 新会话开始时恢复上下文
-- **读取**: `vibe3 handoff status`，claude-memory MCP 工具（`search`、`get_observations`）
+- **读取**: `vibe3 handoff status`，claude-mem MCP 工具（`search`、`get_observations`）
 - **触发**: 手动 `/continue`
 
 ### /check
@@ -46,9 +46,9 @@
 - [ ] context-20260221-004: 与 /learn 集成
 
 ## References
-- /save Skill: [.agent/skills/save/SKILL.md](.agent/skills/save/SKILL.md)
-- /continue Skill: [.agent/skills/continue/SKILL.md](.agent/skills/continue/SKILL.md)
-- /check Skill: [.agent/skills/check/SKILL.md](.agent/skills/check/SKILL.md)
+- /save Skill: [skills/vibe-save/SKILL.md](../../skills/vibe-save/SKILL.md)
+- /continue Skill: [skills/vibe-continue/SKILL.md](../../skills/vibe-continue/SKILL.md)
+- /check Skill: [skills/vibe-check/SKILL.md](../../skills/vibe-check/SKILL.md)
 - Plugin 配置: [.claude-plugin/plugin.json](.claude-plugin/plugin.json)
 
 ---

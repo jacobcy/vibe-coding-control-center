@@ -71,11 +71,6 @@ _vibe_skills_global_agents() {
     local manifest="$(_vibe_skills_manifest_file)"
     if [[ -f "$manifest" ]] && command -v jq >/dev/null 2>&1; then
         jq -r '.global.agents[]?' "$manifest"
-    else
-        echo "antigravity"
-        echo "codex"
-        echo "kiro-cli"
-        echo "copilot"
     fi
 }
 
@@ -85,29 +80,22 @@ _vibe_skills_project_agents() {
         jq -r '.project.agents[]?' "$manifest"
     else
         echo "claude-code"
-        echo "antigravity"
         echo "codex"
-        echo "kiro-cli"
+        echo "opencode"
+        echo "agy"
     fi
 }
 
 _vibe_skills_superpowers() {
-    local yaml_file="$(_vibe_skills_expected_file)"
-    if [[ -f "$yaml_file" ]]; then
-        grep -E '^\s+-\s+\S+' "$yaml_file" | head -n 5 | sed 's/^[[:space:]]*-[[:space:]]*//'
-    else
-        echo "claude-code"
-        echo "antigravity"
-        echo "codex"
-        echo "kiro-cli"
-    fi
+    echo "brainstorming"
+    echo "systematic-debugging"
+    echo "writing-plans"
+    echo "executing-plans"
+    echo "verification-before-completion"
 }
 
 _vibe_skills_agent_dir() {
     case "$1" in
-        antigravity) echo "$HOME/.gemini/antigravity/skills" ;;
-        trae) echo "$HOME/.trae/skills" ;;
-        kiro-cli) echo "$HOME/.kiro/skills" ;;
         codex) echo "$HOME/.agents/skills" ;;
         *) echo "$HOME/.agents/skills/$1" ;;
     esac
@@ -117,9 +105,8 @@ _vibe_skills_project_targets() {
     local agent
     for agent in "$@"; do
         case "$agent" in
-            antigravity) echo "$VIBE_ROOT/.agent/skills" ;;
-            trae) echo "$VIBE_ROOT/.trae/skills" ;;
             claude-code) echo "$VIBE_ROOT/.claude/skills" ;;
+            agy) echo "$VIBE_ROOT/.agent/skills" ;;
             *) echo "$VIBE_ROOT/.$agent/skills" ;;
         esac
     done
@@ -134,6 +121,29 @@ _vibe_skills_sync_claude_plugin() {
         log_success "Claude Code superpowers plugin 安装成功"
     else
         log_warn "无法自动安装，请手动运行: claude plugin add superpowers"
+    fi
+}
+
+_vibe_skills_codex_superpowers_installed() {
+    command -v codex >/dev/null 2>&1 || return 1
+    codex plugin list 2>/dev/null | grep -q '^superpowers@[^[:space:]]\+[[:space:]]\+installed, enabled'
+}
+
+_vibe_skills_sync_codex_plugin() {
+    log_step "检查 Codex superpowers plugin"
+    if _vibe_skills_codex_superpowers_installed; then
+        log_success "Codex superpowers plugin 已安装"
+        return 0
+    fi
+    if ! vibe_has codex; then
+        log_warn "codex CLI 不可用，跳过 Codex superpowers plugin"
+        return 0
+    fi
+    codex plugin marketplace add https://github.com/obra/superpowers.git >/dev/null 2>&1 || true
+    if codex plugin add superpowers@superpowers-dev >/dev/null 2>&1; then
+        log_success "Codex superpowers plugin 安装成功"
+    else
+        log_warn "无法自动安装，请手动运行: codex plugin marketplace add https://github.com/obra/superpowers.git && codex plugin add superpowers@superpowers-dev"
     fi
 }
 
@@ -155,15 +165,19 @@ _vibe_skills_sync_global_superpowers() {
     local -a agents skills cmd
     local agent skill output
     local skills_cli_version superpowers_ref superpowers_source
-    agents=(${(f)"$(_vibe_skills_global_agents)"})
+    agents=(${(f)"$(_vibe_skills_global_agents | grep -Ev '^(codex|claude-code)$' || true)"})
     skills=(${(f)"$(_vibe_skills_superpowers)"})
+    if (( ${#agents[@]} == 0 )); then
+        log_success "无 npx Superpowers agent 需要同步（Codex/Claude 使用 plugin）"
+        return 0
+    fi
     (( ${#skills[@]} )) || { vibe_die "No superpowers skills found in registry"; return 1; }
     skills_cli_version="${VIBE_SKILLS_CLI_VERSION:-1.4.4}"
     superpowers_ref="${VIBE_SUPERPOWERS_REF:-e4a2375cb705ca5800f0833528ce36a3faf9017a}"
     superpowers_source="obra/superpowers@${superpowers_ref}"
     log_step "同步全局 Superpowers skills (${(j: :)agents})"
     cmd=(npx --yes --package "skills@${skills_cli_version}" skills add "$superpowers_source" -g --agent)
-    for agent in "${agents[@]}"; do [[ "$agent" == "codex" || "$agent" == "kiro" ]] || cmd+=("$agent"); done
+    for agent in "${agents[@]}"; do cmd+=("$agent"); done
     for skill in "${skills[@]}"; do cmd+=(--skill "$skill"); done
     cmd+=(-y)
     output="$("${cmd[@]}" 2>&1)" || {
@@ -226,6 +240,19 @@ _vibe_skills_check_status() {
         echo "  建议: ${CYAN}zsh scripts/init.sh${NC}"
     fi
     echo ""
+    echo "${CYAN}Codex:${NC}"
+    if command -v codex >/dev/null 2>&1; then
+        echo "  CLI: 已安装"
+        if _vibe_skills_codex_superpowers_installed; then
+            echo "  Superpowers plugin: 已安装"
+        else
+            echo "  Superpowers plugin: 未安装"
+            echo "  建议: ${CYAN}codex plugin marketplace add https://github.com/obra/superpowers.git && codex plugin add superpowers@superpowers-dev${NC}"
+        fi
+    else
+        echo "  CLI: 未安装 codex"
+    fi
+    echo ""
     echo "${CYAN}全局共享 Skills (~/.agents/skills/，可选增强):${NC}"
     global_count="$(_vibe_skills_count_entries "$HOME/.agents/skills")"
     echo "  已安装: $global_count 个"
@@ -247,7 +274,8 @@ _vibe_skills_check_status() {
     done
     echo ""
     echo "${CYAN}项目级 Skills 同步:${NC}"
-    for target in "$VIBE_ROOT/.agent/skills" "$VIBE_ROOT/.claude/skills" "$VIBE_ROOT/.codex/skills" "$VIBE_ROOT/.kiro/skills" "$VIBE_ROOT/.copilot/skills"; do
+    agents=(${(f)"$(_vibe_skills_project_agents)"})
+    for target in ${(@f)"$(_vibe_skills_project_targets "${agents[@]}")"}; do
         IFS='|' read -r linked missing broken <<< "$(_vibe_skills_target_health "$target")"
         if [[ "$linked" == "skip" ]]; then
             echo "  ${target#$VIBE_ROOT/}: 未启用（目录不存在，跳过）"
@@ -264,8 +292,7 @@ _vibe_skills_check_status() {
     echo ""
     echo "修复建议:"
     echo "  - Claude / 项目级 skills 缺失：${CYAN}zsh scripts/init.sh${NC}"
-    echo "  - 其他 Agent 全局第三方 skills：仅在你实际使用这些 agent 时再装，属于可选增强"
-    echo "    ${CYAN}npx skills add obra/superpowers -g --agent antigravity codex kiro -y${NC}"
+    echo "  - 第三方能力优先使用各 agent plugin；npx skills 仅作为明确需要时的 legacy fallback"
     echo "  - 逻辑审计 / 推荐：${CYAN}/vibe-skills-manager${NC}"
     echo ""
     echo "结论:"
@@ -292,7 +319,16 @@ _vibe_skills_run_audit() {
         issues=$((issues + 1))
     fi
     echo ""
+    echo "${CYAN}[1b] Codex Plugin${NC}"
+    if _vibe_skills_codex_superpowers_installed; then
+        echo "    OK superpowers plugin: 已安装"
+    else
+        echo "    X  superpowers plugin: 未安装"
+        issues=$((issues + 1))
+    fi
+    echo ""
     echo "${CYAN}[2] 全局 Skills 覆盖${NC}"
+    agents=(${(f)"$(_vibe_skills_global_agents | grep -Ev '^(codex|claude-code)$' || true)"})
     for agent in "${agents[@]}"; do
         linked="$global_count"
         [[ "$agent" == "codex" ]] || linked="$(_vibe_skills_count_entries "$(_vibe_skills_agent_dir "$agent")")"

@@ -36,7 +36,7 @@ related_docs:
   - `coding-standards.md`: 实现、边界、工具与交付细则
   - `patterns.md`: 执行模式、报告模式与渐进披露模式
 - **`context/`**: 记忆与任务管理
-  - `memory.md`: 长期记忆，记录关键决策和架构选择（日常记忆优先使用 `claude-memory` MCP 工具）。
+  - `memory.md`: 长期记忆，记录关键决策和架构选择（日常记忆优先使用 `mcp-search` / claude-mem）。
   - `task.md`: **[UNTRACKED]** 由 `vibe3 handoff` 命令自动管理的短期上下文，不建议手动编辑。
   - `handoff`: 由 `vibe3 handoff status` 读取，`vibe3 handoff append` 写入的当前 flow 交接事实。
 - **`workflows/`**: **workflow 层入口**。只负责编排、委托和停点，不承载复杂业务逻辑。

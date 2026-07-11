@@ -1,49 +1,18 @@
 {
-  "_comment": "Vibe Center canonical skills manifest. install.sh syncs this file to ~/.vibe/skills.json and init.sh consumes it.",
-  "_updated": "2026-04-14",
+  "_comment": "Vibe Center canonical skills manifest. install.sh syncs this file to ~/.vibe/skills.json and init.sh consumes it. Codex/Claude primary skills now use plugins; npx skills is only for agents that still require Markdown skill installs.",
+  "_updated": "2026-07-09",
   "global": {
-    "_comment": "Global third-party skills for non-Claude agents",
-    "agents": [
-      "codex"
-    ],
-    "packages": [
-      {
-        "source": "obra/superpowers",
-        "skills": [
-          "brainstorming",
-          "systematic-debugging",
-          "verification-before-completion",
-          "writing-skills",
-          "using-git-worktrees",
-          "test-driven-development",
-          "executing-plans",
-          "writing-plans",
-          "finishing-a-development-branch",
-          "receiving-code-review",
-          "requesting-code-review",
-          "dispatching-parallel-agents",
-          "subagent-driven-development"
-        ]
-      },
-      {
-        "source": "JuliusBrussee/caveman",
-        "skills": [
-          "cavecrew",
-          "caveman",
-          "caveman-commit",
-          "caveman-compress",
-          "caveman-help",
-          "caveman-review",
-          "caveman-stats"
-        ]
-      }
-    ]
+    "_comment": "Codex/Claude plugin-backed skills are not installed through npx skills. Add agents/packages here only for non-plugin Markdown-skill agents.",
+    "agents": [],
+    "packages": []
   },
   "project": {
     "_comment": "Project-visible local skills are linked by scripts/init.sh",
     "agents": [
       "codex",
-      "claude-code"
+      "claude-code",
+      "opencode",
+      "agy"
     ],
     "packages": []
   }

@@ -31,6 +31,30 @@ setup() {
   [ ! -f "$fixture/.claude/rules/coding-standards.md" ]
 }
 
+@test "github-flow init exposes vibe workflows and skills to supported agents" {
+  local fixture
+  fixture="$(mktemp -d)"
+  git -C "$fixture" init >/dev/null 2>&1
+
+  run zsh -c "
+    export VIBE_ROOT='$REPO_ROOT'
+    export VIBE_LIB='$REPO_ROOT/lib'
+    export GREEN='' RED='' YELLOW='' CYAN='' BOLD='' NC=''
+    source '$REPO_ROOT/lib/profiles.sh'
+    source '$REPO_ROOT/lib/init.sh'
+    cd '$fixture'
+    vibe_init --profile github-flow --yes --skip-labels 2>&1
+  "
+
+  [ "$status" -eq 0 ]
+  [ -L "$fixture/.claude/skills/vibe-project-check" ]
+  [ -L "$fixture/.codex/skills/vibe-project-check" ]
+  [ -L "$fixture/.opencode/skills/vibe-project-check" ]
+  [ -L "$fixture/.agent/skills/vibe-project-check" ]
+  [ -L "$fixture/.agent/workflows/vibe:new.md" ]
+  [ -L "$fixture/.claude/commands/vibe:new.md" ]
+}
+
 @test "vibe_init_help explains profile capability differences" {
   run zsh -c "
     export GREEN='' RED='' YELLOW='' CYAN='' BOLD='' NC=''
