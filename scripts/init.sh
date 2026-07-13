@@ -99,7 +99,8 @@ echo "🔗 Creating symlinks for local skills..."
 _symlink_files "skills/vibe-*/" ".agent/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".claude/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".codex/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".opencode/skills" "identity" "dir"
+# .opencode/skills/ 已废弃：OpenCode 默认加载 .claude/skills/，无需独立同步
+# _symlink_files "skills/vibe-*/" ".opencode/skills" "identity" "dir"
 
 #  Symlink workflows
 echo "🔗 Creating symlinks for workflows..."
