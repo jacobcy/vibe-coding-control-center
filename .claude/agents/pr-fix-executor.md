@@ -147,6 +147,16 @@ SendMessage(to="team-lead", summary="修复报告完成", message="""【agent_re
 SendMessage(to="team-lead", summary="ready", message="[agent_ready] ready")
 ```
 
+## 上下文工具（按需使用，graphify / mem-search / context7）
+
+> 详见 supervisor/policies/common.md「上下文工具」。修复执行前按需查询以下工具；不可用时记录限制后继续，不阻塞修复。
+>
+> **调查顺序**：mem-search（查历史同类修复）→ context7（验证外部 API）→ graphify explain（确认修复影响面）。
+
+- **mem-search（3-layer）** — 历史同类修复：`search` → `get_observations` 查相似 issue 的历史修复方案/提交。避免重复已知 bug。
+- **context7** — API 文档：涉及外部库 API 变化时 `resolve-library-id` → `query-docs` 验证 API 用法。
+- **graphify explain（可选）** — 修复影响面：`graphify explain "<ChangedNode>"` 确认修复是否产生意外波及。
+
 ## 项目特有约束（必须遵守）
 
 ### Git 纪律（强制）

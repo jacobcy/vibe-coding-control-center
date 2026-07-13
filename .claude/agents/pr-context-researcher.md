@@ -175,6 +175,15 @@ fi
 - 搜索 `task/issue-<id>` 分支名模式
 - 搜索相关 issue 编号引用
 
+### 4. 上下文工具（必须优先使用）
+
+> 本 agent 的核心职责是收集上下文。以下工具是**首选信息来源**（比 Grep/Read 更深），详见 supervisor/policies/common.md「上下文工具」。工具不可用时记录限制，不阻塞调研。
+
+- **graphify query**（首选） — 代码结构/社区：`graphify query "<问题>"` BFS 取相关模块/社区/god nodes，比 grep 精准。单模块细节用 `graphify explain "<NodeName>"`。
+- **mem-search 3-layer**（首选） — 历史上下文/决策：`search` → `timeline` → `get_observations`（~10x token 节省）取架构决策、历史类似 PR、已知坑。
+- **exa** — 外部领域知识/最佳实践：`web_search_exa` 搜索引入技术、设计模式的外部资料。
+- **context7** — 库 API 文档：涉及外部库时 `resolve-library-id` → `query-docs` 取官方 API 用法。
+
 ## 调试阶段硬规则（强制）
 
 **任何错误必须 blocked**：
