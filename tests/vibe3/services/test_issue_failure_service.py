@@ -83,7 +83,7 @@ def test_block_manager_noop_issue_records_reason_and_syncs_github():
                     with patch(
                         "vibe3.services.flow.blocked_state_io.GitHubClient"
                     ) as mock_github_class:
-                        # Use tracking body so reconcile_blocked can read updated state
+                        # Tracking body so evaluate_auto_eligibility reads updated state
                         _body: str = "User content"
                         mock_github = MagicMock()
 
@@ -141,7 +141,7 @@ def test_block_flow_uses_new_fields():
             ),
         ):
             mock_github = MagicMock()
-            # Use tracking body so reconcile_blocked can read updated state
+            # Tracking body so evaluate_auto_eligibility reads updated state
             _body_dep: str = "User content"
 
             def _get_body_dep(issue_number: int) -> str | None:
@@ -218,7 +218,7 @@ def test_block_flow_writes_body_label_and_cache():
                     "vibe3.services.flow.blocked_state_io.GitHubClient"
                 ) as mock_github_class:
                     mock_github = MagicMock()
-                    # Use tracking body so reconcile_blocked can read updated state
+                    # Tracking body so evaluate_auto_eligibility reads updated state
                     _body_health: str = "User content"
 
                     def _get_body_health(issue_number: int) -> str | None:

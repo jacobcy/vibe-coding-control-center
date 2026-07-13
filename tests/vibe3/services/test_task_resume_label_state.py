@@ -55,8 +55,8 @@ def test_reset_issue_to_ready_with_label_keeps_worktree() -> None:
         operations.git_client.remove_worktree.assert_not_called()
         operations.git_client.delete_branch.assert_not_called()
 
-        # Verify: BlockedStateService.reconcile_blocked was called
-        mock_service.reconcile_blocked.assert_called_once()
+        # Verify: BlockedStateService.manual_resume was called
+        mock_service.manual_resume.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
@@ -90,7 +90,7 @@ def test_reset_issue_to_ready_with_label_ready_restores_to_ready() -> None:
         operations.git_client.remove_worktree.assert_not_called()
 
         # Verify: state restored to READY via BlockedStateService.unblock()
-        mock_service.reconcile_blocked.assert_called_once()
+        mock_service.manual_resume.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
@@ -124,7 +124,7 @@ def test_reset_issue_to_ready_with_label_handoff_explicit() -> None:
         operations.git_client.remove_worktree.assert_not_called()
 
         # Verify: state restored to HANDOFF via BlockedStateService.unblock()
-        mock_service.reconcile_blocked.assert_called_once()
+        mock_service.manual_resume.assert_called_once()
 
     # Verify: reasons cleared
 
@@ -158,7 +158,7 @@ def test_reset_issue_to_ready_with_label_claimed() -> None:
         operations.git_client.remove_worktree.assert_not_called()
 
         # Verify: state restored to CLAIMED via BlockedStateService.unblock()
-        mock_service.reconcile_blocked.assert_called_once()
+        mock_service.manual_resume.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_in_progress() -> None:
@@ -190,7 +190,7 @@ def test_reset_issue_to_ready_with_label_in_progress() -> None:
         operations.git_client.remove_worktree.assert_not_called()
 
         # Verify: state restored to IN_PROGRESS via BlockedStateService.unblock()
-        mock_service.reconcile_blocked.assert_called_once()
+        mock_service.manual_resume.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_review() -> None:
@@ -222,7 +222,7 @@ def test_reset_issue_to_ready_with_label_review() -> None:
         operations.git_client.remove_worktree.assert_not_called()
 
         # Verify: state restored to REVIEW via BlockedStateService.unblock()
-        mock_service.reconcile_blocked.assert_called_once()
+        mock_service.manual_resume.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_merge_ready() -> None:
@@ -254,7 +254,7 @@ def test_reset_issue_to_ready_with_label_merge_ready() -> None:
         operations.git_client.remove_worktree.assert_not_called()
 
         # Verify: state restored to MERGE_READY via BlockedStateService.unblock()
-        mock_service.reconcile_blocked.assert_called_once()
+        mock_service.manual_resume.assert_called_once()
 
 
 def test_reset_issue_to_ready_with_label_auto_no_flow_restores_to_ready() -> None:
@@ -286,11 +286,11 @@ def test_reset_issue_to_ready_with_label_auto_no_flow_restores_to_ready() -> Non
             label_state="",  # --label auto (no flow exists)
         )
 
-        # Verify: BlockedStateService.reconcile_blocked was called
-        mock_service.reconcile_blocked.assert_called_once()
+        # Verify: BlockedStateService.manual_resume was called
+        mock_service.manual_resume.assert_called_once()
 
         # Verify: issue_number and branch passed correctly
-        call_args = mock_service.reconcile_blocked.call_args
+        call_args = mock_service.manual_resume.call_args
         assert call_args.kwargs["issue_number"] == 303
 
 
@@ -364,8 +364,8 @@ def test_label_auto_with_unrecorded_existing_worktree_fixes_and_resumes() -> Non
         # Verify: worktree NOT deleted
         operations.git_client.remove_worktree.assert_not_called()
 
-        # Verify: BlockedStateService.reconcile_blocked was called (resume succeeded)
-        mock_service.reconcile_blocked.assert_called_once()
+        # Verify: BlockedStateService.manual_resume was called (resume succeeded)
+        mock_service.manual_resume.assert_called_once()
 
         # Verify: DB was backfilled with worktree_path
         operations.flow_service.store.update_flow_state.assert_called()

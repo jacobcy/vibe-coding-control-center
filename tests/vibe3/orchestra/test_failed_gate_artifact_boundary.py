@@ -81,11 +81,10 @@ def test_artifact_blocker_does_not_activate_failed_gate(
         "vibe3.services.flow.consistency.check_ref_exists",
         return_value=("docs/plans/missing.md", False),
     ):
-        result = svc.recover(
+        result = svc.recover_auto(
             branch="task/issue-42",
             issue_number=42,
             reason="health check",
-            auto=True,
         )
 
     assert result.action == RecoveryAction.ARTIFACT_BLOCKED

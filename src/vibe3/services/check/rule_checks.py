@@ -184,10 +184,9 @@ def rule_blocked_label_sync(ctx: CheckContext, svc: Any) -> CheckResult | None:
         from vibe3.services.flow import BlockedStateService
 
         service = BlockedStateService(github_client=svc.github_client, store=svc.store)
-        service.reconcile_blocked(
+        service.sync_block_state(
             issue_number=ctx.task_issue,
             branch=ctx.branch,
-            clear_reason=False,
             actor="check:blocked_label_sync",
         )
         return CheckResult(is_valid=True, branch=ctx.branch, issues=[])
@@ -207,9 +206,11 @@ def rule_blocked_flow_reconcile(ctx: CheckContext, svc: Any) -> CheckResult | No
     R1: rule_stale_blocked_sync and rule_blocked_label_sync only fire on
     label/cache *divergence*.  When both label and cache agree on 'blocked'
     but the body truth has all deps closed, no rule was firing and vibe-check
-    would never recover the flow.  This rule closes that gap by running
-    reconcile_blocked for every blocked active flow so vibe-check and the
-    periodic health-check are equivalent to orchestra qualify (§6.1).
+    would never recover the flow.  This rule closes that gap by running the
+    auto eligibility check (evaluate_auto_eligibility + apply_auto_resume,
+    see #3289) for every blocked active flow so vibe-check and the periodic
+    health-check are equivalent to orchestra qualify (§6.1). The auto path
+    never clears a human blocked_reason and never infers target from refs.
     """
     if not svc._sync_rules.local.blocked_label_sync.enabled:
         return None
@@ -219,20 +220,20 @@ def rule_blocked_flow_reconcile(ctx: CheckContext, svc: Any) -> CheckResult | No
     from vibe3.services.check.service import CheckResult
 
     try:
-        from vibe3.services.flow import BlockedStateService
+        from vibe3.services.flow import AutoResumeVerdict, BlockedStateService
 
         service = BlockedStateService(github_client=svc.github_client, store=svc.store)
-        target = service.reconcile_blocked(
+        decision = service.evaluate_auto_eligibility(
             issue_number=ctx.task_issue,
             branch=ctx.branch,
-            clear_reason=False,
-            actor="check:blocked_flow_reconcile",
         )
-        if target is not None:
-            logger.info(
-                f"Recovered blocked flow to {target}",
-                branch=ctx.branch,
-            )
+        if decision.verdict == AutoResumeVerdict.ELIGIBLE:
+            result = service.apply_auto_resume(decision)
+            if result.success and result.target_state is not None:
+                logger.info(
+                    f"Recovered blocked flow to {result.target_state}",
+                    branch=ctx.branch,
+                )
         return CheckResult(is_valid=True, branch=ctx.branch, issues=[])
     except Exception as e:
         logger.error(
@@ -361,11 +362,10 @@ def rule_flow_consistency_recovery(ctx: CheckContext, svc: Any) -> CheckResult |
 
     consistency_error = consistency.reason if consistency else "No flow record"
     try:
-        result = svc.recovery_svc.recover(
+        result = svc.recovery_svc.recover_auto(
             branch=ctx.branch,
             issue_number=ctx.task_issue or 0,
             reason="Health check auto-recover",
-            auto=True,
             ensure_worktree=True,
         )
         if result.action == RecoveryAction.ARTIFACT_BLOCKED:
@@ -376,6 +376,11 @@ def rule_flow_consistency_recovery(ctx: CheckContext, svc: Any) -> CheckResult |
             ctx.issues.append(
                 f"{consistency_error}. Artifact repair blocker: rebind via "
                 "`vibe3 handoff <spec|plan|report|audit> <path>`."
+            )
+            return None
+        if not result.success:
+            ctx.issues.append(
+                f"{consistency_error}. Auto-recovery refused: {result.detail}"
             )
             return None
         logger.info(

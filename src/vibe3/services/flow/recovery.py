@@ -1,14 +1,21 @@
 """Unified flow recovery service.
 
-Single entry point for all recovery paths: health check auto-recover,
-PR-closed reset, manual task resume, and manual flow rebuild.
+Single entry point for all recovery paths, split by authority (#3289):
 
-Decision tree:
-  consistency OK           --> resume only (clear label + body + DB)
-  MISSING_RECORDED_WORKTREE --> fix (backfill DB) + resume
-  MISSING_WORKTREE          --> rebuild (delete + bootstrap) + resume
-  MISSING_ARTIFACT          --> manual: raise (guide rebind/regenerate);
-                                auto: keep blocked (do NOT rebuild healthy scene)
+- ``recover_auto``: observer path (health check, orchestra). Repairs the
+  physical scene when needed, then runs read-only auto resume eligibility.
+  Scene repair preserves business blocked truth; auto resume never clears a
+  human reason and never infers target from local refs.
+- ``recover_manual``: human command path (``vibe3 task resume``). Applies only
+  cheap scene fixes (bails on rebuild with a UserError), then invokes the
+  authorized ``manual_resume`` which clears blocked_reason and advances to an
+  explicit / manually-inferred target.
+
+Decision tree (shared classify):
+  consistency OK            --> eligibility / resume only
+  MISSING_RECORDED_WORKTREE --> fix (backfill DB) + eligibility / resume
+  MISSING_WORKTREE          --> rebuild (auto) / UserError (manual)
+  MISSING_REF               --> manual: guide user; auto: rebuild + eligibility
 """
 
 from __future__ import annotations
@@ -20,6 +27,10 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.exceptions import UserError
+from vibe3.services.flow.blocked_state_types import (
+    AutoResumeVerdict,
+    ResumeResult,
+)
 from vibe3.services.flow.consistency import (
     FlowConsistencyCode,
     FlowConsistencyResult,
@@ -29,6 +40,7 @@ from vibe3.services.flow.consistency import (
 
 if TYPE_CHECKING:
     from vibe3.clients import GitClient, GitHubClient, SQLiteClient
+    from vibe3.models import IssueState
 
 
 class RecoveryAction(StrEnum):
@@ -53,18 +65,18 @@ class RecoveryResult:
 
 
 class FlowRecoveryService:
-    """Unified recovery: classify inconsistency, act, resume.
+    """Unified recovery: classify scene, act, then resume by authority.
 
-    All recovery paths (health check, PR closed, manual resume, manual
-    rebuild) call into this service so the logic is never duplicated.
+    All recovery paths (health check auto-recover, manual task resume) call
+    into this service so the logic is never duplicated.
     """
 
     def __init__(
         self,
         *,
-        store: SQLiteClient,
-        git_client: GitClient,
-        github_client: GitHubClient,
+        store: "SQLiteClient",
+        git_client: "GitClient",
+        github_client: "GitHubClient",
     ) -> None:
         self.store = store
         self.git_client = git_client
@@ -106,45 +118,39 @@ class FlowRecoveryService:
             return (RecoveryAction.REBUILD, consistency)
         return (RecoveryAction.RESUME_ONLY, consistency)
 
-    def recover(
+    # ========================================================================
+    # Auto path: scene repair + read-only resume eligibility
+    # ========================================================================
+
+    def recover_auto(
         self,
         *,
         branch: str,
         issue_number: int,
         reason: str,
-        auto: bool,
         ensure_worktree: bool = True,
         include_remote: bool = False,
     ) -> RecoveryResult:
-        """Execute the full recovery: classify -> act -> resume.
+        """Auto recovery: classify scene, repair, then evaluate resume eligibility.
 
-        Args:
-            branch: Flow branch name (empty string if no flow)
-            issue_number: GitHub issue number
-            reason: Human-readable reason for recovery
-            auto: True for orchestra/health-check paths (auto-rebuild);
-                  False for manual paths (guide user instead of rebuilding)
-            ensure_worktree: Whether rebuild should create worktree
-            include_remote: Whether rebuild should delete remote branch
+        Scene repair (fix / rebuild) preserves business blocked truth. After
+        repair, runs ``evaluate_auto_eligibility``; if eligible, applies the
+        snapshot-bound ``apply_auto_resume`` (existing flow -> handoff,
+        pre-flow -> ready). If not eligible, zero business mutation.
+
+        Per #3289 the auto path has no callable API capable of clearing a
+        human blocked_reason.
         """
-        # Special case: no branch (issue with no flow) -> just clear label
+        # Special case: no branch (pre-flow issue) -> eligibility check only
         if not branch:
-            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
-            return RecoveryResult(
-                action=RecoveryAction.RESUME_ONLY,
-                success=True,
-                detail="No flow branch; cleared blocked markers",
+            return self._auto_resume_attempt(
+                issue_number, branch, RecoveryAction.RESUME_ONLY
             )
 
         flow_state = self.store.get_flow_state(branch)
 
-        # Short-circuit: no flow record -> rebuild (consistent with classify())
+        # No flow record -> rebuild scene, then evaluate eligibility
         if flow_state is None:
-            if not auto:
-                raise UserError(
-                    f"No flow record found for branch '{branch}'. "
-                    f"Run: vibe3 flow rebuild {issue_number} --yes"
-                )
             self._do_rebuild(
                 branch,
                 issue_number,
@@ -152,24 +158,17 @@ class FlowRecoveryService:
                 ensure_worktree=ensure_worktree,
                 include_remote=include_remote,
             )
-            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
-            return RecoveryResult(
-                action=RecoveryAction.REBUILD,
-                success=True,
-                detail="No flow record; rebuilt scene and cleared blocked markers",
+            return self._auto_resume_attempt(
+                issue_number, branch, RecoveryAction.REBUILD
             )
 
         consistency = check_flow_consistency(
             branch, flow_state, git_client=self.git_client
         )
 
-        # --- Classify ---
         if consistency.code == FlowConsistencyCode.OK:
-            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
-            return RecoveryResult(
-                action=RecoveryAction.RESUME_ONLY,
-                success=True,
-                detail="Scene consistent; cleared blocked markers",
+            return self._auto_resume_attempt(
+                issue_number, branch, RecoveryAction.RESUME_ONLY
             )
 
         if consistency.fix_action:
@@ -178,14 +177,8 @@ class FlowRecoveryService:
                 logger.bind(
                     domain="recovery", branch=branch, fix=consistency.fix_action
                 ).info("Applied cheap consistency fix")
-            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
-            return RecoveryResult(
-                action=RecoveryAction.FIX_AND_RESUME,
-                success=True,
-                detail=(
-                    f"Applied fix ({consistency.fix_action}); "
-                    "cleared blocked markers"
-                ),
+            return self._auto_resume_attempt(
+                issue_number, branch, RecoveryAction.FIX_AND_RESUME
             )
 
         if consistency.code == FlowConsistencyCode.MISSING_ARTIFACT:
@@ -193,12 +186,6 @@ class FlowRecoveryService:
             # the scene. Manual path guides the user to rebind/regenerate; auto path
             # keeps the flow blocked for repair (no resume, no rebuild) — spec 012
             # US2, SC-002.
-            if not auto:
-                raise UserError(
-                    f"Artifact repair blocker: {consistency.reason}. "
-                    "通过 `vibe3 handoff <spec|plan|report|audit> <path>` "
-                    "重新绑定或重新生成制品。"
-                )
             return RecoveryResult(
                 action=RecoveryAction.ARTIFACT_BLOCKED,
                 success=False,
@@ -206,11 +193,6 @@ class FlowRecoveryService:
             )
 
         if consistency.needs_rebuild:
-            if not auto:
-                raise UserError(
-                    f"{consistency.reason}. "
-                    f"Run: vibe3 flow rebuild {issue_number} --yes"
-                )
             self._do_rebuild(
                 branch,
                 issue_number,
@@ -218,57 +200,126 @@ class FlowRecoveryService:
                 ensure_worktree=ensure_worktree,
                 include_remote=include_remote,
             )
-            self._do_resume(branch, issue_number, reason, clear_reason=not auto)
-            return RecoveryResult(
-                action=RecoveryAction.REBUILD,
-                success=True,
-                detail=(
-                    f"Rebuilt scene and cleared blocked markers: "
-                    f"{consistency.reason}"
-                ),
+            return self._auto_resume_attempt(
+                issue_number, branch, RecoveryAction.REBUILD
             )
 
-        # Should not reach here
-        self._do_resume(branch, issue_number, reason, clear_reason=not auto)
-        return RecoveryResult(
-            action=RecoveryAction.RESUME_ONLY,
-            success=True,
-            detail="Fallback: cleared blocked markers",
+        return self._auto_resume_attempt(
+            issue_number, branch, RecoveryAction.RESUME_ONLY
         )
 
-    def _do_resume(
+    def _auto_resume_attempt(
         self,
-        branch: str,
         issue_number: int,
-        reason: str,
-        clear_reason: bool = False,
-    ) -> None:
-        """Clear blocked markers via reconcile_blocked."""
+        branch: str,
+        scene_action: RecoveryAction,
+    ) -> RecoveryResult:
+        """Evaluate auto eligibility and apply if eligible (read-only otherwise)."""
         from vibe3.services.flow.blocked_state_service import BlockedStateService
 
         service = BlockedStateService(
             github_client=self.github_client,
             store=self.store,
         )
-        target_state = service.reconcile_blocked(
-            issue_number=issue_number,
-            branch=branch,
-            clear_reason=clear_reason,
-            actor="recovery:resume",
+        decision = service.evaluate_auto_eligibility(issue_number, branch)
+        if decision.verdict == AutoResumeVerdict.ELIGIBLE:
+            result = service.apply_auto_resume(decision)
+            return RecoveryResult(
+                action=scene_action,
+                success=result.success,
+                detail=f"Scene repaired; {result.detail}",
+            )
+        return RecoveryResult(
+            action=scene_action,
+            success=True,
+            detail=(
+                f"Scene repaired; auto resume not eligible "
+                f"({decision.reason_code.value})"
+            ),
         )
-        if target_state is None and clear_reason:
-            # None means either open dependencies remain or GitHub is unreachable
-            # (degraded mode).  Either way we must NOT raise — keeping the flow
-            # blocked is the correct conservative outcome (§6.2 / §6.4).
-            logger.bind(
-                domain="recovery",
-                action="_do_resume",
+
+    # ========================================================================
+    # Manual path: scene fix only (bail on rebuild) + authorized manual_resume
+    # ========================================================================
+
+    def recover_manual(
+        self,
+        *,
+        branch: str,
+        issue_number: int,
+        reason: str,
+        target_state: "IssueState | None" = None,
+        actor: str = "human:resume",
+        force: bool = False,
+    ) -> ResumeResult:
+        """Manual resume: apply cheap scene fixes, then authorized manual_resume.
+
+        Raises UserError when a full rebuild is needed (guide user to
+        ``vibe3 flow rebuild`` first) — manual resume must not accidentally
+        trigger a destructive scene rebuild.
+        """
+        from vibe3.services.flow.blocked_state_service import BlockedStateService
+
+        # Special case: no branch (pre-flow issue) -> manual_resume directly
+        if not branch:
+            service = BlockedStateService(
+                github_client=self.github_client,
+                store=self.store,
+            )
+            return service.manual_resume(
                 issue_number=issue_number,
                 branch=branch,
-            ).warning(
-                "reconcile_blocked returned None after clear_reason; "
-                "flow remains blocked (open deps or GitHub degraded)"
+                target_state=target_state,
+                actor=actor,
+                reason=reason,
+                force=force,
             )
+
+        flow_state = self.store.get_flow_state(branch)
+
+        # No flow record -> guide user to rebuild first
+        if flow_state is None:
+            raise UserError(
+                f"No flow record found for branch '{branch}'. "
+                f"Run: vibe3 flow rebuild {issue_number} --yes"
+            )
+
+        consistency = check_flow_consistency(
+            branch, flow_state, git_client=self.git_client
+        )
+
+        if consistency.code == FlowConsistencyCode.OK:
+            pass  # Scene fine, proceed to manual_resume
+        elif consistency.fix_action:
+            applied = apply_consistency_fix(consistency, branch, store=self.store)
+            if applied:
+                logger.bind(
+                    domain="recovery", branch=branch, fix=consistency.fix_action
+                ).info("Applied cheap consistency fix before manual resume")
+        elif consistency.code == FlowConsistencyCode.MISSING_ARTIFACT:
+            raise UserError(
+                f"Artifact repair blocker: {consistency.reason}. "
+                "通过 `vibe3 handoff <spec|plan|report|audit> <path>` "
+                "重新绑定或重新生成制品。"
+            )
+        elif consistency.needs_rebuild:
+            raise UserError(
+                f"{consistency.reason}. "
+                f"Run: vibe3 flow rebuild {issue_number} --yes"
+            )
+
+        service = BlockedStateService(
+            github_client=self.github_client,
+            store=self.store,
+        )
+        return service.manual_resume(
+            issue_number=issue_number,
+            branch=branch,
+            target_state=target_state,
+            actor=actor,
+            reason=reason,
+            force=force,
+        )
 
     def _do_rebuild(
         self,
@@ -279,7 +330,11 @@ class FlowRecoveryService:
         ensure_worktree: bool = True,
         include_remote: bool = False,
     ) -> None:
-        """Hard rebuild through the canonical rebuild usecase."""
+        """Hard rebuild through the canonical rebuild usecase.
+
+        Per #3289 the rebuild usecase defaults to a no-op label_resume, so the
+        physical scene is repaired without clearing business blocked truth.
+        """
         from vibe3.config import load_orchestra_config
         from vibe3.models import IssueInfo, IssueState
         from vibe3.services.flow.rebuild import FlowRebuildUsecase
@@ -303,7 +358,7 @@ class FlowRecoveryService:
             store=self.store,
             git_client=self.git_client,
             github_client=self.github_client,
-            label_resume=lambda **_: None,
+            orchestrator=None,
         ).rebuild_issue_flow(
             issue=issue_info,
             branch=branch,

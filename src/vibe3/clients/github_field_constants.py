@@ -74,6 +74,9 @@ GITHUB_FIELDS_ISSUE_NUMBER_TITLE: Final[tuple[str, ...]] = ("number", "title")
 # For get_issue_body — single field
 GITHUB_FIELDS_BODY: Final[tuple[str, ...]] = ("body",)
 
+# For get_issue_snapshot — body + updatedAt (optimistic lock for auto resume)
+GITHUB_FIELDS_BODY_UPDATED_AT: Final[tuple[str, ...]] = ("body", "updatedAt")
+
 # For list_issue_comments — single field
 GITHUB_FIELDS_COMMENTS: Final[tuple[str, ...]] = ("comments",)
 

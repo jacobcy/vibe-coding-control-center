@@ -207,6 +207,22 @@ class BlockedStateIO:
         state = getter(issue_number)
         return state if isinstance(state, IssueState) else None
 
+    def read_issue_state_strict(self, issue_number: int) -> IssueState | None:
+        """Read issue state label, raising when labels are unreadable."""
+        issue_port = getattr(self.label_service, "issue_port", None)
+        get_labels = getattr(issue_port, "get_issue_labels", None)
+        if callable(get_labels):
+            labels = get_labels(issue_number)
+            if labels is None:
+                raise RuntimeError(
+                    f"Failed to read state labels on issue #{issue_number}"
+                )
+            from vibe3.services.shared.labels import get_highest_priority_state
+
+            highest = get_highest_priority_state(labels)
+            return IssueState.from_label(highest) if highest else None
+        return self.read_issue_state(issue_number)
+
     def read_body_projection(self, issue_number: int) -> BlockedState:
         """Read blocked state from issue body projection."""
         try:
