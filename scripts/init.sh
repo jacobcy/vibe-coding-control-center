@@ -28,14 +28,6 @@ for arg in "$@"; do
     esac
 done
 
-if [[ -f "config/v3/skills.json" ]]; then
-  VIBE_SKILLS_CONFIG="config/v3/skills.json"
-elif [[ -f "config/skills.json" ]]; then
-  VIBE_SKILLS_CONFIG="config/skills.json"
-else
-  VIBE_SKILLS_CONFIG="${HOME}/.vibe/skills.json"
-fi
-
 # --- Helper Functions ---
 _symlink_files() {
   local source_pattern="$1"
@@ -80,10 +72,6 @@ _install_codex_superpowers_plugin() {
   fi
 }
 
-_join_agents_without_plugin_backed() {
-  jq -r '[.[] | select(. != "codex" and . != "claude-code")] | join(" ")'
-}
-
 echo -e "\n\033[1;36m🔧 Setting up Vibe Center development environment...\033[0m"
 echo "ℹ️  此脚本可重复运行；重复执行会复用已存在的初始化结果。"
 
@@ -98,41 +86,10 @@ if ! command -v uv &> /dev/null; then
   fi
 fi
 
-# ── 1. Install approved third-party skills from ~/.vibe/skills.json ──────────
-# IMPORTANT: Skills installation should NOT be blocked by openspec/pre-commit issues
+# ── 1. Install approved third-party plugins ──────────────────────────────────
 _install_codex_superpowers_plugin
-if [ -f "$VIBE_SKILLS_CONFIG" ] && command -v jq &> /dev/null; then
-  echo "📦 Installing approved third-party skills from $VIBE_SKILLS_CONFIG..."
-
-  global_agents=$(jq '.global.agents // []' "$VIBE_SKILLS_CONFIG" | _join_agents_without_plugin_backed)
-  if [ -n "$global_agents" ]; then
-    jq -c '.global.packages[]?' "$VIBE_SKILLS_CONFIG" | while read -r pkg; do
-      source=$(echo "$pkg" | jq -r '.source')
-      skills=$(echo "$pkg" | jq -r '.skills | join(" ")')
-      echo "  → $source (global): $skills"
-      # shellcheck disable=SC2086
-      npx skills add "$source" -g --agent $global_agents --skill $skills -y
-    done
-  else
-    echo "  → no npx global agents configured"
-  fi
-
-  project_agents=$(jq '.project.agents // []' "$VIBE_SKILLS_CONFIG" | _join_agents_without_plugin_backed)
-  if [ -n "$project_agents" ]; then
-    jq -c '.project.packages[]?' "$VIBE_SKILLS_CONFIG" | while read -r pkg; do
-      source=$(echo "$pkg" | jq -r '.source')
-      skills=$(echo "$pkg" | jq -r '.skills | join(" ")')
-      echo "  → $source (project): $skills"
-      # shellcheck disable=SC2086
-      npx skills add "$source" --agent $project_agents --skill $skills -y
-    done
-  else
-    echo "  → no npx project agents configured"
-  fi
-else
-  echo "📦 Skipping npx skills fallback; configure $VIBE_SKILLS_CONFIG for non-plugin agents"
-fi
-echo "✅ Skills installation complete"
+echo "📦 Skipping npx skills fallback; third-party skills are installed via each agent's plugin system"
+echo "✅ Plugin-backed skills setup complete"
 
 # ── 2. Symlink local project skills to agent directories ─────────────────────
 # IMPORTANT: Symlinks should NOT be blocked by openspec/pre-commit issues

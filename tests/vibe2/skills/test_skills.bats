@@ -26,26 +26,20 @@ SHELL
   [[ "$output" =~ "Codex:" ]]
 }
 
-@test "global agent symlinks target HOME/.agents/skills for opencode and agy" {
+@test "global agent symlinks skip legacy HOME/.agents/skills mirror" {
   run env HOME="$TMP_HOME" VIBE_ROOT="$REPO_ROOT" zsh -c '
     source "'"$REPO_ROOT"'/lib/config.sh"
     source "'"$REPO_ROOT"'/lib/skills.sh"
     _vibe_skills_sync_agents_symlinks opencode agy
-    print -r -- "$(readlink "$HOME/.agents/skills/opencode/brainstorming")"
-    print -r -- "$(readlink "$HOME/.agents/skills/agy/brainstorming")"
   '
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "$TMP_HOME/.agents/skills/brainstorming" ]]
+  [[ "$output" =~ "跳过 ~/.agents/skills 镜像" ]]
+  [ ! -e "$TMP_HOME/.agents/skills/opencode/brainstorming" ]
+  [ ! -e "$TMP_HOME/.agents/skills/agy/brainstorming" ]
 }
 
-@test "global superpowers sync returns failure when npx skills add fails" {
-  local fixture
-  fixture="$(mktemp -d)"
-  mkdir -p "$fixture/config/v3"
-  cat > "$fixture/config/v3/skills.json" <<'JSON'
-{"global":{"agents":["legacy-agent"],"packages":[]},"project":{"agents":["codex","claude-code","opencode","agy"],"packages":[]}}
-JSON
+@test "global superpowers sync does not call npx skills" {
   cat > "$TMP_BIN/npx" <<'SHELL'
 #!/usr/bin/env bash
 echo "network failure" >&2
@@ -54,7 +48,7 @@ SHELL
   chmod +x "$TMP_BIN/npx"
 
   run env HOME="$TMP_HOME" PATH="$TMP_BIN:/usr/bin:/bin" VIBE_ROOT="$REPO_ROOT" bash -lc '
-    HOME="'"$TMP_HOME"'" PATH="'"$TMP_BIN"':/usr/bin:/bin" VIBE_ROOT="'"$fixture"'" \
+    HOME="'"$TMP_HOME"'" PATH="'"$TMP_BIN"':/usr/bin:/bin" VIBE_ROOT="'"$REPO_ROOT"'" \
       zsh -c '"'"'
         source "'"$REPO_ROOT"'/lib/config.sh"
         source "'"$REPO_ROOT"'/lib/skills.sh"
@@ -62,7 +56,8 @@ SHELL
       '"'"' 2>&1
   '
 
-  [ "$status" -eq 1 ]
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "跳过 npx Superpowers sync" ]]
 }
 
 # NOTE: Doc-text regression tests have been migrated to tests/doc-text/
