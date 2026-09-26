@@ -70,6 +70,16 @@ PR_BRANCH=$(gh pr view <number> --json headRefName -q .headRefName)
 gh pr view <number> --comments
 ```
 
+**上下文工具（mem-search / exa，按需）**：
+
+> 详见 supervisor/policies/common.md「上下文工具」。文档审查中可按需查询以下工具；不可用时记录限制后继续。
+>
+> **调查顺序**：mem-search（历史决策）→ exa（外部文档标准）→ graphify query（代码模块）→ context7（API 描述）。
+- **mem-search（3-layer）**：涉及文档规范/历史决策时，`search` → `get_observations` 查架构决策、文档格式约定的历史讨论。memory 不覆盖当前 docs/decisions/ 真源。
+- **exa（可选）**：不熟悉文档领域时，`web_search_exa` 搜索外部文档最佳实践/格式标准。
+- **graphify query（可选）**：需理解文档涉及的代码模块时，`graphify query "<模块>"` 取社区/关系。
+- **context7（可选）**：需验证外部库 API 描述时，`resolve-library-id` → `query-docs`。
+
 ---
 
 ## Step 3: 审查标准
