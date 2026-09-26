@@ -9,7 +9,7 @@ authority:
   - manager-decision-boundary
 author: GPT-5 Codex
 created: 2026-04-17
-last_updated: 2026-07-02
+last_updated: 2026-09-26
 related_docs:
   - ../vibe3-error-severity-and-blocking-standard.md
   - ../../archive/v3/ARCHIVED_vibe3-state-sync-standard.md
@@ -295,12 +295,13 @@ block 或 通过
   ↓ (block 时)
 人工判断 + 恢复操作
   ├── task resume → 恢复 blocked 状态
-  │   清除 blocked_reason，推断恢复 label
+  │   人工授权清除 blocked_reason，检查依赖后恢复 label
   │   保留 flow / worktree / refs
-  │   issue 回到推断的 state (auto label)
+  │   issue 回到显式目标或人工路径解析出的 state
   ├── flow rebuild → 显式重建
   │   删除 worktree / branch / flow
-  │   重新 bootstrap，issue 回到 state/ready
+  │   重新 bootstrap，保留 blocked reason / dependency / label
+  │   若仍需恢复，另行执行 task resume
   ↓
 Re-dispatch
 ```
@@ -312,11 +313,11 @@ Re-dispatch
 | `task resume` | 保留（只清 reason） | 保留 | agent 做了工作但遇到 blocked 状态 |
 | `flow rebuild` | 删除并重建 | 删除并重建 | 需要从 scratch 重新开始 |
 
-`task resume` 的场景：agent 遇到了 blocked 状态（如依赖未满足、临时错误等），但 flow record 和 worktree 里的工作成果仍然有效，只需清除 blocked 状态并恢复 label 就能让 agent 继续推进。
+`task resume` 的场景：agent 遇到了 blocked 状态，但 flow record 和 worktree 里的工作成果仍然有效；人类确认原因已解决、依赖检查通过后再恢复。自动恢复只消费快照绑定的资格决定，不能清除手工 reason。
 
-`flow rebuild` 的场景：现场已经完全不可用或需要放弃，需要显式删除所有资源并重新开始。
+`flow rebuild` 的场景：现场已经完全不可用或需要放弃，需要显式删除并重建物理资源；重建本身不解除业务阻塞。
 
-不带 `--label` 的场景：agent 的整个执行现场有问题（分支创建失败、执行报错、工作产出全废），需要从零开始。删除 flow record 防止 stale 数据被下游 dispatch 捡起。
+不带 `--label` 的 `task resume` 仍是人工恢复，不是重建入口。现场损坏时应显式运行 `flow rebuild`，再单独决定是否解除阻塞。
 
 ### 7.3 反模式：系统主动检测 flow / ref（已移除）
 
