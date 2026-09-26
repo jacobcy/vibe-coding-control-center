@@ -1,7 +1,7 @@
 # Blocked / Dependency 状态与对账标准
 
 **维护者**: Vibe Team
-**最后更新**: 2026-07-02
+**最后更新**: 2026-09-26
 **状态**: Active（权威）
 **文档类型**: 标准
 
@@ -32,9 +32,9 @@
 ## 1. 核心原则（不可协商）
 
 1. **远端单一真源**：GitHub issue body 的托管投影段是 blocked/dependency 状态的**唯一真源**。本地 SQLite（`flow_state`、`flow_issue_links`）一律是**缓存**，由 check remote 从 body 重建。
-2. **统一原语**：blocked_reason 与 blocked_task 的写入/清除必须经过统一底层方法，禁止各路径各写各的。
-3. **flow_status 是指针**：`flow_state.flow_status` 是对真源的派生投影，**只能被对账结果改变，禁止作为阻塞判定的触发源或真源**。
-4. **对账归一**：check remote、orchestra qualify、task resume 共用同一套对账核，**唯一差异是 task resume 会清除 blocked_reason**。
+2. **分离权限**：写入阻塞、同步阻塞、自动恢复资格检查与人工恢复使用独立入口；只有显式人工恢复可以清除手工 `blocked_reason`。
+3. **flow_status 是指针**：`flow_state.flow_status` 是业务状态的本地投影，**禁止作为阻塞判定的唯一真源**。
+4. **只读资格检查**：check remote 与 orchestra qualify 可同步阻塞投影；自动恢复须先只读评估，再消费绑定远端快照的决定，不得从 refs 推断目标状态。
 5. **依赖只能靠关闭解除**：blocked_task（依赖）无手工解除入口；只能通过关闭被依赖 issue 或在 body 移除该依赖来解除。check remote 据此清理本地依赖缓存。
 6. **保守阻塞**：真源不可读（degraded mode）时，宁可保持 blocked 也不误派发。
 
@@ -47,13 +47,13 @@ flowchart TD
     BODY["issue body 托管投影<br/>（唯一真源）<br/>state · blocked_reason · blocked_by #N"]
     CACHE["DB 缓存（check remote 重建）<br/>flow_state.flow_status 指针<br/>flow_state.blocked_reason / blocked_by_issue<br/>flow_issue_links(role=dependency)"]
     LABEL["GitHub label（信号）<br/>state/blocked"]
-    BODY -->|reconcile 重建| CACHE
-    BODY -->|reconcile 同步| LABEL
+    BODY -->|阻塞同步 / 恢复后更新| CACHE
+    BODY -->|阻塞同步 / 恢复后更新| LABEL
 ```
 
 ### 2.1 字段归属表
 
-| 概念 | 真源（body 托管投影） | 缓存（DB，由 reconcile 重建） | 信号（label） |
+| 概念 | 真源（body 托管投影） | 缓存（DB，由阻塞状态服务同步） | 信号（label） |
 |------|----------------------|------------------------------|--------------|
 | 是否阻塞 | 投影 `State`（active/blocked） | `flow_state.flow_status`（指针） | `state/blocked` |
 | 手工原因 | `Blocked reason:` 行 | `flow_state.blocked_reason` | —（仅 state/blocked） |
@@ -73,8 +73,8 @@ flowchart TD
 
 `flow_state.flow_status` 是真源的派生缓存，遵循：
 
-- **只写不判**：只能由 reconcile 依据真源写入；**禁止**任何阻塞/恢复判定以 `flow_status == "blocked"` 作为触发条件或真源。
-- 需要"是否阻塞"时，一律经 reconcile 读取 body 真源（degraded 时回退缓存，见 §6.4）。
+- **不作唯一依据**：不得仅凭 `flow_status == "blocked"` 判定 reason 与依赖已解除。
+- 需要判断恢复资格时，读取远端 body、依赖状态与 label；不可读时保持阻塞，见 §6.4。
 
 ---
 
@@ -95,17 +95,19 @@ flowchart TD
 
 ```
 set_block(issue, branch, *, reason: str | None, tasks: list[int]):
-    # 写真源 body（reason 与 tasks 可分别累加），随后 reconcile 重建缓存+信号
+    # 写真源 body（reason 与 tasks 可分别累加），随后同步阻塞缓存和信号
     # reason 与单次 tasks 互斥由调用层校验
 
-clear_block(issue, branch, *, clear_reason: bool):
-    # 见 §6 reconcile_blocked —— clear_reason=True 时清除 body 的 Blocked reason
-    # 依赖任务不在此清除（只能靠关闭被依赖 issue / body 移除）
+sync_block_state(issue, branch):
+    # 只同步仍然有效的阻塞投影；不清 reason，不恢复状态
+
+manual_resume(issue, branch, *, actor, reason, target_state=None):
+    # 显式人工授权；检查远端真源和依赖后清 reason、恢复 label
 ```
 
 **约束**：
 
-- 原语只改 body 真源；缓存（`flow_state`、`flow_issue_links`）与 label 一律由 reconcile 从 body 重建，不允许旁路直写缓存当真源。
+- `set_block()` 先写 body，再调用 `sync_block_state()` 对齐缓存与 label；恢复入口在远端检查通过后更新 body、缓存与 label，不允许旁路直写缓存当真源。
 - **无 `unlink_dependency` 手工入口**（原则 5）。依赖的消失只有两个合法来源：被依赖 issue 关闭、或 body `Blocked by` 被移除。
 
 ---
@@ -123,51 +125,33 @@ clear_block(issue, branch, *, clear_reason: bool):
 **约定**：
 
 - `intake` 在"只有 issue 无 flow"时先创建 placeholder flow scene（DB 记录，skip_git），再经原语写 body 真源。`--blocked-reason` 单独使用**必须**生效（不得静默丢弃）。
-- 写入后缓存由 reconcile 重建，调用方不直接拼缓存。
+- 写入后缓存由 `sync_block_state()` 对齐，调用方不直接拼缓存。
 
 ---
 
-## 6. 对账机制（唯一对账核）
+## 6. 阻塞同步与恢复
 
-check remote、orchestra qualify、task resume **共用同一对账核**，差异仅 `clear_reason`：
+`BlockedStateService` 使用分离的入口。`sync_block_state()` 只把仍然有效的阻塞真源同步到缓存和 label；真源已不阻塞时，它不会推断目标或执行恢复。
 
-```
-reconcile_blocked(issue, branch, *, clear_reason: bool) -> IssueState | None:
-    truth = read_body_truth(issue)                 # 唯一真源: reason, blocked_by[]
-    current = read_authoritative_issue_label(issue)
-    if clear_reason:                               # 仅 task resume 传 True
-        truth = truth.drop_reason_in_memory()
-    open_tasks = [t for t in truth.blocked_by if not is_closed(t)]   # 关闭=满足
-    effective_blocked = bool(truth.reason) or bool(open_tasks)
-    if effective_blocked:
-        sync_label(issue, BLOCKED)
-        target = None                              # 保持阻塞
-    else:
-        require current == BLOCKED                 # 非 blocked issue 禁止恢复推断
-        target = infer_resume_label(branch)        # 推定恢复状态
-        require transition_budget_available(BLOCKED, target)
-        sync_label(issue, target)
-        record_confirmed_transition(BLOCKED, target)
-        write_body_truth(issue, active)            # 标签成功后才清 body 阻塞段
-    rebuild_cache_from_truth(branch, truth, open_tasks)   # flow_state + flow_issue_links
-    return target
-```
+自动恢复分两步：`evaluate_auto_eligibility()` 只读 issue body 与 `updatedAt`，要求手工 reason 为空且每个依赖已确认关闭；`apply_auto_resume()` 重新核对快照和 `state/blocked` label，再将已有 flow 交给 `state/handoff`，无 flow 现场的 issue 交给 `state/ready`。真源不可读、label 不一致或决定已过期时保持 blocked，不改业务状态。
+
+显式 `task resume` 调用 `manual_resume()`。它读取远端真源和 label，默认在依赖未关闭时拒绝恢复；通过检查后才清除手工 reason，并使用人工指定或人工路径解析出的目标。当前实现还暴露 `force=True` 覆盖依赖检查；其权限边界仍由 [#3289](https://github.com/jacobcy/vibe-coding-control-center/issues/3289) 验收，不属于自动恢复。
 
 ### 6.1 三个入口的关系
 
-| 入口 | `clear_reason` | 语义 |
-|------|---------------|------|
-| `task resume`（人工恢复） | `True` | 清手工原因；若无未关闭依赖 -> 恢复推定状态；若依赖仍在 -> 保持 state/blocked |
-| check remote（`vibe check`） | `False` | 只确认 body 真源是否仍阻塞；恢复了就恢复，仍阻塞就保持 |
-| orchestra qualify（派发对账） | `False` | 同 check remote（应调用同一对账核，不另写一套） |
+| 入口 | 方法 | 语义 |
+|------|------|------|
+| `task resume`（人工恢复） | `manual_resume()` | 人工授权后清 reason；默认要求依赖已关闭 |
+| check remote（`vibe check`） | `sync_block_state()`；资格成立时 `evaluate_auto_eligibility()` + `apply_auto_resume()` | 同步阻塞，或按快照决定恢复 |
+| orchestra qualify（派发对账） | 同上 | 不清手工 reason，不从 refs 推断目标 |
 
 ### 6.2 resume 精确语义（原则 3）
 
-`task resume` = `reconcile_blocked(clear_reason=True)`：
+`task resume` 走人工授权入口：
 
 1. 清除 body `Blocked reason`。
-2. 若 `Blocked by` 已无未关闭依赖 -> `infer_resume_label` 推定状态并恢复。
-3. 若仍有未关闭依赖 -> **保持 `state/blocked` 不变，不得强行清理**。
+2. 默认要求 `Blocked by` 已无未关闭依赖，再按人工指定目标或人工路径的 resolver 恢复。
+3. 若仍有未关闭依赖，普通恢复保持 `state/blocked` 不变；当前 `force=True` 例外见 §6。
 
 ### 6.3 依赖缓存清理（原则 5）
 
@@ -178,11 +162,11 @@ reconcile_blocked(issue, branch, *, clear_reason: bool) -> IssueState | None:
 
 ### 6.4 degraded mode（原则 6）
 
-body 不可读（GitHub API 故障）时，回退本地缓存只读，**保守保持 blocked**，记录降级事件，**不得在降级期执行 resume/清理**。
+body 不可读（GitHub API 故障）时，保守保持 blocked，记录降级事件，**不得在降级期执行 resume/清理**。自动恢复还要求可核对的 `updatedAt` 快照与当前 blocked label。
 
 ### 6.5 推断与循环证据边界
 
-- `infer_resume_label()` 只允许在入口 authoritative label 为 `state/blocked`，且 body 对账确认阻塞原因/依赖已解除时调用。
+- 只有显式人工恢复可以在确认 authoritative label 为 `state/blocked` 后解析目标；自动恢复的目标固定为已有 flow 的 `handoff` 或无现场 issue 的 `ready`。
 - active dispatch、check payload 解析、qualify 与普通 label 读取不得根据 ref/verdict 推断 state。
 - 进入 blocked 与 blocked 恢复都是实际 transition，必须计入 total 与 state-pair 计数。
 - unblock 不清零 transition count，也不删除 pair history；预算耗尽时保持 blocked。
@@ -195,7 +179,7 @@ body 不可读（GitHub API 故障）时，回退本地缓存只读，**保守�
 - ❌ 以 `flow_state.flow_status == "blocked"` 作为 resume / auto-resume 触发条件。
 - ❌ 以 label（state/blocked 增删）作为阻塞真源去回写缓存/body。
 - ❌ 在缓存里伪造 `blocked_reason` / `blocked_by_issue`（必须来自 body 真源）。
-- ✅ `flow_status` 仅由 `reconcile_blocked` 依据 body 真源写入，供展示与派发可见性使用。
+- ✅ 阻塞投影由 `sync_block_state()` 依据 body 真源同步；恢复由独立的人工或自动入口执行。
 
 ---
 
@@ -204,7 +188,7 @@ body 不可读（GitHub API 故障）时，回退本地缓存只读，**保守�
 | 退役对象 | 处理 |
 |---------|------|
 | body `Dependencies:` 字段 | 合并入 `Blocked by`，停止解析/渲染 |
-| `CoordinationTruth.dependencies` + `check_dependencies` | 依赖门禁统一走 `blocked_by`（reconcile 的 open_tasks），移除死路径 |
+| `CoordinationTruth.dependencies` + `check_dependencies` | 依赖门禁统一走 `blocked_by` 真源和逐项依赖检查，移除死路径 |
 | "flow_issue_links 为依赖真源"表述 | 改为缓存（见 §0 废止表） |
 | `flow_status` 作为触发源的所有判定 | 改为读 body 真源（见 §7） |
 

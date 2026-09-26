@@ -9,7 +9,7 @@ authority:
   - cleanup-orchestration
 author: Claude Sonnet 4.6
 created: 2026-04-28
-last_updated: 2026-07-02
+last_updated: 2026-09-26
 related_docs:
   - docs/standards/label-semantics.md
   - docs/standards/glossary.md
@@ -199,9 +199,9 @@ def block(
 
 | 场景 | 动作 | API | 恢复路径 |
 |------|------|-----|----------|
-| 派发失败 | `block(reason=...)` | `BlockedStateService.block()` | `task resume` 或自动解封 |
+| 派发失败 | `block(reason=...)` | `BlockedStateService.block()` | 人工 `task resume` |
 | Health check 失败 | `block(reason=...)` | `BlockedStateService.block()` | `task resume` |
-| 依赖未满足 | `block(blocked_by_issue=N)` | `BlockedStateService.block()` | 依赖 issue 关闭后自动解封 |
+| 依赖未满足 | `block(blocked_by_issue=N)` | `BlockedStateService.block()` | 依赖确认关闭且无手工原因后，经自动资格检查恢复 |
 | 手动阻塞 | `block(reason=..., actor=...)` | `BlockedStateService.block()` | 仅 `task resume` |
 | Issue 关闭 / Branch 丢失 | `mark_flow_aborted()` | `mark_flow_aborted()` | 无恢复（终端状态） |
 | 空 ready flow / 孤儿 flow | `mark_flow_stale()` | `mark_flow_stale()` | Governance 重建 ready flow |
@@ -241,26 +241,25 @@ def mark_flow_stale(self, branch: str, reason: str) -> None
 
 ### 4.6 Qualify Gate 与对账核机制
 
-QualifyGate 在派发前不单独运行独立的阻塞校验，而是统一调用核心对账机制 `reconcile_blocked(clear_reason=False)`，依据 GitHub issue body 真源判断并同步阻塞状态（见 [v3/blocked-dependency-reconciliation-standard.md](v3/blocked-dependency-reconciliation-standard.md) §6）。
+QualifyGate 在派发前依据 GitHub issue body 真源调用 `sync_block_state()` 对齐阻塞投影；需要自动恢复时先调用只读的 `evaluate_auto_eligibility()`，再调用 `apply_auto_resume()` 消费快照绑定的决定（见 [v3/blocked-dependency-reconciliation-standard.md](v3/blocked-dependency-reconciliation-standard.md) §6）。
 
-**对账核流程概要**：
+**阻塞同步与自动恢复概要**：
 
 1. **读取真源**：从 GitHub issue body 托管段获取 `reason` 与 `blocked_by` 依赖列表。
 2. **依赖检查**：检查所有 `blocked_by` 关联任务，若任务全部关闭（Closed）则视为满足。
 3. **判定阻塞**：若 `reason` 有值或存在未关闭依赖，即 `effective_blocked` 为真：
    - 保持 `state/blocked` 标签。
    - `rebuild_cache_from_truth` 重建本地 DB 缓存（`flow_state` 及 `flow_issue_links` 依赖关系）。
-4. **自动解封**：若没有 `reason` 且依赖均满足，则：
-   - 推断恢复状态（`infer_resume_label`）并更新 GitHub 标签。
-   - 清除 body 托管段中的阻塞信息。
-   - 重建本地缓存，将本地 `flow_status` 指针回写更新。
+4. **自动恢复**：若没有 `reason` 且依赖均确认关闭，则只读评估资格；应用时重新核对远端快照和 `state/blocked` label。
+   - 已有 flow 固定进入 `state/handoff`，无 flow 现场的 issue 进入 `state/ready`；不从 refs 推断目标。
+   - 真源不可读、label 不一致或快照已变化时保持 blocked，不改业务状态。
 
 ### 4.7 各状态转换的 GitHub Label 管理
 
 | 转换 | Flow Status 变更 | GitHub Label 变更 | 备注 |
 |------|------------------|-------------------|------|
 | → blocked | active → blocked | 当前 label → `state/blocked` | `block_flow()` 自动处理 |
-| blocked → active（自动） | blocked → active | `state/blocked` → 推断目标 label | QualifyGate 处理 |
+| blocked → active（自动） | blocked → active | `state/blocked` → `state/handoff`（已有 flow）或 `state/ready`（无现场） | 快照资格检查后应用 |
 | blocked → active（手动） | blocked → active | `state/blocked` → 用户指定 label | `task resume` 处理 |
 | → done | active → done | 无需处理（issue 自动关闭） | PR merged 触发 |
 | → aborted | * → aborted | `state/*` → `state/ready` (被动) | `vibe3 check` 清理时恢复 |
@@ -466,7 +465,7 @@ flow_service.delete_flow(branch, force=True)  # 物理删除
 **主动恢复**（task resume）：
 
 - `vibe3 task resume <issue>` 等价于 `vibe3 task resume <issue> --label auto`。
-- `task resume` 只负责清除 blocked cache/body/label，并按 flow refs 推断恢复 label。
+- `task resume` 是人工授权入口；核对远端真源与依赖后清除手工 reason，并按显式目标或人工路径的 resolver 恢复 label。
 - `task resume` 不删除 worktree、branch 或 flow record。
 - 若 label-auto 恢复发现 recorded worktree/ref 场景已经丢失，应委托 explicit rebuild path，而不是在 resume 内静默继续。
 
@@ -474,7 +473,7 @@ flow_service.delete_flow(branch, force=True)  # 物理删除
 
 - `vibe3 flow rebuild <issue>` 是唯一公共 destructive rebuild 入口。
 - rebuild 使用 hard delete 清理旧 flow/worktree/branch scene。
-- rebuild 完成后重新 bootstrap flow/worktree，append rebuild handoff event，然后调用 label-auto resume 清除 blocked。
+- rebuild 完成后重新 bootstrap flow/worktree，记录 `scene_rebuilt` event；保留业务 blocked reason、依赖投影与 label。若仍需恢复，另行显式调用 `task resume`。
 
 **被动清理**（check --clean-branch）：
 ```python
@@ -538,7 +537,7 @@ Manager 标记 blocked
   ↓ 用户决定恢复
 vibe3 task resume 456
   ├─ 清除 blocked_reason
-  ├─ 推断恢复目标 label (auto)
+  ├─ 按人工路径解析恢复目标 label (auto)
   └─ issue label: state/blocked → state/in-progress ✅
   ↓ 继续执行
 Agent 恢复运行
@@ -554,10 +553,9 @@ vibe3 flow rebuild 789
   ├─ hard cleanup: 删除 worktree/branch/flow
   ├─ bootstrap: 创建新 flow/worktree
   ├─ append rebuild handoff event
-  └─ label-auto resume: 清除 blocked
-  ↓ 全新开始
-Manager 重新派发
-  └─ Issue #789 → state/ready
+  └─ 保留 blocked reason / dependency / label
+  ↓ 人工确认阻塞原因已解决后显式 task resume
+Manager 复核并继续派发
 ```
 
 ### 7.4 被动清理孤儿 Flow
