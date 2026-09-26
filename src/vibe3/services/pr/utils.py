@@ -4,7 +4,7 @@ from loguru import logger
 
 from vibe3.clients import GitClient, SQLiteClient, parse_linked_issues
 from vibe3.exceptions import GitError, UserError
-from vibe3.models import DiffSummary, IssueLink, PRMetadata
+from vibe3.models import CommittedChangeSummary, IssueLink, PRMetadata
 
 
 def get_metadata_from_flow(store: SQLiteClient, branch: str) -> PRMetadata | None:
@@ -82,14 +82,18 @@ def _build_linked_section(metadata: PRMetadata, body: str) -> str:
     return f"Closes #{metadata.task_issue}\n\n"
 
 
-def build_pr_body(body: str, metadata: PRMetadata | None = None) -> str:
+def build_pr_body(
+    body: str,
+    metadata: PRMetadata | None = None,
+    change_summary: CommittedChangeSummary | None = None,
+) -> str:
     """Build PR body with issue linkage and contributor signature.
 
     - If a task issue is bound, prepends ``Closes #<n>`` to trigger GitHub's
       native issue-PR linkage (unless already present).
     - If flow_state contains non-placeholder actors, appends a Contributors
       section with normalized, deduplicated signatures.
-    - Appends a change summary section derived from snapshot diff or git diff.
+    - Appends a change summary section if provided (committed-only, pre-computed).
     """
     if not metadata:
         return body
@@ -105,17 +109,9 @@ def build_pr_body(body: str, metadata: PRMetadata | None = None) -> str:
         )
         result = linked_section + body + signature
 
-    # Append change summary (git-only, no snapshot dependency)
-    if metadata.branch:
-        try:
-            from vibe3.analysis import get_git_diff_summary
-
-            diff_summary = get_git_diff_summary(metadata.branch)
-            result += "\n\n---\n\n" + _format_diff_summary(diff_summary)
-        except Exception:
-            logger.bind(domain="pr", branch=metadata.branch).warning(
-                "Failed to get git diff summary, skipping change summary section"
-            )
+    # Append change summary (pre-computed, committed-only)
+    if change_summary is not None:
+        result += "\n\n---\n\n" + _format_diff_summary(change_summary)
 
     return result
 
@@ -161,27 +157,21 @@ def check_upstream_conflicts(
         )
 
 
-def _format_diff_summary(summary: DiffSummary) -> str:
-    """Render DiffSummary as a Markdown table.
-
-    Only files and LOC are shown — module/dependency/function analysis was
-    retired with the snapshot subsystem (#3215).
-    """
+def _format_diff_summary(summary: CommittedChangeSummary) -> str:
+    """Render CommittedChangeSummary as a Markdown table."""
     lines = [
         "## Change Summary",
         "",
         "| Category | Change |",
-        "|----------|--------|",
+        "|---|---:|",
     ]
-
-    files_parts = []
-    if summary.files_added:
-        files_parts.append(f"+{summary.files_added} added")
-    if summary.files_removed:
-        files_parts.append(f"-{summary.files_removed} removed")
-    if summary.files_modified:
-        files_parts.append(f"~{summary.files_modified} modified")
-    lines.append(f"| Files | {', '.join(files_parts) if files_parts else '0'} |")
-    lines.append(f"| LOC | {summary.total_loc_delta:+d} |")
-
+    lines.append(f"| Files | {summary.files_changed} changed |")
+    loc_parts = []
+    if summary.additions:
+        loc_parts.append(f"+{summary.additions}")
+    if summary.deletions:
+        loc_parts.append(f"-{summary.deletions}")
+    lines.append(f"| LOC | {' / '.join(loc_parts) if loc_parts else '0'} |")
+    if summary.binary_files:
+        lines.append(f"| Binary files | {summary.binary_files} |")
     return "\n".join(lines)

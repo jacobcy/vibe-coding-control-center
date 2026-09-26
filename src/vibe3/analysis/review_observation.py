@@ -16,6 +16,7 @@ from vibe3.models import (
     ChangeObservation,
     ChangePartitionSummary,
     ChangeSummary,
+    CommittedChangeSummary,
     ComparisonObservation,
     Diagnostic,
     KernelImpact,
@@ -240,3 +241,28 @@ def build_review_observation(
         review=review,
         diagnostics=diagnostics,
     )
+
+
+def build_committed_summary(
+    git: GitClient,
+    resolved_base: str,
+    head_sha: str,
+) -> CommittedChangeSummary | None:
+    """Build committed-only change summary for PR body from inspect-base facts.
+
+    Returns None on git/parse errors (non-blocking for PR creation).
+    """
+    try:
+        merge_base = git.get_merge_base(resolved_base, head_sha)
+        name_status, numstat = git.get_diff_metadata(merge_base, "HEAD")
+        facts = _parse_changed_files(name_status, numstat)
+        summary = _partition_summary(facts)
+        binary_files = sum(1 for f in facts if f.binary)
+        return CommittedChangeSummary(
+            files_changed=summary.files,
+            additions=summary.additions or 0,
+            deletions=summary.deletions or 0,
+            binary_files=binary_files,
+        )
+    except (GitError, GitMetadataParseError):
+        return None

@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     from vibe3.models.coordination_truth import CoordinationTruth
     from vibe3.models.coverage import CoverageReport, LayerCoverage
     from vibe3.models.data_source import DataSource
-    from vibe3.models.diff_summary import DiffSummary
     from vibe3.models.dispatch import DispatchExclusion
     from vibe3.models.domain_events import (
         ControlPlaneEventPublished,
@@ -77,6 +76,7 @@ if TYPE_CHECKING:
         ChangeObservation,
         ChangePartitionSummary,
         ChangeSummary,
+        CommittedChangeSummary,
         ComparisonObservation,
         Diagnostic,
         ImpactAnalysisStatus,
@@ -189,6 +189,7 @@ _LAZY_IMPORTS = {
     "ChangeObservation": "vibe3.models.inspect_evidence",
     "ChangePartitionSummary": "vibe3.models.inspect_evidence",
     "ChangeSummary": "vibe3.models.inspect_evidence",
+    "CommittedChangeSummary": "vibe3.models.inspect_evidence",
     "ComparisonObservation": "vibe3.models.inspect_evidence",
     "Diagnostic": "vibe3.models.inspect_evidence",
     "ImpactAnalysisStatus": "vibe3.models.inspect_evidence",
@@ -222,7 +223,6 @@ _LAZY_IMPORTS = {
     "AgentOptions": "vibe3.models.review_runner",
     "AgentResult": "vibe3.models.review_runner",
     "SessionRole": "vibe3.models.session_types",
-    "DiffSummary": "vibe3.models.diff_summary",
     "ExecutionStep": "vibe3.models.trace",
     "TraceOutput": "vibe3.models.trace",
     "UpdatePRRequest": "vibe3.models.pr",
@@ -286,6 +286,7 @@ __all__: list[str] = [
     "ChangeObservation",
     "ChangePartitionSummary",
     "ChangeSummary",
+    "CommittedChangeSummary",
     "ComparisonObservation",
     "Diagnostic",
     "ImpactAnalysisStatus",
@@ -303,7 +304,6 @@ __all__: list[str] = [
     "CoverageReport",
     "CreatePRRequest",
     "DataSource",
-    "DiffSummary",
     "DispatchExclusion",
     "DomainEvent",
     "ExecutionLaunchResult",

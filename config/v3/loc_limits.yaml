@@ -24,8 +24,8 @@ code_limits:
         limit: 450
         reason: "Dispatch queue maintenance service，从 dispatch_coordinator.py 提取的 queue lifecycle 操作聚合（startup_restore/promote_progressed/resort_existing/scheduled_refresh/exhausted_refresh/consume_queue_dirty_signal），与 coordinator 紧密耦合不宜拆分"
       - path: "src/vibe3/services/pr/service.py"
-        limit: 610
-        reason: "PR 生命周期聚合；PR #2777 新增 recent_pr_cache path-like guard，兼容 GitClient mock 返回 pathlib.Path，同时避免 MagicMock 路径泄漏"
+        limit: 620
+        reason: "PR 生命周期聚合；PR #2777 新增 recent_pr_cache path-like guard，兼容 GitClient mock 返回 pathlib.Path，同时避免 MagicMock 路径泄漏；Issue #3274 新增 build_committed_summary 调用与 change_summary 注入（+6 行）实现 PR Change Summary 数据源迁移到 inspect-base facts"
       - path: "src/vibe3/services/check/service.py"
         limit: 700
         reason: "校验聚合 + 规则编排；sync rules 实现已提取至 rule_checks.py，_check_branch 精简为编排器；#2912 新增 enforce_label_constraints_remote 方法（+116 行）实现远程 issue 标签约束扫描；issue-3258 新增 flow_state 驱动的 issue_state_from_payload 双层解析 + FlowState 状态转换编排"

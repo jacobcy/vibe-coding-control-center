@@ -58,6 +58,18 @@ class ChangedFileFact(BaseModel):
     binary: bool = False
 
 
+class CommittedChangeSummary(BaseModel):
+    """Committed-only change summary for PR Change Summary section.
+
+    Rename/copy each count as one changed path; binary files tracked separately.
+    """
+
+    files_changed: int = Field(default=0, ge=0)
+    additions: int = Field(default=0, ge=0)
+    deletions: int = Field(default=0, ge=0)
+    binary_files: int = Field(default=0, ge=0)
+
+
 class ChangePartitionSummary(BaseModel):
     """Counts for one Git change partition."""
 

@@ -12,7 +12,6 @@ if TYPE_CHECKING:
         is_test_file,
     )
     from vibe3.analysis.coverage_service import CoverageService
-    from vibe3.analysis.git_diff_summary import get_git_diff_summary
     from vibe3.analysis.local_review_report import (
         LocalReviewReport,
         find_latest_prepush_report,
@@ -25,7 +24,10 @@ if TYPE_CHECKING:
         classify_review_kernel,
         load_review_kernel,
     )
-    from vibe3.analysis.review_observation import build_review_observation
+    from vibe3.analysis.review_observation import (
+        build_committed_summary,
+        build_review_observation,
+    )
     from vibe3.analysis.symbol_reference_service import (
         ProviderSymbol,
         SerenaSymbolReferenceProvider,
@@ -40,7 +42,6 @@ _LAZY_IMPORTS = {
     "count_changed_lines": "vibe3.analysis.change_scope_service",
     "is_test_file": "vibe3.analysis.change_scope_service",
     "CoverageService": "vibe3.analysis.coverage_service",
-    "get_git_diff_summary": "vibe3.analysis.git_diff_summary",
     "find_latest_prepush_report": "vibe3.analysis.local_review_report",
     "LocalReviewReport": "vibe3.analysis.local_review_report",
     "inspect_python_file": "vibe3.analysis.python_file_inspector",
@@ -49,6 +50,7 @@ _LAZY_IMPORTS = {
     "ReviewKernelManifest": "vibe3.analysis.review_kernel",
     "classify_review_kernel": "vibe3.analysis.review_kernel",
     "load_review_kernel": "vibe3.analysis.review_kernel",
+    "build_committed_summary": "vibe3.analysis.review_observation",
     "build_review_observation": "vibe3.analysis.review_observation",
     "ProviderSymbol": "vibe3.analysis.symbol_reference_service",
     "SerenaSymbolReferenceProvider": "vibe3.analysis.symbol_reference_service",
@@ -79,12 +81,12 @@ __all__ = [
     "SerenaSymbolReferenceProvider",
     "SymbolInspectionResult",
     "SymbolReferenceProvider",
+    "build_committed_summary",
     "build_review_observation",
     "classify_changed_files",
     "classify_review_kernel",
     "count_changed_lines",
     "find_latest_prepush_report",
-    "get_git_diff_summary",
     "inspect_python_file",
     "inspect_symbol",
     "is_test_file",

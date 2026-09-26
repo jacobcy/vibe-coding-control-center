@@ -14,3 +14,12 @@
 
 PR 服务不计算或重导出 risk score、impacted modules、symbol DAG 或 snapshot diff。
 需要代码审查证据时复用 versioned `ReviewObservation`，证据不可验证时明确省略。
+
+## Change Summary 数据源
+
+PR body 的 `## Change Summary` 部分由 `analysis/review_observation.py::build_committed_summary` 提供。
+该函数基于 inspect-base facts（`_parse_changed_files` / `_partition_summary` 管线）计算 committed-only 变化统计。
+
+- 数据源：`GitClient.get_diff_metadata(merge_base, "HEAD")`
+- 格式化：`services/pr/utils.py::_format_diff_summary`
+- 注入点：`PRService.create_pr` 在构建 PR body 前调用 `build_committed_summary`
